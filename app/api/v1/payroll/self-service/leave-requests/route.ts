@@ -5,13 +5,14 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, created, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { assertValidLeaveRequest } from "@/lib/api/leave-balances";
 import { z } from "zod";
 
 const createSchema = z.object({
   policyId: z.string().uuid(),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
-  hours: z.number().min(0),
+  hours: z.number().positive(),
   reason: z.string().optional(),
 });
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertValidLeaveRequest(ctx.organizationId, { employeeId: emp.id, ...parsed });
 
     const [req] = await db
       .insert(leaveRequest)

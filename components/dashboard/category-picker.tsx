@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown, Plus, Loader2, Tag, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { toast } from "sonner";
 
 interface Category {
@@ -45,6 +46,8 @@ const COLORS = [
   "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
 ];
 
+const CATEGORIES_URL = "/api/v1/inventory/categories";
+
 interface CategoryPickerProps {
   value: string;
   onChange: (categoryId: string) => void;
@@ -54,13 +57,14 @@ interface CategoryPickerProps {
 
 export function CategoryPicker({ value, onChange, placeholder = "Select category...", triggerClassName }: CategoryPickerProps) {
   const [open, setOpen] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const isSearching = search !== debouncedSearch;
-  const fetchIdRef = useRef(0);
-  const [fetchCount, setFetchCount] = useState(0);
-  const fetching = fetchCount > 0;
+  // Categories load once the popover has been opened (or a category is already selected, to show its name)
+  const [opened, setOpened] = useState(false);
+  const { data: categoryData, loading: fetching } = useApi<{ flat?: Category[] }>(opened || value ? CATEGORIES_URL : null);
+  const categories = categoryData?.flat ?? [];
+  const cache = useApiCache();
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -71,38 +75,14 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  function doFetch() {
-    if (!orgId) return;
-    const id = ++fetchIdRef.current;
-    setFetchCount((c) => c + 1);
-    fetch("/api/v1/inventory/categories", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (id === fetchIdRef.current && data.flat) setCategories(data.flat);
-      })
-      .catch(() => {})
-      .finally(() => setFetchCount((c) => c - 1));
-  }
-
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (nextOpen) {
-      doFetch();
+      setOpened(true);
     } else {
       setSearch("");
     }
   }
-
-  // Listen for refetch-categories event (dispatched by CategoryDrawer on create)
-  const doFetchRef = useRef(doFetch);
-  doFetchRef.current = doFetch;
-  useEffect(() => {
-    function handler() { doFetchRef.current(); }
-    window.addEventListener("refetch-categories", handler);
-    return () => window.removeEventListener("refetch-categories", handler);
-  }, []);
 
   const parentMap = new Map(categories.map((c) => [c.id, c]));
   const selected = categories.find((c) => c.id === value);
@@ -124,7 +104,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
 
     const confirmed = await confirm({
       title: `Delete "${cat.name}"?`,
-      description: "This category will be removed. Items using it will be unlinked.",
+      description: "Items in this category become uncategorised, and any sub-categories move to the top level.",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -141,7 +121,7 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       }
       toast.success("Category deleted");
       if (value === cat.id) onChange("");
-      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      cache.update<{ flat?: Category[] }>(CATEGORIES_URL, (d) => ({ ...d, flat: d.flat?.filter((c) => c.id !== cat.id) }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete category");
     }
@@ -178,9 +158,10 @@ export function CategoryPicker({ value, onChange, placeholder = "Select category
       }
       const data = await res.json();
       toast.success("Category updated");
-      setCategories((prev) =>
-        prev.map((c) => (c.id === editCategory.id ? { ...c, ...data.category } : c))
-      );
+      cache.update<{ flat?: Category[] }>(CATEGORIES_URL, (d) => ({
+        ...d,
+        flat: d.flat?.map((c) => (c.id === editCategory.id ? { ...c, ...data.category } : c)),
+      }));
       setEditOpen(false);
       setEditCategory(null);
     } catch (err) {

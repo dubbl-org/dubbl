@@ -14,6 +14,7 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -98,6 +99,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    // Only an explicitly chosen currency counts; the schema default is not a choice
+    await checkMultiCurrency(ctx.organizationId, body?.currencyCode ? parsed.currencyCode : null);
 
     await assertNotLocked(ctx.organizationId, parsed.issueDate);
 

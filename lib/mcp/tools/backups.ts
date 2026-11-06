@@ -9,6 +9,7 @@ import { createOrgSnapshot, restoreFromSnapshot, checkSnapshotRateLimit } from "
 import { notDeleted } from "@/lib/db/soft-delete";
 import { softDelete } from "@/lib/db/soft-delete";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkManualBackupLimit } from "@/lib/api/check-limit";
 
 export function registerBackupTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -70,6 +71,7 @@ export function registerBackupTools(server: McpServer, ctx: AuthContext) {
         if (!allowed) {
           throw new Error(`Snapshot rate limit reached. Try again in ${retryAfter} seconds.`);
         }
+        await checkManualBackupLimit(ctx.organizationId);
 
         const backup = await createOrgSnapshot(
           ctx.organizationId,
@@ -83,7 +85,7 @@ export function registerBackupTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "restore_backup",
-    "Restore organization data from a backup. WARNING: This replaces all current data. A snapshot of current data is saved automatically before restoring.",
+    "Restore organization data from a backup. WARNING: This replaces all current data: every record type in the backup (accounts, contacts, tax rates, cost centers, products, bank accounts, projects, budgets, journal entries, invoices, quotes, purchase orders, bills, credit and debit notes, expenses, payments, fixed assets, loans, recurring templates, documents, with their lines) is written back, and records added since move to the trash. A snapshot of current data is saved automatically first. Runs in one transaction: if any record can't be restored, the error names it and nothing changes. Returns restoredCounts per entity type.",
     {
       backupId: z.string().describe("UUID of the backup to restore"),
       confirm: z

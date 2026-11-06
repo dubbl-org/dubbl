@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PLAN_ORDER } from "@/lib/plans";
 import {
   Users,
   Building2,
@@ -23,12 +24,16 @@ interface Stats {
 
 const PLAN_COLORS: Record<string, string> = {
   free: "bg-zinc-200 dark:bg-zinc-700",
-  pro: "bg-blue-500",
+  standard: "bg-blue-400",
+  premium: "bg-blue-600",
+  ultimate: "bg-indigo-700",
 };
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free",
-  pro: "Pro",
+  standard: "Standard",
+  premium: "Premium",
+  ultimate: "Ultimate",
 };
 
 export default function AdminDashboardPage() {
@@ -118,7 +123,7 @@ export default function AdminDashboardPage() {
           <div className="flex h-3 rounded-full overflow-hidden bg-muted">
             {stats.planBreakdown
               .sort((a, b) => {
-                const order = ["free", "pro"];
+                const order: string[] = PLAN_ORDER;
                 return order.indexOf(a.plan) - order.indexOf(b.plan);
               })
               .map((r) => (
@@ -134,7 +139,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-wrap gap-4">
             {stats.planBreakdown
               .sort((a, b) => {
-                const order = ["free", "pro"];
+                const order: string[] = PLAN_ORDER;
                 return order.indexOf(a.plan) - order.indexOf(b.plan);
               })
               .map((r) => (

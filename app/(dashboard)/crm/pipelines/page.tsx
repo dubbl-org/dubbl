@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
@@ -44,6 +44,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 
 interface PipelineStage {
@@ -114,6 +115,8 @@ function SortableStageRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
   const [showColors, setShowColors] = useState(false);
+  // Won and Lost are how deals close; they can't be removed.
+  const isOutcome = stage.id === "closed_won" || stage.id === "closed_lost";
 
   function save() {
     if (!name.trim()) return;
@@ -190,22 +193,31 @@ function SortableStageRow({
         <span className="text-sm font-medium flex-1 min-w-0 truncate">{stage.name}</span>
       )}
 
+      {isOutcome && !editing && (
+        <span className="text-[10px] font-medium text-muted-foreground shrink-0" title="Deals close here. This stage can be renamed and recoloured but not removed.">
+          Outcome
+        </span>
+      )}
+
       {/* Actions */}
       {!editing && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <Button type="button" variant="ghost" size="sm" className="size-7 p-0" onClick={() => { setName(stage.name); setEditing(true); }}>
+          <Button type="button" variant="ghost" size="sm" className="size-7 p-0" onClick={() => { setName(stage.name); setEditing(true); }} title="Rename">
             <Pencil className="size-3" />
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="size-7 p-0 text-destructive"
-            onClick={onRemove}
-            disabled={total <= 1}
-          >
-            <Trash2 className="size-3" />
-          </Button>
+          {!isOutcome && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="size-7 p-0 text-destructive"
+              onClick={onRemove}
+              disabled={total <= 1}
+              title="Remove stage"
+            >
+              <Trash2 className="size-3" />
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -219,13 +231,11 @@ function PipelineEditor({
   open,
   onOpenChange,
   pipeline,
-  onSaved,
   orgId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   pipeline: Pipeline | null;
-  onSaved: () => void;
   orgId: string | null;
 }) {
   const isNew = !pipeline;
@@ -311,7 +321,6 @@ function PipelineEditor({
       toast.success(isNew ? "Pipeline created" : "Pipeline updated");
       setDirty(false);
       onOpenChange(false);
-      onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -349,11 +358,15 @@ function PipelineEditor({
                 <input
                   type="checkbox"
                   checked={isDefault}
+                  disabled={!isNew && pipeline?.isDefault}
                   onChange={(e) => { setIsDefault(e.target.checked); setDirty(true); }}
                   className="size-4 rounded border-border accent-brand-600"
                 />
                 <span className="text-sm">Set as default pipeline</span>
               </label>
+              {!isNew && pipeline?.isDefault && (
+                <p className="text-[11px] text-muted-foreground -mt-2">This is the default pipeline. To change it, set another pipeline as the default.</p>
+              )}
             </div>
 
             <div className="h-px bg-border" />
@@ -369,7 +382,7 @@ function PipelineEditor({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Deals move through stages from top to bottom. Click the color to change it, or use the arrows to reorder.
+                Deals move through stages from top to bottom. Drag the handle to reorder, click the colour to change it. Won and Lost are where deals close, so they always stay. Deals in a stage you remove move to the first stage.
               </p>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={stages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -412,29 +425,12 @@ function PipelineEditor({
 // ---------------------------------------------------------------------------
 export default function PipelinesPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ pipelines?: Pipeline[] }>("/api/v1/crm/pipelines");
+  const pipelines = data?.pipelines || [];
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPipeline, setEditingPipeline] = useState<Pipeline | null>(null);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("CRM · Pipelines");
-
-  const fetchPipelines = useCallback(async () => {
-    if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/crm/pipelines", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      setPipelines(data.pipelines || []);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchPipelines();
-  }, [fetchPipelines]);
 
   function handleEdit(p: Pipeline) {
     setEditingPipeline(p);
@@ -449,17 +445,30 @@ export default function PipelinesPage() {
   async function handleDelete(p: Pipeline) {
     await confirm({
       title: `Delete "${p.name}"?`,
-      description: "This pipeline will be removed. Existing deals will not be deleted but will lose their pipeline reference.",
+      description: p.isDefault
+        ? "Its deals move to another pipeline, which becomes the default. Deals in a stage that pipeline doesn't have go to its first stage."
+        : "Its deals move to the default pipeline. Deals in a stage the default pipeline doesn't have go to its first stage.",
       confirmLabel: "Delete",
       destructive: true,
       onConfirm: async () => {
         if (!orgId) return;
-        await fetch(`/api/v1/crm/pipelines/${p.id}`, {
-          method: "DELETE",
-          headers: { "x-organization-id": orgId },
-        });
-        await fetchPipelines();
-        toast.success("Pipeline deleted");
+        try {
+          const res = await fetch(`/api/v1/crm/pipelines/${p.id}`, {
+            method: "DELETE",
+            headers: { "x-organization-id": orgId },
+          });
+          const data = (await res.json().catch(() => ({}))) as { error?: string; movedDeals?: number; movedTo?: { name: string } | null };
+          if (!res.ok) throw new Error(data.error || "Failed to delete pipeline");
+          await refetch();
+          toast.success(
+            data.movedDeals && data.movedTo
+              ? `Pipeline deleted. ${data.movedDeals} ${data.movedDeals === 1 ? "deal" : "deals"} moved to ${data.movedTo.name}.`
+              : "Pipeline deleted"
+          );
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to delete pipeline");
+          throw err;
+        }
       },
     });
   }
@@ -467,12 +476,13 @@ export default function PipelinesPage() {
   async function handleSetDefault(p: Pipeline) {
     if (!orgId || p.isDefault) return;
     try {
-      await fetch(`/api/v1/crm/pipelines/${p.id}`, {
+      const res = await fetch(`/api/v1/crm/pipelines/${p.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({ isDefault: true }),
       });
-      await fetchPipelines();
+      if (!res.ok) throw new Error("Failed");
+      await refetch();
       toast.success(`"${p.name}" set as default`);
     } catch {
       toast.error("Failed to update default pipeline");
@@ -564,7 +574,6 @@ export default function PipelinesPage() {
         open={editorOpen}
         onOpenChange={setEditorOpen}
         pipeline={editingPipeline}
-        onSaved={fetchPipelines}
         orgId={orgId}
       />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Truck, PackageCheck, BookOpen, ReceiptText, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi } from "@/lib/query/use-api";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -49,8 +50,8 @@ const statusLabels: Record<string, string> = {
 export default function GoodsReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [gr, setGr] = useState<GoodsReceiptDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ goodsReceipt?: GoodsReceiptDetail }>(`/api/v1/goods-receipts/${id}`);
+  const gr = data?.goodsReceipt ?? null;
   const [billing, setBilling] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
@@ -78,18 +79,6 @@ export default function GoodsReceiptDetailPage() {
   }
 
   useEntityTitle(gr?.receiptNumber);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/goods-receipts/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.goodsReceipt) setGr(data.goodsReceipt);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
   if (!gr) return <div className="space-y-6"><PageHeader title="Goods receipt not found" /></div>;

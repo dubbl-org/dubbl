@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { taxPeriod } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { z } from "zod";
+import { getOrgTaxConfig } from "@/lib/reports/tax-return";
+import { filingDeadline } from "@/lib/tax/filing-deadline";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -25,7 +27,14 @@ export async function GET(request: Request) {
       with: { lines: true },
     });
 
-    return NextResponse.json({ taxPeriods: periods });
+    const config = await getOrgTaxConfig(ctx.organizationId);
+    return NextResponse.json({
+      currency: config.baseCurrency,
+      taxPeriods: periods.map((p) => ({
+        ...p,
+        dueDate: filingDeadline(p.endDate, config.country, p.type),
+      })),
+    });
   } catch (err) {
     return handleError(err);
   }

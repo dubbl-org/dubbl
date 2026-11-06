@@ -293,11 +293,13 @@ export async function GET(request: Request) {
         const margin =
           revenue > 0 ? Math.round((profit / revenue) * 10000) / 100 : 0;
 
-        // Estimate-vs-actual baselines.
-        const budget = p.budget; // cents (total cost budget)
-        const budgetVariance = budget - costs; // +ve = under budget
+        // Estimate-vs-actual baselines. project.budget is the fee budget (what
+        // the client can be billed), the same meaning as on the project pages,
+        // so it is compared with invoiced revenue, not costs.
+        const budget = p.budget; // cents (fee budget)
+        const budgetVariance = budget - revenue; // +ve = budget left to bill
         const budgetUsedPercent =
-          budget > 0 ? Math.round((costs / budget) * 10000) / 100 : 0;
+          budget > 0 ? Math.round((revenue / budget) * 10000) / 100 : 0;
         const estimatedHours = p.estimatedHours; // minutes
         const actualMinutes = labor.totalMinutes;
         const hoursVariance = estimatedHours - actualMinutes; // minutes, +ve = under estimate

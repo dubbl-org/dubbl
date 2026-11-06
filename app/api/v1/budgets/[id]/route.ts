@@ -58,6 +58,8 @@ const updateSchema = z.object({
   endDate: z.string().optional(),
   periodType: z.enum(["monthly", "weekly", "daily", "quarterly", "yearly", "custom"]).optional(),
   isActive: z.boolean().optional(),
+  // Notify owners/admins when an account's spending in a period reaches this % of its budget; null turns it off
+  varianceThresholdPct: z.number().int().min(1).max(1000).nullable().optional(),
   lines: z
     .array(
       z.object({

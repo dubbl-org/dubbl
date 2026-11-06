@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Trash2, Users, Power, PowerOff } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Save, Trash2, Users, Power, PowerOff, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,8 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { standardPeriodHours } from "@/lib/payroll/overtime";
 
 interface EmployeeDetail {
   id: string;
@@ -49,11 +53,24 @@ interface EmployeeDetail {
   compensationBandId: string | null;
 }
 
+interface DeductionTypeOption {
+  id: string;
+  name: string;
+  category: string; // pre_tax | post_tax
+  defaultAmount: number | null; // cents
+  defaultPercent: number | null;
+  isActive: boolean;
+}
+
 interface EmployeeDeduction {
   id: string;
-  deductionType: { name: string; category: string; timing: string };
-  amount: number;
-  isPercentage: boolean;
+  deductionTypeId: string;
+  deductionType: DeductionTypeOption;
+  timing: string; // recurring | one_time
+  amount: number | null; // cents
+  percent: number | null;
+  startDate: string | null;
+  endDate: string | null;
   isActive: boolean;
 }
 
@@ -62,8 +79,11 @@ interface TaxConfig {
   filingStatus: string;
   federalAllowances: number;
   stateAllowances: number;
-  additionalFederalWithholding: number;
-  additionalStateWithholding: number;
+  additionalWithholding: number | null; // cents per period, federal
+  additionalStateWithholding: number; // cents per period
+  stateCode: string | null;
+  localCode: string | null;
+  exempt: boolean;
 }
 
 interface LeaveBalance {
@@ -76,10 +96,100 @@ interface LeaveBalance {
 interface CompensationBand {
   id: string;
   name: string;
-  minSalary: number;
+  level: string | null;
+  minSalary: number; // annual cents
   midSalary: number;
   maxSalary: number;
+  currency: string | null;
+  isActive: boolean;
 }
+
+interface EmployeeForm {
+  name: string;
+  email: string;
+  employeeNumber: string;
+  position: string;
+  salary: string;
+  payFrequency: string;
+  taxRate: string;
+  bankAccountNumber: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  compensationType: string;
+  hourlyRate: string;
+  currency: string;
+  memberId: string;
+  department: string;
+  compensationBandId: string;
+}
+
+function toEmployeeForm(e: EmployeeDetail | null): EmployeeForm {
+  if (!e) {
+    return { name: "", email: "", employeeNumber: "", position: "", salary: "", payFrequency: "monthly", taxRate: "", bankAccountNumber: "", startDate: "", endDate: "", isActive: true, compensationType: "salary", hourlyRate: "", currency: "USD", memberId: "none", department: "", compensationBandId: "none" };
+  }
+  return {
+    name: e.name,
+    email: e.email || "",
+    employeeNumber: e.employeeNumber,
+    position: e.position || "",
+    salary: (e.salary / 100).toFixed(2),
+    payFrequency: e.payFrequency,
+    taxRate: (e.taxRate / 100).toFixed(2),
+    bankAccountNumber: e.bankAccountNumber || "",
+    startDate: e.startDate || "",
+    endDate: e.endDate || "",
+    isActive: e.isActive,
+    compensationType: e.compensationType || "salary",
+    hourlyRate: e.hourlyRate ? (e.hourlyRate / 100).toFixed(2) : "",
+    currency: e.currency || "USD",
+    memberId: e.memberId ?? "none",
+    department: e.department || "",
+    compensationBandId: e.compensationBandId ?? "none",
+  };
+}
+
+interface TaxConfigForm {
+  tcFilingStatus: string;
+  tcFederalAllowances: string;
+  tcStateAllowances: string;
+  tcAddlFederal: string; // dollars
+  tcAddlState: string; // dollars
+  tcStateCode: string;
+  tcLocalCode: string;
+  tcExempt: boolean;
+}
+
+function toTaxConfigForm(tc: TaxConfig | null): TaxConfigForm {
+  return {
+    tcFilingStatus: tc?.filingStatus || "single",
+    tcFederalAllowances: String(tc?.federalAllowances ?? 0),
+    tcStateAllowances: String(tc?.stateAllowances ?? 0),
+    tcAddlFederal: ((tc?.additionalWithholding ?? 0) / 100).toFixed(2),
+    tcAddlState: ((tc?.additionalStateWithholding ?? 0) / 100).toFixed(2),
+    tcStateCode: tc?.stateCode || "",
+    tcLocalCode: tc?.localCode || "",
+    tcExempt: tc?.exempt ?? false,
+  };
+}
+
+/** Dollars typed in a money field → integer cents (blank or invalid → 0). */
+function toCents(value: string): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+interface DeductionForm {
+  deductionTypeId: string;
+  basis: "amount" | "percent";
+  amount: string; // dollars
+  percent: string;
+  timing: string;
+  startDate: string;
+  endDate: string;
+}
+
+const EMPTY_DEDUCTION_FORM: DeductionForm = { deductionTypeId: "", basis: "amount", amount: "", percent: "", timing: "recurring", startDate: "", endDate: "" };
 
 const anim = (delay: number) => ({
   initial: { opacity: 0, y: 12 } as const,
@@ -87,7 +197,9 @@ const anim = (delay: number) => ({
   transition: { duration: 0.3, delay } as const,
 });
 
-function getPerPeriodPay(salary: number, frequency: string): number {
+/** Pay for one period: hourly rate × standard hours for hourly staff, salary spread over the year otherwise. */
+function getPerPeriodPay(salary: number, frequency: string, compensationType: string, hourlyRate: number): number {
+  if (compensationType === "hourly") return Math.round(hourlyRate * standardPeriodHours(frequency));
   switch (frequency) {
     case "weekly": return Math.round(salary / 52);
     case "biweekly": return Math.round(salary / 26);
@@ -99,133 +211,82 @@ function getPerPeriodPay(salary: number, frequency: string): number {
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [emp, setEmp] = useState<EmployeeDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const cache = useApiCache();
+
+  const employeeUrl = `/api/v1/payroll/employees/${id}`;
+  const taxConfigUrl = `/api/v1/payroll/employees/${id}/tax-config`;
+  const { data: employeeData, loading } = useApi<{ employee?: EmployeeDetail }>(employeeUrl);
+  const emp = employeeData?.employee ?? null;
 
   // New section state
-  const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
-  const [taxConfig, setTaxConfig] = useState<TaxConfig | null>(null);
-  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
-  const [compensationBand, setCompensationBand] = useState<CompensationBand | null>(null);
+  const { data: deductionsData } = useApi<{ data?: EmployeeDeduction[] }>(`/api/v1/payroll/employees/${id}/deductions`);
+  const { data: deductionTypesData } = useApi<{ data?: DeductionTypeOption[] }>("/api/v1/payroll/deductions/types");
+  const { data: taxConfigData } = useApi<{ taxConfig?: TaxConfig | null }>(taxConfigUrl);
+  const { data: leaveBalancesData } = useApi<{ data?: LeaveBalance[] }>(`/api/v1/payroll/employees/${id}/leave-balances`);
+  // Fetch compensation band when employee loads
+  const { data: bandData } = useApi<{ band?: CompensationBand }>(emp?.compensationBandId ? `/api/v1/payroll/compensation/bands/${emp.compensationBandId}` : null);
+  const { data: bandsData } = useApi<{ data?: CompensationBand[] }>("/api/v1/payroll/compensation/bands");
+  const { data: membersData } = useApi<{ members?: { id: string; userName: string | null; userEmail: string }[] }>("/api/v1/members");
+  const deductions = deductionsData?.data ?? [];
+  const deductionTypes = (deductionTypesData?.data ?? []).filter((t) => t.isActive);
+  const taxConfig = taxConfigData?.taxConfig ?? null;
+  const leaveBalances = leaveBalancesData?.data ?? [];
+  const compensationBand = bandData?.band ?? null;
+  const bands = bandsData?.data ?? [];
+  const members = membersData?.members ?? [];
   const [taxSaving, setTaxSaving] = useState(false);
 
-  // Tax config form state
-  const [tcFilingStatus, setTcFilingStatus] = useState("");
-  const [tcFederalAllowances, setTcFederalAllowances] = useState("0");
-  const [tcStateAllowances, setTcStateAllowances] = useState("0");
-  const [tcAddlFederal, setTcAddlFederal] = useState("0");
-  const [tcAddlState, setTcAddlState] = useState("0");
+  // Add-deduction form
+  const [deductionForm, setDeductionForm] = useState<DeductionForm>(EMPTY_DEDUCTION_FORM);
+  const [addingDeduction, setAddingDeduction] = useState(false);
+  const [showDeductionForm, setShowDeductionForm] = useState(false);
 
-  // Edit form state
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [employeeNumber, setEmployeeNumber] = useState("");
-  const [position, setPosition] = useState("");
-  const [salary, setSalary] = useState("");
-  const [payFrequency, setPayFrequency] = useState("monthly");
-  const [taxRate, setTaxRate] = useState("");
-  const [bankAccountNumber, setBankAccountNumber] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [compensationType, setCompensationType] = useState("salary");
-  const [hourlyRate, setHourlyRate] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [memberId, setMemberId] = useState<string>("none");
-  const [members, setMembers] = useState<{ id: string; userName: string | null; userEmail: string }[]>([]);
+  // Tax config form state (seeded from the saved config until edited)
+  const [tcDraft, setTcDraft] = useState<TaxConfigForm | null>(null);
+  const tcForm = tcDraft ?? toTaxConfigForm(taxConfig);
+  const setTcField = <K extends keyof TaxConfigForm>(key: K) => (value: TaxConfigForm[K]) =>
+    setTcDraft((d) => ({ ...(d ?? toTaxConfigForm(taxConfig)), [key]: value }));
+  const { tcFilingStatus, tcFederalAllowances, tcStateAllowances, tcAddlFederal, tcAddlState, tcStateCode, tcLocalCode, tcExempt } = tcForm;
+  const setTcFilingStatus = setTcField("tcFilingStatus");
+  const setTcFederalAllowances = setTcField("tcFederalAllowances");
+  const setTcStateAllowances = setTcField("tcStateAllowances");
+  const setTcAddlFederal = setTcField("tcAddlFederal");
+  const setTcAddlState = setTcField("tcAddlState");
+  const setTcStateCode = setTcField("tcStateCode");
+  const setTcLocalCode = setTcField("tcLocalCode");
+  const setTcExempt = setTcField("tcExempt");
+
+  // Edit form state (seeded from the employee until edited)
+  const [draft, setDraft] = useState<EmployeeForm | null>(null);
+  const form = draft ?? toEmployeeForm(emp);
+  const setField = <K extends keyof EmployeeForm>(key: K) => (value: EmployeeForm[K]) =>
+    setDraft((d) => ({ ...(d ?? toEmployeeForm(emp)), [key]: value }));
+  const { name, email, employeeNumber, position, salary, payFrequency, taxRate, bankAccountNumber, startDate, endDate, isActive, compensationType, hourlyRate, currency, memberId, department, compensationBandId } = form;
+  const setName = setField("name");
+  const setEmail = setField("email");
+  const setEmployeeNumber = setField("employeeNumber");
+  const setPosition = setField("position");
+  const setSalary = setField("salary");
+  const setPayFrequency = setField("payFrequency");
+  const setTaxRate = setField("taxRate");
+  const setBankAccountNumber = setField("bankAccountNumber");
+  const setStartDate = setField("startDate");
+  const setEndDate = setField("endDate");
+  const setIsActive = setField("isActive");
+  const setCompensationType = setField("compensationType");
+  const setHourlyRate = setField("hourlyRate");
+  const setCurrency = setField("currency");
+  const setMemberId = setField("memberId");
+  const setDepartment = setField("department");
+  const setCompensationBandId = setField("compensationBandId");
   useDocumentTitle("Payroll · Employee Details");
 
   const orgId =
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/payroll/employees/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.employee) {
-          const e = data.employee;
-          setEmp(e);
-          setName(e.name);
-          setEmail(e.email || "");
-          setEmployeeNumber(e.employeeNumber);
-          setPosition(e.position || "");
-          setSalary((e.salary / 100).toFixed(2));
-          setPayFrequency(e.payFrequency);
-          setTaxRate((e.taxRate / 100).toFixed(2));
-          setBankAccountNumber(e.bankAccountNumber || "");
-          setStartDate(e.startDate || "");
-          setEndDate(e.endDate || "");
-          setIsActive(e.isActive);
-          setCompensationType(e.compensationType || "salary");
-          setHourlyRate(e.hourlyRate ? (e.hourlyRate / 100).toFixed(2) : "");
-          setCurrency(e.currency || "USD");
-          setMemberId(e.memberId ?? "none");
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  // Fetch deductions, tax config, leave balances, compensation band
-  useEffect(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    fetch(`/api/v1/payroll/employees/${id}/deductions`, { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.deductions) setDeductions(data.deductions);
-      })
-      .catch(() => {});
-
-    fetch(`/api/v1/payroll/employees/${id}/tax-config`, { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.taxConfig) {
-          const tc = data.taxConfig;
-          setTaxConfig(tc);
-          setTcFilingStatus(tc.filingStatus || "");
-          setTcFederalAllowances(String(tc.federalAllowances ?? 0));
-          setTcStateAllowances(String(tc.stateAllowances ?? 0));
-          setTcAddlFederal(String(tc.additionalFederalWithholding ?? 0));
-          setTcAddlState(String(tc.additionalStateWithholding ?? 0));
-        }
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/members", { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.members) setMembers(data.members);
-      })
-      .catch(() => {});
-
-    fetch(`/api/v1/payroll/employees/${id}/leave-balances`, { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.leaveBalances) setLeaveBalances(data.leaveBalances);
-      })
-      .catch(() => {});
-  }, [id, orgId]);
-
-  // Fetch compensation band when employee loads
-  useEffect(() => {
-    if (!orgId || !emp?.compensationBandId) return;
-    fetch(`/api/v1/payroll/compensation-bands/${emp.compensationBandId}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.band) setCompensationBand(data.band);
-      })
-      .catch(() => {});
-  }, [orgId, emp?.compensationBandId]);
 
   async function handleSaveTaxConfig() {
     if (!orgId) return;
@@ -241,13 +302,19 @@ export default function EmployeeDetailPage() {
           filingStatus: tcFilingStatus,
           federalAllowances: parseInt(tcFederalAllowances) || 0,
           stateAllowances: parseInt(tcStateAllowances) || 0,
-          additionalFederalWithholding: parseFloat(tcAddlFederal) || 0,
-          additionalStateWithholding: parseFloat(tcAddlState) || 0,
+          additionalWithholding: toCents(tcAddlFederal),
+          additionalStateWithholding: toCents(tcAddlState),
+          stateCode: tcStateCode.trim() || null,
+          localCode: tcLocalCode.trim() || null,
+          exempt: tcExempt,
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.taxConfig) setTaxConfig(data.taxConfig);
+        if (data.taxConfig) {
+          cache.set(taxConfigUrl, { taxConfig: data.taxConfig });
+          setTcDraft(null);
+        }
         toast.success("Tax configuration updated");
       } else {
         const data = await res.json();
@@ -283,12 +350,17 @@ export default function EmployeeDetailPage() {
           hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : null,
           currency,
           memberId: memberId === "none" ? null : memberId,
+          department: department.trim() || null,
+          compensationBandId: compensationBandId === "none" ? null : compensationBandId,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        setEmp(data.employee);
+        if (data.employee) {
+          cache.set(employeeUrl, { employee: data.employee });
+          setDraft(null);
+        }
         toast.success("Employee updated");
       } else {
         const data = await res.json();
@@ -305,7 +377,7 @@ export default function EmployeeDetailPage() {
     if (!orgId) return;
     const confirmed = await confirm({
       title: "Delete this employee?",
-      description: "This action cannot be undone.",
+      description: "They'll be removed from payroll and won't be included in new pay runs. Past pay runs and payslips keep their record.",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -320,6 +392,57 @@ export default function EmployeeDetailPage() {
     } else {
       toast.error("Failed to delete employee");
     }
+  }
+
+  async function handleAddDeduction() {
+    if (!orgId || !deductionForm.deductionTypeId) return;
+    setAddingDeduction(true);
+    try {
+      // Blank amount and percent → the deduction type's default applies.
+      const amount = deductionForm.basis === "amount" && deductionForm.amount ? toCents(deductionForm.amount) : undefined;
+      const percent = deductionForm.basis === "percent" && deductionForm.percent ? parseFloat(deductionForm.percent) : undefined;
+      const res = await fetch(`/api/v1/payroll/employees/${id}/deductions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({
+          deductionTypeId: deductionForm.deductionTypeId,
+          timing: deductionForm.timing,
+          amount,
+          percent: percent != null && Number.isFinite(percent) ? percent : undefined,
+          startDate: deductionForm.startDate || undefined,
+          endDate: deductionForm.endDate || undefined,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Deduction added");
+        setDeductionForm(EMPTY_DEDUCTION_FORM);
+        setShowDeductionForm(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to add deduction");
+      }
+    } catch {
+      toast.error("Failed to add deduction");
+    } finally {
+      setAddingDeduction(false);
+    }
+  }
+
+  async function handleRemoveDeduction(d: EmployeeDeduction) {
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Remove this deduction?",
+      description: `${d.deductionType.name} won't be taken from future pay runs. Past pay runs keep it.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/v1/payroll/employees/${id}/deductions/${d.id}`, {
+      method: "DELETE",
+      headers: { "x-organization-id": orgId },
+    });
+    if (res.ok) toast.success("Deduction removed");
+    else toast.error("Failed to remove deduction");
   }
 
   if (loading) return <BrandLoader />;
@@ -340,7 +463,15 @@ export default function EmployeeDetailPage() {
   }
 
   const salaryInCents = Math.round(parseFloat(salary || "0") * 100);
+  const hourlyRateInCents = Math.round(parseFloat(hourlyRate || "0") * 100);
   const taxRateNum = parseFloat(taxRate || "0");
+  // The band picked in the form (falls back to the saved band while the list loads)
+  const selectedBand =
+    compensationBandId === "none"
+      ? null
+      : bands.find((b) => b.id === compensationBandId) ??
+        (compensationBand?.id === compensationBandId ? compensationBand : null);
+  const selectedDeductionType = deductionTypes.find((t) => t.id === deductionForm.deductionTypeId) ?? null;
 
   return (
     <ContentReveal className="space-y-6">
@@ -411,13 +542,16 @@ export default function EmployeeDetailPage() {
             {compensationType === "salary"
               ? formatMoney(salaryInCents)
               : compensationType === "hourly"
-                ? formatMoney(Math.round(parseFloat(hourlyRate || "0") * 100))
+                ? formatMoney(hourlyRateInCents)
                 : "-"}
           </p>
         </motion.div>
         <motion.div {...anim(0.05)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Per-Period Pay</p>
-          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(getPerPeriodPay(salaryInCents, payFrequency))}</p>
+          <p className="mt-1 text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(getPerPeriodPay(salaryInCents, payFrequency, compensationType, hourlyRateInCents))}</p>
+          {compensationType === "hourly" && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground">At {standardPeriodHours(payFrequency)} standard hours</p>
+          )}
         </motion.div>
         <motion.div {...anim(0.09)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tax Rate</p>
@@ -459,6 +593,14 @@ export default function EmployeeDetailPage() {
               <Input
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Department</Label>
+              <Input
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="e.g. Engineering"
               />
             </div>
           </div>
@@ -521,6 +663,25 @@ export default function EmployeeDetailPage() {
               <Label className="text-xs">Currency</Label>
               <CurrencySelect value={currency} onValueChange={setCurrency} />
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">Pay band</Label>
+              <Select value={compensationBandId} onValueChange={setCompensationBandId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No pay band</SelectItem>
+                  {bands.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.level ? `${b.name} (${b.level})` : b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[12px] text-muted-foreground">
+                {selectedBand
+                  ? `Range ${formatMoney(selectedBand.minSalary, selectedBand.currency || "USD")} to ${formatMoney(selectedBand.maxSalary, selectedBand.currency || "USD")} a year, midpoint ${formatMoney(selectedBand.midSalary, selectedBand.currency || "USD")}.`
+                  : "Pick a salary band from Compensation to compare this pay against its range."}
+              </p>
+            </div>
           </div>
         </Section>
 
@@ -577,57 +738,203 @@ export default function EmployeeDetailPage() {
         <div className="h-px bg-border" />
 
         {/* Deductions */}
-        <Section title="Deductions" description="Assigned deductions for this employee. Manage deduction types in settings.">
-          {deductions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No deductions assigned.</p>
-          ) : (
-            <div className="space-y-2">
-              {deductions.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between rounded-md border px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{d.deductionType.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[11px]">
-                          {d.deductionType.category}
-                        </Badge>
+        <Section title="Deductions" description="Amounts taken from this employee's pay each pay run, such as pension or benefits. Manage deduction types in settings.">
+          <div className="space-y-3">
+            {deductions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No deductions assigned.</p>
+            ) : (
+              <div className="space-y-2">
+                {deductions.map((d) => {
+                  // Same order as the pay run: own amount, own percent, type's default amount, type's default percent
+                  const amt = d.amount ?? (d.percent == null ? d.deductionType.defaultAmount : null);
+                  const pct = amt == null ? (d.percent ?? d.deductionType.defaultPercent) : null;
+                  const preTax = d.deductionType.category === "pre_tax";
+                  return (
+                    <div
+                      key={d.id}
+                      className="flex items-center justify-between gap-3 rounded-md border px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{d.deductionType.name}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[11px]",
+                              preTax
+                                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            )}
+                          >
+                            {preTax ? "Pre-tax" : "Post-tax"}
+                          </Badge>
+                          <Badge variant="outline" className="text-[11px]">
+                            {d.timing === "one_time" ? "One-time" : "Recurring"}
+                          </Badge>
+                          {(d.startDate || d.endDate) && (
+                            <span className="text-[11px] text-muted-foreground">
+                              {d.startDate ? `From ${d.startDate}` : ""}{d.startDate && d.endDate ? " " : ""}{d.endDate ? `until ${d.endDate}` : ""}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono tabular-nums">
+                          {pct != null ? `${pct}% of gross` : amt != null ? formatMoney(amt, currency) : "-"}
+                        </span>
                         <Badge
                           variant="outline"
                           className={cn(
                             "text-[11px]",
-                            d.deductionType.timing === "pre_tax"
-                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            d.isActive
+                              ? "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300"
+                              : ""
                           )}
                         >
-                          {d.deductionType.timing === "pre_tax" ? "Pre-tax" : "Post-tax"}
+                          {d.isActive ? "Active" : "Inactive"}
                         </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          aria-label={`Remove ${d.deductionType.name}`}
+                          onClick={() => handleRemoveDeduction(d)}
+                        >
+                          <Trash2 className="size-3.5 text-muted-foreground" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono tabular-nums">
-                      {d.isPercentage ? `${d.amount}%` : formatMoney(d.amount)}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[11px]",
-                        d.isActive
-                          ? "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300"
-                          : ""
-                      )}
+                  );
+                })}
+              </div>
+            )}
+
+            {!showDeductionForm ? (
+              <Button size="sm" variant="outline" onClick={() => setShowDeductionForm(true)}>
+                <Plus className="mr-1.5 size-3" />
+                Add deduction
+              </Button>
+            ) : deductionTypes.length === 0 ? (
+              <div className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                No deduction types yet. Add one in{" "}
+                <Link href="/payroll/settings" className="underline underline-offset-2 hover:text-foreground">
+                  Payroll settings
+                </Link>{" "}
+                first.
+              </div>
+            ) : (
+              <form
+                className="space-y-4 rounded-md border px-4 py-4"
+                onSubmit={(e) => { e.preventDefault(); handleAddDeduction(); }}
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Deduction type</Label>
+                    <Select
+                      value={deductionForm.deductionTypeId}
+                      onValueChange={(v) => setDeductionForm({ ...deductionForm, deductionTypeId: v })}
                     >
-                      {d.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                      <SelectTrigger><SelectValue placeholder="Choose a type" /></SelectTrigger>
+                      <SelectContent>
+                        {deductionTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name} ({t.category === "pre_tax" ? "Pre-tax" : "Post-tax"})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Calculate as</Label>
+                    <Select
+                      value={deductionForm.basis}
+                      onValueChange={(v) => setDeductionForm({ ...deductionForm, basis: v as DeductionForm["basis"] })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="amount">Fixed amount</SelectItem>
+                        <SelectItem value="percent">Percent of gross pay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {deductionForm.basis === "amount" ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Amount per pay run</Label>
+                      <CurrencyInput
+                        prefix="$"
+                        value={deductionForm.amount}
+                        onChange={(v) => setDeductionForm({ ...deductionForm, amount: v })}
+                        placeholder={selectedDeductionType?.defaultAmount != null ? (selectedDeductionType.defaultAmount / 100).toFixed(2) : "0.00"}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Percent (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={deductionForm.percent}
+                        onChange={(e) => setDeductionForm({ ...deductionForm, percent: e.target.value })}
+                        placeholder={selectedDeductionType?.defaultPercent != null ? String(selectedDeductionType.defaultPercent) : "0"}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">How often</Label>
+                    <Select
+                      value={deductionForm.timing}
+                      onValueChange={(v) => setDeductionForm({ ...deductionForm, timing: v })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recurring">Recurring</SelectItem>
+                        <SelectItem value="one_time">One-time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Start date (optional)</Label>
+                    <Input
+                      type="date"
+                      value={deductionForm.startDate}
+                      onChange={(e) => setDeductionForm({ ...deductionForm, startDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">End date (optional)</Label>
+                    <Input
+                      type="date"
+                      value={deductionForm.endDate}
+                      onChange={(e) => setDeductionForm({ ...deductionForm, endDate: e.target.value })}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <p className="text-[12px] text-muted-foreground">
+                  Leave the amount blank to use the deduction type&apos;s default. The deduction applies to every pay run between the start and end dates. A one-time deduction is taken in the next finished pay run, then switches off.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setShowDeductionForm(false); setDeductionForm(EMPTY_DEDUCTION_FORM); }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={addingDeduction || !deductionForm.deductionTypeId}
+                    className="bg-brand-600 hover:bg-brand-700"
+                  >
+                    {addingDeduction ? "Adding..." : "Add deduction"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
         </Section>
 
         <div className="h-px bg-border" />
@@ -645,11 +952,29 @@ export default function EmployeeDetailPage() {
                     <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="single">Single</SelectItem>
-                      <SelectItem value="married_filing_jointly">Married Filing Jointly</SelectItem>
-                      <SelectItem value="married_filing_separately">Married Filing Separately</SelectItem>
+                      <SelectItem value="married_joint">Married Filing Jointly</SelectItem>
+                      <SelectItem value="married_separate">Married Filing Separately</SelectItem>
                       <SelectItem value="head_of_household">Head of Household</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">State code</Label>
+                  <Input
+                    value={tcStateCode}
+                    onChange={(e) => setTcStateCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. CA"
+                    maxLength={10}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Local code</Label>
+                  <Input
+                    value={tcLocalCode}
+                    onChange={(e) => setTcLocalCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. NYC"
+                    maxLength={20}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Federal Allowances</Label>
@@ -668,20 +993,34 @@ export default function EmployeeDetailPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Additional Federal Withholding</Label>
+                  <Label className="text-xs">Extra federal withholding</Label>
                   <CurrencyInput
                     prefix="$"
                     value={tcAddlFederal}
                     onChange={setTcAddlFederal}
                   />
+                  <p className="text-[11px] text-muted-foreground">Withheld on top of the calculated amount, each pay run.</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Additional State Withholding</Label>
+                  <Label className="text-xs">Extra state withholding</Label>
                   <CurrencyInput
                     prefix="$"
                     value={tcAddlState}
                     onChange={setTcAddlState}
                   />
+                  <p className="text-[11px] text-muted-foreground">Withheld on top of the calculated amount, each pay run.</p>
+                </div>
+              </div>
+              <p className="text-[12px] text-muted-foreground">
+                State and local codes pick which tax brackets apply. They must match the jurisdiction code on brackets in Payroll settings.
+              </p>
+              <div className="flex items-start gap-3">
+                <Switch id="tc-exempt" checked={tcExempt} onCheckedChange={(v: boolean) => setTcExempt(v)} />
+                <div className="space-y-0.5">
+                  <Label htmlFor="tc-exempt" className="text-xs">Exempt from income tax</Label>
+                  <p className="text-[12px] text-muted-foreground">
+                    No federal, state or local income tax is withheld. Social Security and Medicare still apply.
+                  </p>
                 </div>
               </div>
               <div className="flex justify-end">
@@ -739,7 +1078,7 @@ export default function EmployeeDetailPage() {
         </Section>
 
         {/* Compensation Band */}
-        {emp.compensationBandId && compensationBand && (
+        {selectedBand && (
           <>
             <div className="h-px bg-border" />
 
@@ -748,22 +1087,22 @@ export default function EmployeeDetailPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Band</p>
-                    <p className="text-sm font-medium">{compensationBand.name}</p>
+                    <p className="text-sm font-medium">{selectedBand.level ? `${selectedBand.name} (${selectedBand.level})` : selectedBand.name}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Min Salary</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.minSalary)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(selectedBand.minSalary, selectedBand.currency || "USD")}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Mid Salary</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.midSalary)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(selectedBand.midSalary, selectedBand.currency || "USD")}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Max Salary</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(compensationBand.maxSalary)}</p>
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(selectedBand.maxSalary, selectedBand.currency || "USD")}</p>
                   </div>
                 </div>
-                {compensationBand.maxSalary > compensationBand.minSalary && (
+                {selectedBand.maxSalary > selectedBand.minSalary && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>Range Penetration</span>
@@ -773,8 +1112,8 @@ export default function EmployeeDetailPage() {
                           Math.max(
                             0,
                             Math.round(
-                              ((salaryInCents - compensationBand.minSalary) /
-                                (compensationBand.maxSalary - compensationBand.minSalary)) *
+                              ((salaryInCents - selectedBand.minSalary) /
+                                (selectedBand.maxSalary - selectedBand.minSalary)) *
                                 100
                             )
                           )
@@ -791,8 +1130,8 @@ export default function EmployeeDetailPage() {
                             Math.max(
                               0,
                               Math.round(
-                                ((salaryInCents - compensationBand.minSalary) /
-                                  (compensationBand.maxSalary - compensationBand.minSalary)) *
+                                ((salaryInCents - selectedBand.minSalary) /
+                                  (selectedBand.maxSalary - selectedBand.minSalary)) *
                                   100
                               )
                             )
@@ -825,12 +1164,12 @@ export default function EmployeeDetailPage() {
         <div className="h-px bg-border" />
 
         {/* Danger zone */}
-        <Section title="Danger zone" description="Irreversible actions for this employee.">
+        <Section title="Danger zone" description="Remove this employee from payroll.">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
             <div>
               <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete employee</p>
               <p className="text-[12px] text-muted-foreground">
-                Permanently delete this employee and all associated data.
+                Remove this employee from payroll. Past pay runs and payslips keep their record.
               </p>
             </div>
             <Button

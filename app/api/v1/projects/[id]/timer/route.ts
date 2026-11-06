@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, runningTimer } from "@/lib/db/schema";
+import { runningTimer } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
+import { requireProjectAccess } from "@/lib/api/project-access";
 import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
 // GET - fetch current user's running timer for this project
@@ -45,16 +44,7 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
-
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "contribute");
 
     // Delete any existing timer for this user+project
     await db

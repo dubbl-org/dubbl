@@ -1,4 +1,5 @@
 import { schedules } from "@trigger.dev/sdk";
+import { withWebhookEvents } from "@/lib/webhooks/events";
 import { processAutoReversals } from "@/lib/api/auto-reverse";
 
 const retry = {
@@ -18,5 +19,5 @@ export const autoReverseTask = schedules.task({
   id: "auto-reverse-journals",
   cron: "0 5 * * *", // daily, before period-end maintenance
   retry,
-  run: async () => processAutoReversals(),
+  run: async () => withWebhookEvents(processAutoReversals()),
 });

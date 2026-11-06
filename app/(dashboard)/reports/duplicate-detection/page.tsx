@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
@@ -9,6 +8,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 
 interface DuplicateItem {
   id: string;
@@ -26,34 +26,10 @@ interface DuplicateGroup {
 
 export default function DuplicateDetectionPage() {
   const router = useRouter();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState<DuplicateGroup[]>([]);
+  const { data, loading } = useApi<{ duplicateGroups?: DuplicateGroup[] }>("/api/v1/reports/duplicate-detection");
+  const groups = data?.duplicateGroups || [];
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetch("/api/v1/reports/duplicate-detection", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setGroups(data.duplicateGroups || []);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -66,9 +42,7 @@ export default function DuplicateDetectionPage() {
         description="Invoices or bills that may have been entered twice (same contact, same amount, within 7 days)."
       />
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : groups.length === 0 ? (
+      {groups.length === 0 ? (
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <div className="flex justify-center mb-3">

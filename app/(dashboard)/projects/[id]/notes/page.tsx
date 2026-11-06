@@ -26,11 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useProject, type NoteData } from "../project-context";
+import { useProject, projectFetch, errorText, type NoteData } from "../project-context";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function NotesPage() {
-  const { project: proj, orgId, projectId, refresh } = useProject();
+  const { project: proj, orgId, projectId, canContribute, canManage } = useProject();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -91,30 +93,30 @@ export default function NotesPage() {
     if (!orgId || !content.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/notes`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/notes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ content: content.trim() }),
+        body: { content: content.trim() },
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success("Note added");
       setContent("");
-      refresh();
-    } catch { toast.error("Failed to add note"); }
+    } catch (err) { toast.error(errorText(err, "Failed to add note")); }
     finally { setSaving(false); }
   }
 
   async function deleteNote(noteId: string) {
     if (!orgId || deletingId) return;
+    const ok = await confirm({
+      title: "Delete this note?",
+      description: "The note is removed for good.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeletingId(noteId);
     try {
-      await fetch(`/api/v1/projects/${projectId}/notes?noteId=${noteId}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": orgId },
-      });
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/notes?noteId=${noteId}`, { method: "DELETE" });
       toast.success("Note deleted");
-      refresh();
-    } catch { toast.error("Failed to delete note"); }
+    } catch (err) { toast.error(errorText(err, "Failed to delete note")); }
     finally { setDeletingId(null); }
   }
 
@@ -122,15 +124,12 @@ export default function NotesPage() {
     if (!orgId) return;
     setTogglingPinId(note.id);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/notes?noteId=${note.id}`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/notes?noteId=${note.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ isPinned: !note.isPinned }),
+        body: { isPinned: !note.isPinned },
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success(note.isPinned ? "Note unpinned" : "Note pinned");
-      refresh();
-    } catch { toast.error("Failed to update note"); }
+    } catch (err) { toast.error(errorText(err, "Failed to update note")); }
     finally { setTogglingPinId(null); }
   }
 
@@ -148,17 +147,14 @@ export default function NotesPage() {
     if (!orgId || !editingId || !editContent.trim()) return;
     setEditSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/notes?noteId=${editingId}`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/notes?noteId=${editingId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ content: editContent.trim() }),
+        body: { content: editContent.trim() },
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success("Note updated");
       setEditingId(null);
       setEditContent("");
-      refresh();
-    } catch { toast.error("Failed to update note"); }
+    } catch (err) { toast.error(errorText(err, "Failed to update note")); }
     finally { setEditSaving(false); }
   }
 
@@ -167,7 +163,7 @@ export default function NotesPage() {
   return (
     <div className="space-y-4">
       {/* Compose */}
-      <div className="rounded-xl border bg-card p-4">
+      {canContribute && <div className="rounded-xl border bg-card p-4">
         <Textarea
           value={content}
           onChange={e => setContent(e.target.value)}
@@ -186,7 +182,7 @@ export default function NotesPage() {
             {saving ? "Adding..." : "Add Note"}
           </Button>
         </div>
-      </div>
+      </div>}
 
       {/* Stats + Filter bar */}
       {notes.length > 0 && (
@@ -297,10 +293,13 @@ export default function NotesPage() {
               deleting={deletingId === note.id}
               togglingPin={togglingPinId === note.id}
               searchQuery={searchQuery}
+              canPin={canContribute}
+              canEdit={canManage || note.author?.id === proj.viewerUserId}
             />
           ))}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -319,6 +318,8 @@ function NoteCard({
   deleting,
   togglingPin,
   searchQuery,
+  canPin,
+  canEdit,
 }: {
   note: NoteData;
   isEditing: boolean;
@@ -332,6 +333,8 @@ function NoteCard({
   onTogglePin: () => void;
   deleting: boolean;
   togglingPin: boolean;
+  canPin: boolean;
+  canEdit: boolean;
   searchQuery: string;
 }) {
   return (
@@ -358,7 +361,7 @@ function NoteCard({
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
+          {canPin && <button
             onClick={onTogglePin}
             disabled={togglingPin}
             className={cn(
@@ -370,8 +373,8 @@ function NoteCard({
             title={note.isPinned ? "Unpin" : "Pin"}
           >
             {togglingPin ? <Loader2 className="size-3 animate-spin" /> : note.isPinned ? <PinOff className="size-3" /> : <Pin className="size-3" />}
-          </button>
-          {!isEditing && (
+          </button>}
+          {canEdit && !isEditing && (
             <button
               onClick={onStartEdit}
               className="p-1.5 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors"
@@ -380,14 +383,14 @@ function NoteCard({
               <Pencil className="size-3" />
             </button>
           )}
-          <button
+          {canEdit && <button
             onClick={onDelete}
             disabled={deleting}
             className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
             title="Delete"
           >
             {deleting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-          </button>
+          </button>}
         </div>
       </div>
 

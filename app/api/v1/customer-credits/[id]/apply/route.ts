@@ -25,6 +25,7 @@ import {
   ensureControlAccount,
 } from "@/lib/api/journal-automation";
 import { z } from "zod";
+import { emitInvoicePaid } from "@/lib/webhooks/events";
 
 const applySchema = z.object({
   invoiceId: z.string().min(1),
@@ -86,7 +87,11 @@ export async function POST(
     });
 
     if (!foundInvoice) return notFound("Invoice");
-    if (foundInvoice.status === "draft" || foundInvoice.status === "void") {
+    // A customer's credit can only settle that same customer's invoice.
+    if (foundInvoice.contactId !== found.contactId) {
+      return validationError("The credit and the invoice must belong to the same customer");
+    }
+    if (["draft", "void", "pending_approval", "rejected"].includes(foundInvoice.status)) {
       return validationError("Cannot apply a credit to this invoice status");
     }
     if (foundInvoice.currencyCode !== found.currencyCode) {
@@ -216,6 +221,8 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      // A credit applied, not money received: only invoice.paid can apply
+      emitInvoicePaid(ctx.organizationId, [foundInvoice.id]);
 
       await tx.insert(paymentAllocation).values([
         {

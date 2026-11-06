@@ -1,8 +1,16 @@
 import { db } from "@/lib/db";
 import { recurringTemplate, reminderRule, quote, invoice, bill } from "@/lib/db/schema";
-import { eq, and, lte, inArray, lt } from "drizzle-orm";
+import { eq, and, lte, inArray, lt, isNull } from "drizzle-orm";
 import { processRecurringTemplates } from "./recurring-generate";
 import { processReminders } from "@/lib/email/reminder-processor";
+import { notifyInvoicesOverdue, notifySafely } from "@/lib/notifications/events";
+import { emitBillDue, emitInvoiceOverdue } from "@/lib/webhooks/events";
+
+function groupIdsByOrg(rows: { id: string; organizationId: string }[]) {
+  const byOrg = new Map<string, string[]>();
+  for (const r of rows) byOrg.set(r.organizationId, [...(byOrg.get(r.organizationId) ?? []), r.id]);
+  return byOrg;
+}
 
 export async function processInvoicingMaintenance() {
   const today = new Date().toISOString().split("T")[0];
@@ -59,7 +67,14 @@ export async function processInvoicingMaintenance() {
         lt(invoice.dueDate, today)
       )
     )
-    .returning({ id: invoice.id });
+    .returning({ id: invoice.id, organizationId: invoice.organizationId });
+
+  for (const [orgId, ids] of groupIdsByOrg(overdueInvoices)) {
+    emitInvoiceOverdue(orgId, ids);
+  }
+
+  // Tell the team about each invoice that just went overdue
+  await notifySafely(notifyInvoicesOverdue(overdueInvoices.map((i) => i.id)));
 
   // 5. Mark bills overdue: received/partial + dueDate < today
   const overdueBills = await db
@@ -72,6 +87,21 @@ export async function processInvoicingMaintenance() {
       )
     )
     .returning({ id: bill.id });
+
+  // 6. bill.due webhooks for bills falling due today and still unpaid
+  const billsDueToday = await db
+    .select({ id: bill.id, organizationId: bill.organizationId })
+    .from(bill)
+    .where(
+      and(
+        inArray(bill.status, ["received", "partial"]),
+        eq(bill.dueDate, today),
+        isNull(bill.deletedAt)
+      )
+    );
+  for (const [orgId, ids] of groupIdsByOrg(billsDueToday)) {
+    emitBillDue(orgId, ids);
+  }
 
   return {
     recurringGenerated,

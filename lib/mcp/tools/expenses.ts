@@ -6,15 +6,15 @@ import { expenseClaim, expenseItem, chartAccount } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
-import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
-import {
-  createExpenseClaimApprovalJournalEntry,
-  createExpenseClaimPaymentJournalEntry,
-} from "@/lib/api/expense-claims";
+import { createExpenseClaimPaymentJournalEntry } from "@/lib/api/expense-claims";
 import { wrapTool } from "@/lib/mcp/errors";
+import { approveEntity, rejectEntity, submitForApproval } from "@/lib/approvals/entities";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { emitExpenseCreated } from "@/lib/webhooks/events";
 
 /**
  * MCP tools for employee expense claims and their lifecycle (draft -> submitted
@@ -58,7 +58,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
           orderBy: desc(expenseClaim.createdAt),
           limit: params.limit,
           offset,
-          with: { submittedByUser: true },
+          with: { submittedByUser: { columns: { id: true, name: true, email: true, image: true } } },
         });
         const [countResult] = await db
           .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -84,8 +84,8 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
             notDeleted(expenseClaim.deletedAt)
           ),
           with: {
-            submittedByUser: true,
-            approvedByUser: true,
+            submittedByUser: { columns: { id: true, name: true, email: true, image: true } },
+            approvedByUser: { columns: { id: true, name: true, email: true, image: true } },
             items: {
               with: { account: true },
               orderBy: (items, { asc }) => [asc(items.sortOrder)],
@@ -114,6 +114,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
             description: z.string().describe("Line item description"),
             amount: z
               .number()
+              .int()
               .min(0)
               .describe("Line amount in integer cents (tax-inclusive when taxRateId is set)"),
             category: z.string().optional().describe("Optional free-text category label"),
@@ -164,6 +165,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
           params.currencyCode,
           undefined
         );
+        await checkMultiCurrency(ctx.organizationId, currencyCode);
 
         // Period lock check for each item date.
         for (const item of params.items) {
@@ -172,7 +174,9 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
 
         let totalAmount = 0;
         const processedItems = params.items.map((item, i) => {
-          const amount = decimalToMinorUnits(item.amount, currencyCode);
+          // MCP amounts are already integer cents (unlike the REST route, which
+          // takes decimals), so they're stored as-is.
+          const amount = item.amount;
           totalAmount += amount;
           return {
             date: item.date,
@@ -201,6 +205,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
             currencyCode,
           })
           .returning();
+        emitExpenseCreated(ctx.organizationId, [created.id]);
 
         await db.insert(expenseItem).values(
           processedItems.map((item) => ({
@@ -214,40 +219,121 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
   );
 
   server.tool(
-    "submit_expense_claim",
-    "Submit a draft (or corrected rejected) expense claim for approval. Sets status to 'submitted', records the submission time, and clears any prior rejection. Only draft or rejected claims can be submitted. Returns the updated claim.",
+    "update_expense_claim",
+    "Update a draft or rejected expense claim (approved/paid claims must be reversed first; a submitted claim must be recalled first). Changes the title/description and, when `items` is given, REPLACES all line items (dropping any receipts attached to the old ones) and recomputes the total. Item amounts are integer cents (e.g. 1250 = $12.50) and tax-inclusive when taxRateId is set. Returns the updated claim.",
     {
-      expenseClaimId: z.string().describe("The UUID of the expense claim to submit"),
+      expenseClaimId: z.string().describe("The UUID of the expense claim to update"),
+      title: z.string().optional().describe("New claim title"),
+      description: z.string().nullable().optional().describe("New description (null clears it)"),
+      items: z
+        .array(
+          z.object({
+            date: z.string().describe("Expense date (YYYY-MM-DD)"),
+            description: z.string().describe("Line item description"),
+            amount: z
+              .number()
+              .int()
+              .min(0)
+              .describe("Line amount in integer cents (tax-inclusive when taxRateId is set)"),
+            category: z.string().optional().describe("Optional free-text category label"),
+            accountId: z
+              .string()
+              .optional()
+              .describe("Expense chart-account UUID; falls back to Miscellaneous Expense 5990 at approval"),
+            taxRateId: z.string().optional().describe("Tax rate UUID applied to this line"),
+            isMileage: z
+              .boolean()
+              .optional()
+              .describe("True if this is a mileage line; requires distanceMiles and mileageRate"),
+            distanceMiles: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .describe("Distance in miles x 100 (2 decimals), integer; required for mileage lines"),
+            mileageRate: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .describe("Reimbursement rate in cents per mile, integer; required for mileage lines"),
+          })
+        )
+        .min(1)
+        .optional()
+        .describe("Replacement line items (at least one). Omit to keep the current items"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:expenses");
 
-        const found = await db.query.expenseClaim.findFirst({
+        const existing = await db.query.expenseClaim.findFirst({
           where: and(
             eq(expenseClaim.id, params.expenseClaimId),
             eq(expenseClaim.organizationId, ctx.organizationId),
             notDeleted(expenseClaim.deletedAt)
           ),
         });
-        if (!found) throw new Error("Expense claim not found");
-        if (found.status !== "draft" && found.status !== "rejected") {
-          throw new Error("Only draft or rejected expense claims can be submitted");
+        if (!existing) throw new Error("Expense claim not found");
+        if (!["draft", "rejected"].includes(existing.status)) {
+          throw new Error(
+            "Only draft or rejected expense claims can be edited. Recall a submitted claim first, or reverse an approved/paid one."
+          );
+        }
+
+        let totalAmount: number | undefined;
+        if (params.items) {
+          for (const item of params.items) {
+            if (item.isMileage && (item.distanceMiles == null || item.mileageRate == null)) {
+              throw new Error(
+                "Mileage items require both distanceMiles and mileageRate when isMileage is true"
+              );
+            }
+          }
+          totalAmount = params.items.reduce((sum, item) => sum + item.amount, 0);
+          await db.delete(expenseItem).where(eq(expenseItem.expenseClaimId, existing.id));
+          await db.insert(expenseItem).values(
+            params.items.map((item, i) => ({
+              expenseClaimId: existing.id,
+              date: item.date,
+              description: item.description,
+              amount: item.amount,
+              category: item.category || null,
+              accountId: item.accountId || null,
+              taxRateId: item.taxRateId || null,
+              isMileage: item.isMileage ?? false,
+              distanceMiles: item.isMileage ? (item.distanceMiles ?? null) : null,
+              mileageRate: item.isMileage ? (item.mileageRate ?? null) : null,
+              sortOrder: i,
+            }))
+          );
         }
 
         const [updated] = await db
           .update(expenseClaim)
           .set({
-            status: "submitted",
-            submittedAt: new Date(),
-            rejectedAt: null,
-            rejectionReason: null,
+            ...(params.title && { title: params.title }),
+            ...(params.description !== undefined && { description: params.description }),
+            ...(totalAmount !== undefined && { totalAmount }),
             updatedAt: new Date(),
           })
-          .where(eq(expenseClaim.id, params.expenseClaimId))
+          .where(eq(expenseClaim.id, existing.id))
           .returning();
 
         return { expenseClaim: updated };
+      })
+  );
+
+  server.tool(
+    "submit_expense_claim",
+    "Submit a draft (or corrected rejected) expense claim for approval. Sets status to 'submitted', records the submission time, and clears any prior rejection. When an active approval workflow matches the claim (the most specific one wins, then the oldest), an approval request is opened and its approvers act in order; otherwise anyone with approve:expenses can approve it. Only draft or rejected claims can be submitted. Returns the updated claim and the approval request (null when no workflow applies).",
+    {
+      expenseClaimId: z.string().describe("The UUID of the expense claim to submit"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const outcome = await submitForApproval(ctx, "expense", params.expenseClaimId);
+        return { expenseClaim: outcome.entity, request: outcome.request };
       })
   );
 
@@ -283,67 +369,38 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
           .where(eq(expenseClaim.id, params.expenseClaimId))
           .returning();
 
+        // Pull it out of the approvers' queue too.
+        await cancelApprovalRequests(ctx.organizationId, "expense", params.expenseClaimId, ["pending"]);
+
         return { expenseClaim: updated };
       })
   );
 
   server.tool(
     "approve_expense_claim",
-    "Approve a submitted expense claim. Posts the approval journal entry — DR each expense line to its account (falling back to Miscellaneous Expense 5990) / CR Employee Reimbursements Payable 2110 for the total — dated today, then flips status to 'approved' and records the approver, atomically. Only submitted claims can be approved, and today's date must not be in a locked/closed period. Returns the updated claim.",
+    "Approve a submitted expense claim (requires approve:expenses). Full approval posts the approval journal entry (DR each expense line to its account, falling back to Miscellaneous Expense 5990 / CR Employee Reimbursements Payable 2110 for the total) dated today, then flips status to 'approved' and records the approver, atomically. With an approval workflow request, only the current step's approver can act and the claim posts only after the last step; until then it stays 'submitted'. Today's date must not be in a locked/closed period. Returns the claim, the approval request (null without a workflow) and finalized (true once approved and posted).",
     {
       expenseClaimId: z.string().describe("The UUID of the expense claim to approve"),
+      comment: z.string().optional().describe("Optional comment recorded with the approval (workflow approvals only)"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "approve:expenses");
+        const outcome = await approveEntity(ctx, "expense", params.expenseClaimId, params.comment);
+        return { expenseClaim: outcome.entity, request: outcome.request, finalized: outcome.finalized };
+      })
+  );
 
-        const found = await db.query.expenseClaim.findFirst({
-          where: and(
-            eq(expenseClaim.id, params.expenseClaimId),
-            eq(expenseClaim.organizationId, ctx.organizationId),
-            notDeleted(expenseClaim.deletedAt)
-          ),
-          with: {
-            items: {
-              with: { account: true },
-            },
-          },
-        });
-        if (!found) throw new Error("Expense claim not found");
-        if (found.status !== "submitted") {
-          throw new Error("Only submitted expense claims can be approved");
-        }
-
-        const approvedAt = new Date();
-        await assertNotLocked(
-          ctx.organizationId,
-          approvedAt.toISOString().slice(0, 10),
-          ctx
-        );
-
-        const updated = await db.transaction(async (tx) => {
-          const entry = await createExpenseClaimApprovalJournalEntry(
-            ctx,
-            found,
-            tx,
-            approvedAt.toISOString().slice(0, 10)
-          );
-
-          const [row] = await tx
-            .update(expenseClaim)
-            .set({
-              status: "approved",
-              approvedBy: ctx.userId,
-              approvedAt,
-              journalEntryId: entry.id,
-              updatedAt: approvedAt,
-            })
-            .where(eq(expenseClaim.id, params.expenseClaimId))
-            .returning();
-          return row;
-        });
-
-        return { expenseClaim: updated };
+  server.tool(
+    "reject_expense_claim",
+    "Reject a submitted expense claim with a reason (requires approve:expenses; with an approval workflow only the current step's approver can act). Status becomes 'rejected' with the reason recorded; the claimant can fix it and submit it again. Returns the claim and the approval request.",
+    {
+      expenseClaimId: z.string().describe("The UUID of the expense claim to reject"),
+      reason: z.string().min(1).describe("Why the claim is rejected (required)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const outcome = await rejectEntity(ctx, "expense", params.expenseClaimId, params.reason);
+        return { expenseClaim: outcome.entity, request: outcome.request };
       })
   );
 

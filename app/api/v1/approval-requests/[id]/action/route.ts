@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { approvalRequest, member } from "@/lib/db/schema";
+import { approvalRequest } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
-import { processApprovalAction } from "@/lib/approvals/engine";
+import { logAudit } from "@/lib/api/audit";
+import { processApprovalAction, resolveApprovalMember } from "@/lib/approvals/engine";
+import { approveEntity, rejectEntity } from "@/lib/approvals/entities";
+import { ProcurementBlockedError } from "../../../bills/_procurement";
 import { z } from "zod";
 
 const actionSchema = z.object({
@@ -12,6 +15,10 @@ const actionSchema = z.object({
   comment: z.string().optional(),
 });
 
+// Act on an approval request. Approve / reject go through the same path as the
+// record's own approve / reject action, so the record moves on too (a fully
+// approved bill posts, a rejected invoice becomes rejected, ...). Only the
+// current step's approver can approve or reject; anyone can comment.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -33,32 +40,27 @@ export async function POST(
     const body = await request.json();
     const parsed = actionSchema.parse(body);
 
-    // Resolve the member ID for the current user in this org
-    const mem = await db.query.member.findFirst({
-      where: and(
-        eq(member.organizationId, ctx.organizationId),
-        eq(member.userId, ctx.userId)
-      ),
-    });
-
-    if (!mem) {
-      return NextResponse.json(
-        { error: "Member not found" },
-        { status: 403 }
-      );
+    if (parsed.action === "comment") {
+      const mem = await resolveApprovalMember(ctx);
+      const updated = await processApprovalAction(id, mem.id, "comment", parsed.comment, ctx.organizationId);
+      return NextResponse.json({ request: updated });
     }
 
-    const updated = await processApprovalAction(
-      id,
-      mem.id,
-      parsed.action,
-      parsed.comment
-    );
+    if (existing.status !== "pending") {
+      return NextResponse.json({ error: "Approval request is no longer pending" }, { status: 409 });
+    }
 
-    return NextResponse.json({ request: updated });
+    const outcome =
+      parsed.action === "approve"
+        ? await approveEntity(ctx, existing.entityType, existing.entityId, parsed.comment)
+        : await rejectEntity(ctx, existing.entityType, existing.entityId, parsed.comment);
+
+    logAudit({ ctx, action: parsed.action, entityType: existing.entityType, entityId: existing.entityId, request });
+
+    return NextResponse.json({ request: outcome.request, entity: outcome.entity, finalized: outcome.finalized });
   } catch (err) {
-    if (err instanceof Error && err.message.includes("not the approver")) {
-      return NextResponse.json({ error: err.message }, { status: 403 });
+    if (err instanceof ProcurementBlockedError) {
+      return NextResponse.json({ error: err.message, issues: err.issues }, { status: 422 });
     }
     return handleError(err);
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -10,6 +10,7 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { BackToReports, ReportHelp, BasisToggle } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface Box {
   box: string;
@@ -42,38 +43,15 @@ const BOX_PLAIN: Record<string, { title: string; help: string; drill?: "tax-summ
 
 export default function VatReturnPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [basis, setBasis] = useState<"accrual" | "cash">("accrual");
-  const [data, setData] = useState<VatResponse | null>(null);
+  const { data: report, loading } = useApi<VatResponse>(
+    `/api/v1/reports/vat-return?${new URLSearchParams({ startDate, endDate, basis })}`,
+    { keepPrevious: true }
+  );
+  const data = report?.boxes ? report : null;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate, basis });
-    fetch(`/api/v1/reports/vat-return?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.boxes) setData(d);
-        else setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate, basis]);
 
   function toggle(box: string) {
     setExpanded((prev) => {
@@ -91,7 +69,7 @@ export default function VatReturnPage() {
     return `/reports/general-ledger?${dr.toString()}`;
   }
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -126,9 +104,7 @@ export default function VatReturnPage() {
         <BasisToggle basis={basis} onChange={setBasis} />
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !data ? (
+      {!data ? (
         <p className="text-sm text-muted-foreground">No tax figures for this period.</p>
       ) : (
         <ContentReveal>

@@ -39,7 +39,9 @@ interface Org {
 
 const PLAN_BADGE: Record<string, string> = {
   free: "text-zinc-600 bg-zinc-50 dark:text-zinc-400 dark:bg-zinc-800/50",
-  pro: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/50",
+  standard: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/50",
+  premium: "text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/50",
+  ultimate: "text-indigo-700 bg-indigo-100 dark:text-indigo-300 dark:bg-indigo-900/50",
 };
 
 type SortKey = "name" | "created" | "members";
@@ -144,7 +146,9 @@ export default function AdminOrganizationsPage() {
             <SelectContent>
               <SelectItem value="all">All Plans</SelectItem>
               <SelectItem value="free">Free</SelectItem>
-              <SelectItem value="pro">Pro</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+              <SelectItem value="ultimate">Ultimate</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>

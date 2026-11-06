@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -38,6 +38,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useApi } from "@/lib/query/use-api";
 
 interface WebhookItem {
   id: string;
@@ -98,8 +99,8 @@ function orgHeaders(extra?: Record<string, string>) {
 }
 
 export default function WebhooksPage() {
-  const [webhooks, setWebhooks] = useState<WebhookItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: webhooksData, loading } = useApi<{ data?: WebhookItem[] }>("/api/v1/webhooks");
+  const webhooks = webhooksData?.data ?? [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingWebhook, setEditingWebhook] = useState<WebhookItem | null>(
     null
@@ -113,45 +114,13 @@ export default function WebhooksPage() {
 
   // Expanded delivery log
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [deliveries, setDeliveries] = useState<DeliveryItem[]>([]);
-  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
-
-  const fetchWebhooks = useCallback(() => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    fetch("/api/v1/webhooks", { headers: orgHeaders() })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setWebhooks(data.data);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    fetchWebhooks();
-  }, [fetchWebhooks]);
-
-  const fetchDeliveries = useCallback((webhookId: string) => {
-    setDeliveriesLoading(true);
-    fetch(`/api/v1/webhooks/${webhookId}/deliveries?limit=20`, {
-      headers: orgHeaders(),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setDeliveries(data.data);
-      })
-      .finally(() => setDeliveriesLoading(false));
-  }, []);
+  const { data: deliveriesData, loading: deliveriesLoading } = useApi<{ data?: DeliveryItem[] }>(
+    expandedId ? `/api/v1/webhooks/${expandedId}/deliveries?limit=20` : null
+  );
+  const deliveries = deliveriesData?.data ?? [];
 
   const toggleExpand = (id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null);
-      setDeliveries([]);
-    } else {
-      setExpandedId(id);
-      fetchDeliveries(id);
-    }
+    setExpandedId(expandedId === id ? null : id);
   };
 
   const openCreate = () => {
@@ -206,7 +175,6 @@ export default function WebhooksPage() {
 
       toast.success(editingWebhook ? "Webhook updated" : "Webhook created");
       setSheetOpen(false);
-      fetchWebhooks();
     } catch {
       toast.error("Failed to save webhook");
     } finally {
@@ -223,7 +191,6 @@ export default function WebhooksPage() {
 
       if (res.ok) {
         toast.success("Webhook deleted");
-        fetchWebhooks();
       } else {
         toast.error("Failed to delete webhook");
       }
@@ -242,7 +209,6 @@ export default function WebhooksPage() {
 
       if (res.ok) {
         toast.success(wh.isActive ? "Webhook disabled" : "Webhook enabled");
-        fetchWebhooks();
       } else {
         toast.error("Failed to update webhook");
       }
@@ -260,18 +226,12 @@ export default function WebhooksPage() {
 
       if (res.ok) {
         toast.success("Test delivery sent");
-        if (expandedId === id) fetchDeliveries(id);
       } else {
         toast.error("Test delivery failed");
       }
     } catch {
       toast.error("Test delivery failed");
     }
-  };
-
-  const getSuccessRate = (wh: WebhookItem): string | null => {
-    // Success rate is shown from deliveries when expanded; we show a placeholder here
-    return null;
   };
 
   return (

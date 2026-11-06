@@ -6,6 +6,7 @@ import {
   bill,
   billLine,
   billPurchaseOrder,
+  billPurchaseOrderLine,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
@@ -15,10 +16,11 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
 import {
-  derivePurchaseOrderStatusAfterBilling,
+  derivePurchaseOrderStatus,
   resolveConvertLineAllocations,
 } from "@/lib/api/procurement";
 import { z } from "zod";
+import { emitBillCreated } from "@/lib/webhooks/events";
 
 /**
  * Convert a purchase order to a bill.
@@ -221,6 +223,7 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      emitBillCreated(ctx.organizationId, [createdBill.id]);
 
       await tx.insert(billLine).values(
         billLines.map((l) => ({
@@ -248,6 +251,18 @@ export async function POST(
         .onConflictDoNothing();
 
       // Increment quantityBilled on each PO line.
+      // Record what this bill counted per PO line, so voiding or deleting it
+      // gives back exactly that much.
+      const counted = items.filter((it) => it.qtyScaled > 0);
+      if (counted.length > 0) {
+        await tx.insert(billPurchaseOrderLine).values(
+          counted.map((it) => ({
+            billId: createdBill.id,
+            purchaseOrderLineId: it.poLine.id,
+            quantity: it.qtyScaled,
+          }))
+        );
+      }
       for (const it of items) {
         await tx
           .update(purchaseOrderLine)
@@ -260,10 +275,11 @@ export async function POST(
         const it = items.find((x) => x.poLine.id === l.id);
         return {
           quantity: l.quantity,
+          quantityReceived: l.quantityReceived,
           quantityBilled: l.quantityBilled + (it?.qtyScaled ?? 0),
         };
       });
-      const newStatus = derivePurchaseOrderStatusAfterBilling(updatedLines);
+      const newStatus = derivePurchaseOrderStatus(updatedLines);
 
       const [updatedPO] = await tx
         .update(purchaseOrder)

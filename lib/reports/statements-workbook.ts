@@ -6,20 +6,14 @@
  * (e.g. balance sheet + P&L + trial balance) into one downloadable file.
  *
  * Cell rules mirror lib/reports/statement-export.ts: amounts are integer minor
- * units (cents), divided by 100 exactly once at the numeric cell, and text
+ * units (cents), scaled by the currency's minor units once at the numeric cell, and text
  * cells are guarded against CSV/formula injection.
  */
 import type { Statement } from "@/lib/reports/statement-export";
+import { getCurrencyMinorUnits } from "@/lib/currency/iso4217";
 
 function getMinorUnits(currency: string): number {
-  try {
-    return (
-      new Intl.NumberFormat("en", { style: "currency", currency })
-        .resolvedOptions().maximumFractionDigits ?? 2
-    );
-  } catch {
-    return 2;
-  }
+  return getCurrencyMinorUnits(currency);
 }
 
 function currencyNumberFormat(currency: string): string {

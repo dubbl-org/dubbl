@@ -3,12 +3,15 @@ import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, invoice, bill, payment, paymentAllocation, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
 
 const splitSchema = z.object({
   allocations: z.array(z.object({
@@ -167,6 +170,9 @@ export async function POST(
     const paymentType = isOutgoing ? "made" : "received";
     const journalType = isOutgoing ? "bill" : "invoice";
 
+    // The payment posts on its date: refuse a locked or closed period.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
+
     const { created, results } = await db.transaction(async (tx) => {
       // Create one payment record
       const [created] = await tx
@@ -185,6 +191,7 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      emitPaymentReceived(ctx.organizationId, [created.id]);
 
       // Create payment allocations and update documents
       const results: Array<{
@@ -293,6 +300,8 @@ export async function POST(
       entityId: id,
       changes: { allocations: parsed.allocations, paymentId: created.id },
     });
+
+    await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
 
     return NextResponse.json({
       payment: { id: created.id, paymentNumber },

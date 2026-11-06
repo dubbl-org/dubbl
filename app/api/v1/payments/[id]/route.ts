@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { reverseJournalEntry } from "@/lib/api/journal-automation";
+import { restoreAppliedCredits } from "@/lib/api/payment-credits";
 
 export async function GET(
   request: Request,
@@ -114,6 +115,10 @@ export async function DELETE(
           }
         }
       }
+
+      // A credit note / prepayment / supplier credit applied through this
+      // carrier gets its amount back so it can be used again.
+      await restoreAppliedCredits(tx, ctx.organizationId, existing.allocations);
 
       // Reverse the payment's own GL entry (DR Bank/CR AR, or DR AP/CR Bank) so
       // the bank and the control accounts come back in line. A zero-cash carrier

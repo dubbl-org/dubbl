@@ -1,18 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell,
-  FileText,
-  DollarSign,
-  Package,
-  Landmark,
   ShieldCheck,
-  AlertTriangle,
-  ClipboardList,
   CheckCheck,
   ArrowRight,
 } from "lucide-react";
@@ -23,6 +17,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { recordLink, typeMeta } from "@/components/dashboard/notifications/meta";
 
 interface Notification {
   id: string;
@@ -72,26 +68,6 @@ function approvalEntityHref(req: ApprovalRequest): string {
   }
 }
 
-const TYPE_ICONS: Record<string, typeof Bell> = {
-  invoice_overdue: FileText,
-  payment_received: DollarSign,
-  inventory_low: Package,
-  payroll_due: Landmark,
-  approval_needed: ShieldCheck,
-  system_alert: AlertTriangle,
-  task_assigned: ClipboardList,
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  invoice_overdue: "text-red-500 bg-red-500/10",
-  payment_received: "text-brand-500 bg-brand-500/10",
-  inventory_low: "text-amber-500 bg-amber-500/10",
-  payroll_due: "text-blue-500 bg-blue-500/10",
-  approval_needed: "text-purple-500 bg-purple-500/10",
-  system_alert: "text-orange-500 bg-orange-500/10",
-  task_assigned: "text-indigo-500 bg-indigo-500/10",
-};
-
 function relativeTime(date: string) {
   const now = new Date();
   const d = new Date(date);
@@ -106,105 +82,54 @@ function relativeTime(date: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+interface NotificationList {
+  data?: Notification[];
+  unreadCount?: number;
+}
+
+// The bell badge's unread count, and the latest few shown when the popover opens
+const BADGE_URL = "/api/v1/notifications?unread=true&limit=1";
+const LIST_URL = "/api/v1/notifications?limit=8";
+
 export function NotificationDropdown() {
   const router = useRouter();
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false);
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const cache = useApiCache();
+
+  // Shell-wide requests, not part of whichever page is open, so they aren't learned for prefetching
+  const { data: badge } = useApi<NotificationList>(BADGE_URL, { learn: false });
+  const { data: list, loading } = useApi<NotificationList>(open ? LIST_URL : null, { keepPrevious: true, learn: false });
+  const notifications = list?.data ?? [];
+  const unreadCount = (open ? list?.unreadCount : undefined) ?? badge?.unreadCount ?? 0;
 
   // Resolve the current user's member id (approvals are keyed by member, not user)
-  const resolveMemberId = useCallback(async (orgId: string): Promise<string | null> => {
-    if (!userId) return null;
-    try {
-      const res = await fetch("/api/v1/members", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      const mine = (data.members as { id: string; userId: string }[] | undefined)?.find(
-        (m) => m.userId === userId
-      );
-      return mine?.id ?? null;
-    } catch {
-      return null;
-    }
-  }, [userId]);
-
-  const fetchApprovals = useCallback(async () => {
-    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-    if (!orgId) return;
-    const memberId = await resolveMemberId(orgId);
-    if (!memberId) {
-      setApprovals([]);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/v1/approval-requests?status=pending&approverId=${memberId}&limit=8`,
-        { headers: { "x-organization-id": orgId } }
-      );
-      const data = await res.json();
-      if (Array.isArray(data.data)) setApprovals(data.data as ApprovalRequest[]);
-    } catch {
-      // ignore
-    }
-  }, [resolveMemberId]);
-
-  const fetchNotifications = useCallback(() => {
-    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-    if (!orgId) return;
-    setLoading(true);
-
-    fetch("/api/v1/notifications?limit=8", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setNotifications(data.data);
-        if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
-        setHasFetched(true);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Fetch unread count + pending approvals on mount (for the bell badge)
-  useEffect(() => {
-    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-    if (!orgId) return;
-    fetch("/api/v1/notifications?unread=true&limit=1", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.unreadCount !== undefined) setUnreadCount(data.unreadCount);
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchApprovals();
-  }, [fetchApprovals]);
+  const { data: members } = useApi<{ members?: { id: string; userId: string }[] }>(userId ? "/api/v1/members" : null, { learn: false });
+  const memberId = members?.members?.find((m) => m.userId === userId)?.id ?? null;
+  const { data: approvalData, refetch: refetchApprovals } = useApi<{ data?: ApprovalRequest[] }>(
+    memberId ? `/api/v1/approval-requests?status=pending&approverId=${memberId}&limit=8` : null,
+    { learn: false }
+  );
+  const approvals = memberId && Array.isArray(approvalData?.data) ? approvalData.data : [];
 
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next);
-    if (next) {
-      fetchNotifications();
-      fetchApprovals();
-    }
-  }, [fetchNotifications, fetchApprovals]);
+    if (next && memberId) void refetchApprovals();
+  }, [memberId, refetchApprovals]);
 
   const markAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
-    );
-    setUnreadCount((c) => Math.max(0, c - 1));
+    const stamp = new Date().toISOString();
+    cache.update<NotificationList>(LIST_URL, (d) => ({
+      ...d,
+      data: d.data?.map((n) => (n.id === id ? { ...n, readAt: stamp } : n)),
+      unreadCount: Math.max(0, (d.unreadCount ?? 0) - 1),
+    }));
+    cache.update<NotificationList>(BADGE_URL, (d) => ({ ...d, unreadCount: Math.max(0, (d.unreadCount ?? 0) - 1) }));
 
     await fetch(`/api/v1/notifications/${id}/read`, {
       method: "POST",
@@ -216,10 +141,13 @@ export function NotificationDropdown() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
-    );
-    setUnreadCount(0);
+    const stamp = new Date().toISOString();
+    cache.update<NotificationList>(LIST_URL, (d) => ({
+      ...d,
+      data: d.data?.map((n) => ({ ...n, readAt: n.readAt || stamp })),
+      unreadCount: 0,
+    }));
+    cache.update<NotificationList>(BADGE_URL, (d) => ({ ...d, unreadCount: 0 }));
 
     await fetch("/api/v1/notifications/read-all", {
       method: "POST",
@@ -333,7 +261,7 @@ export function NotificationDropdown() {
             </div>
           )}
 
-          {loading && !hasFetched ? (
+          {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground animate-spin" />
             </div>
@@ -349,8 +277,9 @@ export function NotificationDropdown() {
             )
           ) : (
             notifications.map((n) => {
-              const Icon = TYPE_ICONS[n.type] || Bell;
-              const colorClass = TYPE_COLORS[n.type] || "text-muted-foreground bg-muted";
+              const meta = typeMeta(n.type);
+              const Icon = meta.icon;
+              const href = recordLink(n)?.href;
               const isUnread = !n.readAt;
 
               return (
@@ -358,16 +287,20 @@ export function NotificationDropdown() {
                   key={n.id}
                   onClick={(e) => {
                     if (isUnread) markAsRead(n.id, e);
+                    if (href) {
+                      setOpen(false);
+                      router.push(href);
+                    }
                   }}
                   className={cn(
                     "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 group border-b border-border/50 last:border-0",
                     isUnread && "bg-primary/[0.03]"
                   )}
                 >
-                  <div className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                    colorClass,
-                  )}>
+                  <div
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: `${meta.color}17`, color: meta.color }}
+                  >
                     <Icon className="size-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">

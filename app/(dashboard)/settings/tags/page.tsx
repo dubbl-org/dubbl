@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,8 +48,8 @@ const TAG_COLORS = [
 ];
 
 export default function TagsPage() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ tags?: Tag[] }>("/api/v1/tags");
+  const tags = data?.tags || [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [name, setName] = useState("");
@@ -56,21 +57,6 @@ export default function TagsPage() {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   useDocumentTitle("Settings · Tags");
-
-  const fetchTags = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/tags", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setTags(data.tags || []))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
 
   const openCreate = () => {
     setEditingTag(null);
@@ -111,7 +97,6 @@ export default function TagsPage() {
 
       toast.success(editingTag ? "Tag updated" : "Tag created");
       setSheetOpen(false);
-      fetchTags();
     } finally {
       setSaving(false);
     }
@@ -128,7 +113,6 @@ export default function TagsPage() {
 
     if (res.ok) {
       toast.success("Tag deleted");
-      fetchTags();
     } else {
       toast.error("Failed to delete tag");
     }

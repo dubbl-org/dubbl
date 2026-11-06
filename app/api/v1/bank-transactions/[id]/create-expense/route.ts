@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -21,8 +22,10 @@ import {
   ensureAccountByCode,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { emitExpenseCreated } from "@/lib/webhooks/events";
 
 const itemSchema = z.object({
   date: z.string().min(1),
@@ -83,6 +86,7 @@ export async function POST(
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertCostCentersActive(ctx.organizationId, [parsed.costCenterId]);
 
     // Calculate total from items
     let totalAmount = 0;
@@ -155,6 +159,7 @@ export async function POST(
     const currencyCode = transaction.currencyCode || account.currencyCode;
 
     // Pre-flight the FX rate so a missing rate fails cleanly (422) before writes.
+    await assertNotLocked(ctx.organizationId, transaction.date, ctx);
     await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
     const { created, entry } = await db.transaction(async (tx) => {
@@ -170,6 +175,7 @@ export async function POST(
           currencyCode: parsed.currencyCode,
         })
         .returning();
+      emitExpenseCreated(ctx.organizationId, [created.id]);
 
       await tx.insert(expenseItem).values(
         processedItems.map((item) => ({

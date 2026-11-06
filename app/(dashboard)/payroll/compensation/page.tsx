@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { motion, MotionConfig } from "motion/react";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
   DollarSign,
@@ -45,6 +45,7 @@ import { formatMoney } from "@/lib/money";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface Band {
   id: string;
@@ -96,24 +97,24 @@ const REVIEW_SORT_OPTIONS = [
 
 export default function CompensationPage() {
   const router = useRouter();
-  const { confirm, dialog: confirmDialog } = useConfirm();
-  const [bands, setBands] = useState<Band[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { dialog: confirmDialog } = useConfirm();
+  const { data: bandsData, loading: bandsLoading, refetch: refetchBands } = useApi<{ data?: Band[] }>("/api/v1/payroll/compensation/bands");
+  const { data: reviewsData, loading: reviewsLoading, refetch: refetchReviews } = useApi<{ data?: Review[] }>("/api/v1/payroll/compensation/reviews");
+  const bands = useMemo(() => bandsData?.data ?? [], [bandsData]);
+  const reviews = useMemo(() => reviewsData?.data ?? [], [reviewsData]);
+  const loading = bandsLoading || reviewsLoading;
 
   /* Search / filter / sort */
   const [bandSearch, setBandSearch] = useState("");
   const debouncedBandSearch = useDebounce(bandSearch);
   const pendingBandSearch = bandSearch !== debouncedBandSearch;
   const [bandSort, setBandSort] = useState("name:asc");
-  const [bandFetchKey, setBandFetchKey] = useState(0);
 
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [reviewSearch, setReviewSearch] = useState("");
   const debouncedReviewSearch = useDebounce(reviewSearch);
   const pendingReviewSearch = reviewSearch !== debouncedReviewSearch;
   const [reviewSort, setReviewSort] = useState("date:desc");
-  const [reviewFetchKey, setReviewFetchKey] = useState(0);
 
   const [bandSheet, setBandSheet] = useState(false);
   const [bandSaving, setBandSaving] = useState(false);
@@ -126,32 +127,9 @@ export default function CompensationPage() {
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Compensation");
 
-  const fetchData = useCallback(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-    Promise.all([
-      fetch("/api/v1/payroll/compensation/bands", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/compensation/reviews", { headers }).then((r) => r.json()),
-    ])
-      .then(([bandsData, reviewsData]) => {
-        if (bandsData.data) setBands(bandsData.data);
-        if (reviewsData.data) setReviews(reviewsData.data);
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
   /* Re-animate on filter changes */
-  useEffect(() => {
-    if (!loading) setBandFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bandSort, debouncedBandSearch]);
-
-  useEffect(() => {
-    if (!loading) setReviewFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewFilter, reviewSort, debouncedReviewSearch]);
+  const bandFetchKey = bandSort;
+  const reviewFetchKey = `${reviewFilter}-${reviewSort}`;
 
   /* Filtered + sorted */
   const filteredBands = useMemo(() => {
@@ -214,7 +192,10 @@ export default function CompensationPage() {
         toast.success("Band added");
         setBandSheet(false);
         setNewBand({ name: "", level: "", minSalary: "", midSalary: "", maxSalary: "", currency: "USD" });
-        fetchData();
+        await refetchBands();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to create band");
       }
     } catch {
       toast.error("Failed to create band");
@@ -226,6 +207,7 @@ export default function CompensationPage() {
   async function handleAddReview(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!orgId || !newReview.name) return;
+    if (!newReview.effectiveDate) { toast.error("Pick an effective date"); return; }
     setReviewSaving(true);
     try {
       const res = await fetch("/api/v1/payroll/compensation/reviews", {
@@ -238,10 +220,15 @@ export default function CompensationPage() {
         }),
       });
       if (res.ok) {
+        const data = await res.json();
         toast.success("Review created");
         setReviewSheet(false);
         setNewReview({ name: "", effectiveDate: "", totalBudget: "" });
-        fetchData();
+        await refetchReviews();
+        if (data.review?.id) router.push(`/payroll/compensation/reviews/${data.review.id}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to create review");
       }
     } catch {
       toast.error("Failed to create review");
@@ -406,16 +393,6 @@ export default function CompensationPage() {
 
   return (
     <ContentReveal className="space-y-6">
-      {/* Actions */}
-      <div className="flex justify-end gap-2">
-        <Button size="sm" onClick={() => setBandSheet(true)}>
-          <Plus className="mr-1.5 size-3.5" /> Add Band
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setReviewSheet(true)}>
-          <Plus className="mr-1.5 size-3.5" /> New Review
-        </Button>
-      </div>
-
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <motion.div {...anim(0)} className="rounded-xl border bg-card p-4">
@@ -594,7 +571,9 @@ export default function CompensationPage() {
                 >
                   <div>
                     <p className="text-sm font-medium">{r.name}</p>
-                    <p className="text-xs text-muted-foreground">Effective: {r.effectiveDate}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Effective: {r.effectiveDate} · {r._count?.entries ?? 0} {(r._count?.entries ?? 0) === 1 ? "entry" : "entries"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {r.totalBudget && <span className="text-sm font-mono tabular-nums">{formatMoney(r.totalBudget)}</span>}

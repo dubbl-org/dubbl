@@ -19,7 +19,7 @@ import {
   ensureAccountByCode,
   resolveBaseRate,
 } from "@/lib/api/journal-automation";
-import { calculateMonthlyDepreciation } from "@/lib/fixed-assets/depreciation";
+import { nextDepreciationCharge } from "@/lib/fixed-assets/depreciation";
 import { z } from "zod";
 
 const disposeSchema = z.object({
@@ -85,20 +85,7 @@ export async function POST(
         .where(eq(depreciationEntry.fixedAssetId, asset.id));
       const periodIndex = Number(priorCount?.count ?? 0);
 
-      catchUpAmount = calculateMonthlyDepreciation({
-        purchasePrice: asset.purchasePrice,
-        residualValue: asset.residualValue,
-        usefulLifeMonths: asset.usefulLifeMonths,
-        depreciationMethod: asset.depreciationMethod,
-        accumulatedDepreciation: asset.accumulatedDepreciation,
-        purchaseDate: asset.purchaseDate,
-        periodIndex,
-        convention: asset.convention,
-        inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
-        totalExpectedUnits: asset.totalExpectedUnits,
-        unitsThisPeriod: undefined,
-        periodDate: parsed.date,
-      });
+      catchUpAmount = nextDepreciationCharge(asset, periodIndex, parsed.date);
     }
 
     // Effective accumulated depreciation / net book value at disposal, after the

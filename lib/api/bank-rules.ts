@@ -1,12 +1,14 @@
 import { db } from "@/lib/db";
-import { bankAccount, bankRule, bankTransaction } from "@/lib/db/schema";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { bankAccount, bankRule, bankTransaction, chartAccount } from "@/lib/db/schema";
+import { eq, and, desc, isNull, isNotNull, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import {
   createCategorizationJournalEntry,
   assertBaseRateAvailable,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { decideRuleOutcome } from "@/lib/banking/rule-outcome";
 
 interface MatchResult {
   accountId: string | null;
@@ -319,28 +321,34 @@ async function postSplitAllocations(
 }
 
 /**
- * Retroactively apply the organization's active bank rules to existing,
- * still-unreconciled transactions in a bank account that have not yet been
- * categorized (accountId is null).
+ * Apply the organization's active bank rules to a bank account's still-to-do
+ * lines (status 'unreconciled', no category yet). Used by Apply rules (REST +
+ * MCP) and by every statement import, so a rule behaves the same everywhere.
  *
- * For rules without split actions: populates accountId/contactId/taxRateId from
- * the first matching rule, and sets status='reconciled' when the matched rule
- * has autoReconcile=true.
+ * Per matched line (see decideRuleOutcome):
+ * - Split rules post one categorization journal entry per allocation and move
+ *   the line to Done, stamped with the first entry id.
+ * - Rules with autoReconcile ("Categorize matching transactions
+ *   automatically") and a single account post the categorization entry, exactly
+ *   like the manual Categorize action, and move the line to Done.
+ * - Every other match only fills in the rule's category / contact / tax and
+ *   leaves the line in To do for the user to confirm.
  *
- * For rules WITH split actions: posts one categorization journal entry per
- * allocation (coded across the chosen accounts), reconciles the transaction,
- * and stamps it with the first journal entry id. Splits require the bank account
- * to be linked to a ledger account, and are skipped if no rate is available for
- * a foreign-currency transaction.
+ * A line is never moved to Done without a ledger entry. Posting needs a
+ * `userId`, a date outside any locked period / closed fiscal year, and an
+ * exchange rate for foreign-currency lines; when any of those is missing the
+ * line falls back to the suggestion (counted in `skipped`).
  *
+ * `options.importId` limits the pass to the lines of one statement import.
  * The caller must have already verified that the bank account belongs to the org.
- * Returns the number of transactions updated and how many were reconciled.
  */
 export async function applyBankRulesToAccount(
   organizationId: string,
   bankAccountId: string,
-  userId?: string
-): Promise<{ applied: number; reconciled: number; split: number }> {
+  userId?: string,
+  options: { importId?: string } = {}
+): Promise<{ applied: number; reconciled: number; split: number; skipped: number }> {
+  const empty = { applied: 0, reconciled: 0, split: 0, skipped: 0 };
   const account = await db.query.bankAccount.findFirst({
     where: and(
       eq(bankAccount.id, bankAccountId),
@@ -355,10 +363,10 @@ export async function applyBankRulesToAccount(
       currencyCode: true,
     },
   });
-  if (!account) return { applied: 0, reconciled: 0, split: 0 };
+  if (!account) return empty;
 
   const rules = await loadActiveBankRules(organizationId);
-  if (rules.length === 0) return { applied: 0, reconciled: 0, split: 0 };
+  if (rules.length === 0) return empty;
 
   // Only touch transactions that are still unreconciled and uncategorized.
   const transactions = await db.query.bankTransaction.findMany({
@@ -366,6 +374,7 @@ export async function applyBankRulesToAccount(
       eq(bankTransaction.bankAccountId, bankAccountId),
       eq(bankTransaction.status, "unreconciled"),
       isNull(bankTransaction.accountId),
+      options.importId ? eq(bankTransaction.importId, options.importId) : undefined,
     ),
     columns: {
       id: true,
@@ -382,15 +391,19 @@ export async function applyBankRulesToAccount(
   let applied = 0;
   let reconciled = 0;
   let split = 0;
+  let skipped = 0;
 
   for (const txn of transactions) {
     const assignment = applyBankRulesToTransaction(rules, txn);
     if (!assignment) continue;
 
-    // Split actions post journal entries and reconcile the transaction.
-    if (assignment.splitAllocations && userId) {
+    const outcome = decideRuleOutcome(assignment, Boolean(userId));
+
+    if (outcome !== "suggest") {
       const currencyCode = txn.currencyCode || account.currencyCode;
       try {
+        // Never post into a locked period or a closed fiscal year.
+        await assertNotLocked(organizationId, txn.date);
         // Connect the bank account to its ledger account automatically (older
         // accounts self-heal on first use); cache on `account` so we link once
         // per pass rather than per transaction.
@@ -400,101 +413,67 @@ export async function applyBankRulesToAccount(
         // Fail cleanly before any write if the FX rate is missing.
         await assertBaseRateAvailable(organizationId, currencyCode, txn.date);
 
-        const firstEntryId = await db.transaction(async (dbTx) => {
-          const entryIds = await postSplitAllocations(
-            { organizationId, userId },
-            {
-              bankGlAccountId: account.chartAccountId!,
-              allocations: assignment.splitAllocations!,
-              signedAmount: txn.amount,
-              date: txn.date,
-              reference: txn.reference || txn.description,
-              description: txn.description,
-              currencyCode,
-            },
-            dbTx
-          );
-
-          await dbTx
-            .update(bankTransaction)
-            .set({
-              status: "reconciled" as const,
-              contactId: assignment.contactId,
-              journalEntryId: entryIds[0] ?? null,
-            })
-            .where(eq(bankTransaction.id, txn.id));
-
-          return entryIds[0] ?? null;
-        });
-
-        applied += 1;
-        reconciled += 1;
-        split += 1;
-        void firstEntryId;
-        continue;
-      } catch {
-        // Skip this transaction (e.g. missing exchange rate) and move on; the
-        // user can categorize it manually or after adding a rate.
-        continue;
-      }
-    }
-
-    // A rule that auto-reconciles to a single account must POST the
-    // categorization entry, exactly like the manual Categorize action — not
-    // just flip the status. Otherwise the line shows as done with a category
-    // but nothing hits the ledger, so income/expense silently never gets
-    // recorded and the statement-vs-books difference is wrong.
-    const canPost =
-      assignment.reconcile && assignment.accountId && userId;
-
-    if (canPost) {
-      const currencyCode = txn.currencyCode || account.currencyCode;
-      try {
-        if (!account.chartAccountId) {
-          account.chartAccountId = await ensureBankLedgerAccount(organizationId, account);
-        }
-        await assertBaseRateAvailable(organizationId, currencyCode, txn.date);
-
         await db.transaction(async (dbTx) => {
-          const entry = await createCategorizationJournalEntry(
-            { organizationId, userId: userId! },
-            {
-              bankGlAccountId: account.chartAccountId!,
-              otherAccountId: assignment.accountId!,
-              amount: txn.amount,
-              date: txn.date,
-              reference: txn.reference || txn.description,
-              description: txn.description,
-              currencyCode,
-              taxRateId: assignment.taxRateId ?? null,
-            },
-            dbTx
-          );
+          let entryId: string | null = null;
+          if (outcome === "split") {
+            const entryIds = await postSplitAllocations(
+              { organizationId, userId: userId! },
+              {
+                bankGlAccountId: account.chartAccountId!,
+                allocations: assignment.splitAllocations!,
+                signedAmount: txn.amount,
+                date: txn.date,
+                reference: txn.reference || txn.description,
+                description: txn.description,
+                currencyCode,
+              },
+              dbTx
+            );
+            entryId = entryIds[0] ?? null;
+          } else {
+            const entry = await createCategorizationJournalEntry(
+              { organizationId, userId: userId! },
+              {
+                bankGlAccountId: account.chartAccountId!,
+                otherAccountId: assignment.accountId!,
+                amount: txn.amount,
+                date: txn.date,
+                reference: txn.reference || txn.description,
+                description: txn.description,
+                currencyCode,
+                taxRateId: assignment.taxRateId ?? null,
+              },
+              dbTx
+            );
+            entryId = entry?.id ?? null;
+          }
 
           await dbTx
             .update(bankTransaction)
             .set({
               status: "reconciled" as const,
-              accountId: assignment.accountId,
+              ...(outcome === "post"
+                ? { accountId: assignment.accountId, taxRateId: assignment.taxRateId }
+                : {}),
               contactId: assignment.contactId,
-              taxRateId: assignment.taxRateId,
-              journalEntryId: entry?.id ?? null,
+              journalEntryId: entryId,
             })
             .where(eq(bankTransaction.id, txn.id));
         });
 
         applied += 1;
         reconciled += 1;
+        if (outcome === "split") split += 1;
         continue;
       } catch {
-        // Missing FX rate or similar — skip; the user can categorize manually.
-        continue;
+        // Locked period, missing exchange rate or similar: fall through and
+        // leave the rule's category as a suggestion for the user to confirm.
+        skipped += 1;
       }
     }
 
-    // No reconcile (or no account to post to): just apply the rule's category /
-    // contact / tax without changing the line's status, so we never mark a line
-    // "done" without a matching ledger entry.
+    // Fill in the rule's category / contact / tax without changing the line's
+    // status, so we never mark a line "done" without a matching ledger entry.
     await db
       .update(bankTransaction)
       .set({
@@ -507,7 +486,7 @@ export async function applyBankRulesToAccount(
     applied += 1;
   }
 
-  return { applied, reconciled, split };
+  return { applied, reconciled, split, skipped };
 }
 
 /**
@@ -533,4 +512,94 @@ export async function matchBankRules(
   }
 
   return null;
+}
+
+/** A rule the user could create, learned from lines they already categorized. */
+export interface BankRuleSuggestion {
+  matchField: "description";
+  matchType: "contains";
+  /** The keyword to match (the longest word of the sample description). */
+  matchValue: string;
+  accountId: string;
+  accountName: string;
+  accountCode: string;
+  /** How many categorized lines share this description and category. */
+  occurrences: number;
+  sampleDescription: string;
+}
+
+/**
+ * Suggest bank rules from repeat categorizations: descriptions categorized to
+ * the same account at least twice. Lines an existing active rule already
+ * matches are left out, so every suggestion is something new to automate.
+ */
+export async function getBankRuleSuggestions(
+  organizationId: string,
+  limit = 20
+): Promise<BankRuleSuggestion[]> {
+  const patterns = await db
+    .select({
+      description: bankTransaction.description,
+      accountId: bankTransaction.accountId,
+      accountName: chartAccount.name,
+      accountCode: chartAccount.code,
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(bankTransaction)
+    .innerJoin(bankAccount, eq(bankTransaction.bankAccountId, bankAccount.id))
+    .innerJoin(chartAccount, eq(bankTransaction.accountId, chartAccount.id))
+    .where(
+      and(
+        eq(bankAccount.organizationId, organizationId),
+        notDeleted(bankAccount.deletedAt),
+        // Only lines the user actually put in the books, not rule suggestions
+        // still waiting in To do.
+        isNotNull(bankTransaction.journalEntryId),
+        isNotNull(bankTransaction.accountId)
+      )
+    )
+    .groupBy(
+      bankTransaction.description,
+      bankTransaction.accountId,
+      chartAccount.name,
+      chartAccount.code
+    )
+    .having(sql`count(*) >= 2`)
+    .orderBy(sql`count(*) desc`)
+    .limit(100);
+
+  const rules = await loadActiveBankRules(organizationId);
+  const seen = new Set<string>();
+  const suggestions: BankRuleSuggestion[] = [];
+
+  for (const p of patterns) {
+    if (!p.accountId) continue;
+    // Already handled by a rule: nothing to suggest.
+    if (applyBankRulesToTransaction(rules, { description: p.description })) continue;
+
+    // Use the longest word (over 3 characters) as the keyword to match on.
+    const words = p.description
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .sort((a, b) => b.length - a.length);
+    const keyword = words[0] || p.description;
+
+    const key = `${keyword.toLowerCase()}_${p.accountId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    suggestions.push({
+      matchField: "description",
+      matchType: "contains",
+      matchValue: keyword,
+      accountId: p.accountId,
+      accountName: p.accountName,
+      accountCode: p.accountCode,
+      occurrences: p.count,
+      sampleDescription: p.description,
+    });
+    if (suggestions.length >= limit) break;
+  }
+
+  return suggestions;
 }

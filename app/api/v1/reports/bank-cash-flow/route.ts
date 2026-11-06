@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankAccount, bankTransaction } from "@/lib/db/schema";
-import { eq, and, gte, lte, ne, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, ne, sql, desc, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     const conditions = [
       bankAccountId
         ? eq(bankTransaction.bankAccountId, bankAccountId)
-        : sql`${bankTransaction.bankAccountId} = ANY(${orgAccountIds})`,
+        : inArray(bankTransaction.bankAccountId, orgAccountIds),
       ne(bankTransaction.status, "excluded"),
       gte(bankTransaction.date, startDate),
       lte(bankTransaction.date, endDate),

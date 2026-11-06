@@ -13,11 +13,15 @@ import { applyBankRulesToAccount } from "@/lib/api/bank-rules";
  * POST /api/v1/bank-accounts/[id]/apply-rules
  *
  * Runs the organization's active bank rules over EXISTING transactions in this
- * bank account that are still unreconciled and have no accountId yet, populating
- * accountId/contactId/taxRateId from the first matching rule (and reconciling
- * the transaction when that rule has autoReconcile=true).
+ * bank account that are still unreconciled and have no accountId yet. Rules
+ * that categorize automatically (autoReconcile) or split post the
+ * categorization journal entry and move the line to Done, exactly like the
+ * manual Categorize action; other matches only fill in the category / contact
+ * / tax as a suggestion. See applyBankRulesToAccount.
  *
- * Returns { applied, reconciled } counts.
+ * Returns { applied, reconciled, split, skipped } counts: `skipped` lines
+ * matched a posting rule but couldn't be posted (locked period, missing
+ * exchange rate) and were left as suggestions.
  */
 export async function POST(
   request: Request,
@@ -39,14 +43,14 @@ export async function POST(
 
     if (!account) return notFound("Bank account");
 
-    const result = await applyBankRulesToAccount(ctx.organizationId, id);
+    const result = await applyBankRulesToAccount(ctx.organizationId, id, ctx.userId);
 
     await logAudit({
       ctx,
       action: "apply_rules",
       entityType: "bank_account",
       entityId: id,
-      changes: { applied: result.applied, reconciled: result.reconciled },
+      changes: { applied: result.applied, reconciled: result.reconciled, split: result.split, skipped: result.skipped },
       request,
     });
 

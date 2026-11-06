@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Briefcase, DollarSign, FileText, Plus, Power, Banknote } from "lucide-react";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
 import { ActionButton } from "@/components/dashboard/explorer/action-button";
@@ -193,27 +194,12 @@ export default function ContractorsPage() {
 
 /** Payments made or waiting to be made to this contractor. */
 function ContractorPayments({ contractorId, currency }: { contractorId: string; currency: string | null }) {
-  const [state, setState] = useState<{ id: string; payments: Payment[] } | null>(null);
-  const payments = state && state.id === contractorId ? state.payments : null;
+  const { data, error } = useApi<{ contractor?: { payments?: Payment[] } }>(`/api/v1/payroll/contractors/${contractorId}`);
+  const payments = useMemo(() => {
+    if (!data) return error ? [] : null;
+    return [...(data.contractor?.payments ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [data, error]);
   const cur = currency || "USD";
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch(`/api/v1/payroll/contractors/${contractorId}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((json: { contractor?: { payments?: Payment[] } }) => {
-        const list = [...(json.contractor?.payments ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        if (!cancelled) setState({ id: contractorId, payments: list });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ id: contractorId, payments: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [contractorId]);
 
   const paid = payments?.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0) ?? 0;
   const pending = payments?.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0) ?? 0;

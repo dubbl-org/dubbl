@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const BlurRevealContext = createContext(false);
 
+/** Fades a page or tab in. Kept short: switching views should feel instant. */
 export function BlurReveal({
   children,
   className,
@@ -24,10 +25,9 @@ export function BlurReveal({
       <MotionConfig reducedMotion="never">
         <motion.div
           className={cn(className)}
-          initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          style={{ willChange: "opacity, transform, filter" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.14, ease: "easeOut" }}
         >
           {children}
         </motion.div>

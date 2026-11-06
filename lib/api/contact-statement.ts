@@ -41,6 +41,9 @@ export class StatementError extends Error {
 }
 
 const NOT_POSTED = ["draft", "void"] as const;
+// Invoices/bills awaiting (or rejected in) approval aren't posted either.
+const INVOICE_NOT_POSTED = [...NOT_POSTED, "pending_approval", "rejected"] as const;
+const BILL_NOT_POSTED = [...NOT_POSTED, "pending_approval"] as const;
 
 function defaultRange() {
   const now = new Date();
@@ -99,13 +102,15 @@ export async function buildContactStatement(
 
   if (isCustomer) {
     const [priorInvoices, priorCredits, priorReceived, invoices, credits, received] = await Promise.all([
-      db.select({ v: invoice.amountDue }).from(invoice).where(and(eq(invoice.organizationId, organizationId), eq(invoice.contactId, contactId), lt(invoice.issueDate, startDate), notInArray(invoice.status, [...NOT_POSTED]), isNull(invoice.deletedAt))),
+      db.select({ v: invoice.total }).from(invoice).where(and(eq(invoice.organizationId, organizationId), eq(invoice.contactId, contactId), lt(invoice.issueDate, startDate), notInArray(invoice.status, [...INVOICE_NOT_POSTED]), isNull(invoice.deletedAt))),
       db.select({ v: creditNote.total }).from(creditNote).where(and(eq(creditNote.organizationId, organizationId), eq(creditNote.contactId, contactId), lt(creditNote.issueDate, startDate), notInArray(creditNote.status, [...NOT_POSTED]), isNull(creditNote.deletedAt))),
       db.select({ v: payment.amount }).from(payment).where(and(eq(payment.organizationId, organizationId), eq(payment.contactId, contactId), eq(payment.type, "received"), lt(payment.date, startDate), isNull(payment.deletedAt), excludeCarriers)),
-      db.select().from(invoice).where(and(eq(invoice.organizationId, organizationId), eq(invoice.contactId, contactId), gte(invoice.issueDate, startDate), lte(invoice.issueDate, endDate), notInArray(invoice.status, [...NOT_POSTED]), isNull(invoice.deletedAt))),
+      db.select().from(invoice).where(and(eq(invoice.organizationId, organizationId), eq(invoice.contactId, contactId), gte(invoice.issueDate, startDate), lte(invoice.issueDate, endDate), notInArray(invoice.status, [...INVOICE_NOT_POSTED]), isNull(invoice.deletedAt))),
       db.select().from(creditNote).where(and(eq(creditNote.organizationId, organizationId), eq(creditNote.contactId, contactId), gte(creditNote.issueDate, startDate), lte(creditNote.issueDate, endDate), notInArray(creditNote.status, [...NOT_POSTED]), isNull(creditNote.deletedAt))),
       db.select().from(payment).where(and(eq(payment.organizationId, organizationId), eq(payment.contactId, contactId), eq(payment.type, "received"), gte(payment.date, startDate), lte(payment.date, endDate), isNull(payment.deletedAt), excludeCarriers)),
     ]);
+    // Invoices at their full total: payments and credit notes are subtracted
+    // separately (using amountDue here would count them twice).
     openingBalance += sum(priorInvoices) - sum(priorCredits) - sum(priorReceived);
     for (const inv of invoices) {
       transactions.push({ date: inv.issueDate, type: "invoice", documentNumber: inv.invoiceNumber, description: inv.reference || `Invoice ${inv.invoiceNumber}`, debit: inv.total, credit: 0, balance: 0 });
@@ -120,10 +125,10 @@ export async function buildContactStatement(
 
   if (isSupplier) {
     const [priorBills, priorDebits, priorMade, bills, debits, made] = await Promise.all([
-      db.select({ v: bill.amountDue }).from(bill).where(and(eq(bill.organizationId, organizationId), eq(bill.contactId, contactId), lt(bill.issueDate, startDate), notInArray(bill.status, [...NOT_POSTED]), isNull(bill.deletedAt))),
+      db.select({ v: bill.total }).from(bill).where(and(eq(bill.organizationId, organizationId), eq(bill.contactId, contactId), lt(bill.issueDate, startDate), notInArray(bill.status, [...BILL_NOT_POSTED]), isNull(bill.deletedAt))),
       db.select({ v: debitNote.total }).from(debitNote).where(and(eq(debitNote.organizationId, organizationId), eq(debitNote.contactId, contactId), lt(debitNote.issueDate, startDate), notInArray(debitNote.status, [...NOT_POSTED]), isNull(debitNote.deletedAt))),
       db.select({ v: payment.amount }).from(payment).where(and(eq(payment.organizationId, organizationId), eq(payment.contactId, contactId), eq(payment.type, "made"), lt(payment.date, startDate), isNull(payment.deletedAt), excludeCarriers)),
-      db.select().from(bill).where(and(eq(bill.organizationId, organizationId), eq(bill.contactId, contactId), gte(bill.issueDate, startDate), lte(bill.issueDate, endDate), notInArray(bill.status, [...NOT_POSTED]), isNull(bill.deletedAt))),
+      db.select().from(bill).where(and(eq(bill.organizationId, organizationId), eq(bill.contactId, contactId), gte(bill.issueDate, startDate), lte(bill.issueDate, endDate), notInArray(bill.status, [...BILL_NOT_POSTED]), isNull(bill.deletedAt))),
       db.select().from(debitNote).where(and(eq(debitNote.organizationId, organizationId), eq(debitNote.contactId, contactId), gte(debitNote.issueDate, startDate), lte(debitNote.issueDate, endDate), notInArray(debitNote.status, [...NOT_POSTED]), isNull(debitNote.deletedAt))),
       db.select().from(payment).where(and(eq(payment.organizationId, organizationId), eq(payment.contactId, contactId), eq(payment.type, "made"), gte(payment.date, startDate), lte(payment.date, endDate), isNull(payment.deletedAt), excludeCarriers)),
     ]);
@@ -172,8 +177,8 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const fmtDate = (d: string) =>
   new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-function renderStatementHtml(s: ContactStatement, orgName: string) {
-  const money = (cents: number) => formatMoney(cents);
+function renderStatementHtml(s: ContactStatement, orgName: string, currency: string) {
+  const money = (minorUnits: number) => formatMoney(minorUnits, currency);
   const totalDebit = s.transactions.reduce((t, x) => t + x.debit, 0);
   const totalCredit = s.transactions.reduce((t, x) => t + x.credit, 0);
   const td = "padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;";
@@ -234,13 +239,16 @@ export async function emailContactStatement(
   const cfg = await db.query.emailConfig.findFirst({ where: eq(emailConfig.organizationId, organizationId) });
   if (!cfg) throw new StatementError("Email not configured. Please set up SMTP settings first.", 400);
 
-  const [org] = await db.select({ name: organization.name }).from(organization).where(eq(organization.id, organizationId)).limit(1);
+  const [[org], [c]] = await Promise.all([
+    db.select({ name: organization.name }).from(organization).where(eq(organization.id, organizationId)).limit(1),
+    db.select({ currencyCode: contact.currencyCode }).from(contact).where(eq(contact.id, contactId)).limit(1),
+  ]);
   const orgName = org?.name || "Organization";
 
   await sendEmail(cfg, {
     to: statement.contact.email,
     subject: `Statement from ${orgName} - ${fmtDate(statement.startDate)} to ${fmtDate(statement.endDate)}`,
-    html: renderStatementHtml(statement, orgName),
+    html: renderStatementHtml(statement, orgName, c?.currencyCode || "USD"),
   });
 
   return {

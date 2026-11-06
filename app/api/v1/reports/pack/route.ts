@@ -229,7 +229,7 @@ export async function GET(request: Request) {
     openingAsAt.setDate(openingAsAt.getDate() - 1);
     const openingAsAtStr = openingAsAt.toISOString().slice(0, 10);
 
-    const [pl, balancesAsAt, openingBalances] = await Promise.all([
+    const [pl, balancesAsAt, openingBalances, allBalancesAsAt] = await Promise.all([
       aggregateByDateRange(
         ctx.organizationId,
         { startDate, endDate },
@@ -244,6 +244,9 @@ export async function GET(request: Request) {
         basis,
         accountTypes: ["asset"],
       }),
+      // The trial balance lists every account (income and costs too), so its
+      // debit and credit columns tie out.
+      aggregateAsAt(ctx.organizationId, endDate, { basis }),
     ]);
 
     const org = await db.query.organization.findFirst({
@@ -266,7 +269,7 @@ export async function GET(request: Request) {
       endDate
     );
     const profitAndLoss = buildProfitAndLoss(pl, currency, startDate, endDate);
-    const trialBalance = buildTrialBalance(balancesAsAt, currency, endDate);
+    const trialBalance = buildTrialBalance(allBalancesAsAt, currency, endDate);
     const cashFlow = buildCashFlow(
       openingCash,
       closingCash,

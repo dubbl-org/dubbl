@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { motion, MotionConfig } from "motion/react";
 import { Users, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -10,6 +10,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface MemberTeam {
   id: string;
@@ -24,6 +25,8 @@ interface Member {
   teams?: MemberTeam[];
 }
 
+type RawMember = { id: string; userName?: string; userEmail?: string; name?: string; email?: string; teams?: MemberTeam[] };
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -35,47 +38,24 @@ function getInitials(name: string) {
 }
 
 export default function TeamMembersPage() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchKey, setFetchKey] = useState(0);
+  const { data, loading } = useApi<{ members?: RawMember[]; data?: RawMember[] }>("/api/v1/members");
+  const members = useMemo<Member[]>(() => {
+    const raw = data?.members || data?.data || [];
+    return raw.map((m) => ({
+      id: m.id,
+      name: m.userName || m.name || "",
+      email: m.userEmail || m.email || "",
+      teams: m.teams || [],
+    }));
+  }, [data]);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const pendingSearch = search !== debouncedSearch;
   useDocumentTitle("Teams · Members");
 
-  const fetchMembers = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/members", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const raw = data.members || data.data || [];
-        setMembers(raw.map((m: { id: string; userName?: string; userEmail?: string; name?: string; email?: string; teams?: MemberTeam[] }) => ({
-          id: m.id,
-          name: m.userName || m.name || "",
-          email: m.userEmail || m.email || "",
-          teams: m.teams || [],
-        })));
-      })
-      .finally(() => {
-        setLoading(false);
-        setFetchKey((k) => k + 1);
-      });
-  }, []);
-
-  useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
-
   // Re-animate on search changes
-  useEffect(() => {
-    if (!loading) setFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
+  const fetchKey = debouncedSearch;
 
   const filtered = members.filter((m) => {
     if (debouncedSearch) {

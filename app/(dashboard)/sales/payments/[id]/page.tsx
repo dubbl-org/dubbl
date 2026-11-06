@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { formatMoney, minorUnitsToDecimal, decimalToMinorUnits } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface Allocation {
   documentType: string;
@@ -45,7 +46,7 @@ interface PaymentDetail {
   currencyCode: string;
   contactId: string;
   contact: { name: string; email: string | null } | null;
-  bankAccount: { name: string } | null;
+  bankAccount: { accountName: string } | null;
   allocations: Allocation[];
 }
 
@@ -70,78 +71,45 @@ const methodLabels: Record<string, string> = {
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [pmt, setPmt] = useState<PaymentDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  // Maps invoice id -> invoice number so allocations can show which invoice
-  // they settled (the payment only stores the document id + amount).
-  const [invoiceLookup, setInvoiceLookup] = useState<Record<string, InvoiceOption>>({});
+  const url = `/api/v1/payments/${id}`;
+  const { data, loading } = useApi<{ payment?: PaymentDetail }>(url);
+  const pmt = data?.payment ?? null;
+  const cache = useApiCache();
 
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyInvoiceId, setApplyInvoiceId] = useState("");
   const [applyAmount, setApplyAmount] = useState("");
-  const [openInvoices, setOpenInvoices] = useState<InvoiceOption[]>([]);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(pmt ? `Payment ${pmt.paymentNumber}` : undefined);
 
-  const loadPayment = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/payments/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.payment) setPmt(data.payment);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    loadPayment();
-  }, [loadPayment]);
-
-  // Resolve the invoice numbers behind this payment's existing allocations.
-  useEffect(() => {
-    if (!orgId || !pmt) return;
-    const invoiceIds = pmt.allocations
-      .filter((a) => a.documentType === "invoice" && !invoiceLookup[a.documentId])
-      .map((a) => a.documentId);
-    if (invoiceIds.length === 0) return;
-    fetch(`/api/v1/invoices?limit=200`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          const map: Record<string, InvoiceOption> = {};
-          for (const inv of data.data as InvoiceOption[]) map[inv.id] = inv;
-          setInvoiceLookup((prev) => ({ ...prev, ...map }));
-        }
-      });
-  }, [orgId, pmt, invoiceLookup]);
+  // Maps invoice id -> invoice number so allocations can show which invoice
+  // they settled (the payment only stores the document id + amount).
+  const hasInvoiceAllocations = !!pmt?.allocations.some((a) => a.documentType === "invoice");
+  const { data: lookupData } = useApi<{ data?: InvoiceOption[] }>(hasInvoiceAllocations ? `/api/v1/invoices?limit=200` : null);
+  const invoiceLookup = useMemo(() => {
+    const map: Record<string, InvoiceOption> = {};
+    for (const inv of lookupData?.data ?? []) map[inv.id] = inv;
+    return map;
+  }, [lookupData]);
 
   // Load this customer's open invoices (same currency) for the allocate dialog.
-  useEffect(() => {
-    if (!orgId || !applyOpen || !pmt) return;
-    fetch(`/api/v1/invoices?limit=200&contactId=${pmt.contactId}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setOpenInvoices(
-            (data.data as InvoiceOption[]).filter(
-              (inv) =>
-                ["sent", "partial", "overdue"].includes(inv.status) &&
-                inv.amountDue > 0 &&
-                inv.currencyCode === pmt.currencyCode
-            )
-          );
-        }
-      });
-  }, [orgId, applyOpen, pmt]);
+  const { data: openData } = useApi<{ data?: InvoiceOption[] }>(applyOpen && pmt ? `/api/v1/invoices?limit=200&contactId=${pmt.contactId}` : null);
+  const openInvoices = useMemo(
+    () =>
+      (openData?.data ?? []).filter(
+        (inv) =>
+          ["sent", "partial", "overdue"].includes(inv.status) &&
+          inv.amountDue > 0 &&
+          inv.currencyCode === pmt?.currencyCode
+      ),
+    [openData, pmt?.currencyCode]
+  );
+
+  const allocatedTotal = pmt ? pmt.allocations.reduce((sum, a) => sum + a.amount, 0) : 0;
+  const unallocated = pmt ? pmt.amount - allocatedTotal : 0;
 
   async function handleAllocate() {
     if (!orgId || !applyInvoiceId || !pmt) return;
@@ -155,27 +123,29 @@ export default function PaymentDetailPage() {
       toast.error("That's more than this invoice still needs");
       return;
     }
+    if (amount > unallocated) {
+      toast.error("That's more than this payment has left");
+      return;
+    }
     setApplyLoading(true);
     try {
-      const res = await fetch(`/api/v1/invoices/${applyInvoiceId}/pay`, {
+      // Allocates the money this payment already brought in (no new payment,
+      // so the cash isn't counted twice).
+      const res = await fetch(`/api/v1/payments/${id}/allocate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-organization-id": orgId,
         },
-        body: JSON.stringify({
-          amount,
-          date: pmt.date,
-          method: pmt.method,
-          reference: pmt.reference || null,
-        }),
+        body: JSON.stringify({ documentId: applyInvoiceId, amount }),
       });
       if (res.ok) {
+        cache.invalidate(url);
+        cache.invalidate("/api/v1/invoices");
         setApplyOpen(false);
         setApplyInvoiceId("");
         setApplyAmount("");
         toast.success("Leftover put toward the invoice");
-        loadPayment();
       } else {
         const data = await res.json();
         toast.error(typeof data.error === "string" ? data.error : "Couldn't allocate the leftover");
@@ -188,20 +158,18 @@ export default function PaymentDetailPage() {
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
   if (!pmt) return <div className="space-y-6"><PageHeader title="Payment not found" /></div>;
 
-  const allocatedTotal = pmt.allocations.reduce((sum, a) => sum + a.amount, 0);
-  const unallocated = pmt.amount - allocatedTotal;
   const cur = pmt.currencyCode;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Payment ${pmt.paymentNumber}`}
-        description={`From: ${pmt.contact?.name || "Unknown"}`}
+        description={`${pmt.type === "made" ? "To" : "From"}: ${pmt.contact?.name || "Unknown"}`}
       >
         <Button variant="outline" size="sm" asChild>
           <Link href="/sales/payments"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>
-        {unallocated > 0 && (
+        {unallocated > 0 && pmt.type === "received" && (
           <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
             <DialogTrigger asChild>
               <Button
@@ -266,12 +234,12 @@ export default function PaymentDetailPage() {
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <Badge variant="outline">{methodLabels[pmt.method] || pmt.method}</Badge>
-        <span className="text-xs sm:text-sm text-muted-foreground">Received {pmt.date}</span>
+        <span className="text-xs sm:text-sm text-muted-foreground">{pmt.type === "made" ? "Paid" : "Received"} {pmt.date}</span>
         {pmt.reference && (
           <span className="text-xs sm:text-sm text-muted-foreground">Ref: {pmt.reference}</span>
         )}
         {pmt.bankAccount && (
-          <span className="text-xs sm:text-sm text-muted-foreground">Into: {pmt.bankAccount.name}</span>
+          <span className="text-xs sm:text-sm text-muted-foreground">Into: {pmt.bankAccount.accountName}</span>
         )}
       </div>
 
@@ -296,7 +264,7 @@ export default function PaymentDetailPage() {
         </div>
       </div>
 
-      {unallocated > 0 && (
+      {unallocated > 0 && pmt.type === "received" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           {formatMoney(unallocated, cur)} of this payment hasn&apos;t been put toward any invoice yet.
           Use &ldquo;Put leftover toward an invoice&rdquo; above to apply it to an open invoice for this customer.
@@ -321,7 +289,7 @@ export default function PaymentDetailPage() {
                     <FileText className="size-3.5 text-muted-foreground" />
                     {inv ? (
                       <Link
-                        href={`/sales/invoices/${a.documentId}`}
+                        href={`/sales/${a.documentId}`}
                         className="font-medium hover:underline"
                       >
                         {inv.invoiceNumber}

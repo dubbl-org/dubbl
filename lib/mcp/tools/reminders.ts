@@ -257,7 +257,7 @@ export function registerReminderTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "process_reminders",
-    "Run the payment-reminder sweep for the org now. Evaluates every enabled rule against current invoices/bills, sends any due reminder emails, and records a reminder log entry for each. No-op (returns zero counts) if email isn't configured/verified. Returns { sent, failed, skipped } counts.",
+    "Run the payment-reminder sweep for the org now. Evaluates every enabled rule against current invoices/bills, sends any due reminder emails, and records a reminder log entry for each. Emails go out through the org's own mail server when it's set up and verified, otherwise through dubbl's shared sender with replies going to the org's contact email. Returns { sent, failed, skipped } counts.",
     {},
     () =>
       wrapTool(ctx, async () => {

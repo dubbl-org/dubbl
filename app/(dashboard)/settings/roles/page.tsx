@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useApi } from "@/lib/query/use-api";
+import { PERMISSION_CATEGORIES } from "@/lib/plans";
 import { toast } from "sonner";
 import { Plus, ShieldCheck, MoreHorizontal, Loader2, Trash2, Pencil } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -35,26 +37,6 @@ interface CustomRole {
   createdAt: string;
 }
 
-const PERMISSION_CATEGORIES: Record<string, string[]> = {
-  "General": ["view:data"],
-  "Accounting": ["create:entries", "edit:entries", "post:entries", "void:entries", "manage:accounts", "manage:recurring", "manage:period-lock"],
-  "Invoicing": ["manage:invoices", "approve:invoices", "manage:credit-notes", "manage:debit-notes"],
-  "Bills": ["manage:bills", "approve:bills"],
-  "Banking": ["manage:banking", "manage:bank-rules"],
-  "Contacts": ["manage:contacts"],
-  "Payments": ["manage:payments"],
-  "Expenses": ["manage:expenses", "approve:expenses"],
-  "Inventory": ["manage:inventory"],
-  "Payroll": ["manage:payroll", "approve:payroll", "manage:timesheets", "manage:leave", "manage:contractors", "view:payslips", "manage:compensation", "manage:tax-config", "manage:shifts", "self-service:payroll", "view:payroll-reports"],
-  "Projects": ["manage:projects"],
-  "Assets": ["manage:assets"],
-  "Budgets": ["manage:budgets"],
-  "Tax": ["manage:tax-rates"],
-  "Cost Centers": ["manage:cost-centers"],
-  "Admin": ["manage:teams", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
-  "Owner": ["manage:billing", "delete:organization"],
-};
-
 // Plain-language label for each permission. The end user is not an accountant,
 // so these describe what the permission lets someone DO rather than echoing the
 // internal permission code (e.g. "post:entries" -> "Finalize transactions").
@@ -67,6 +49,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "manage:accounts": "Manage the chart of accounts",
   "manage:recurring": "Manage repeating transactions",
   "manage:period-lock": "Lock past dates",
+  "bypass:period-lock": "Work in dates locked for staff (advisor lock)",
   "manage:invoices": "Manage invoices",
   "approve:invoices": "Approve invoices",
   "manage:credit-notes": "Manage refunds to customers",
@@ -96,6 +79,15 @@ const PERMISSION_LABELS: Record<string, string> = {
   "manage:budgets": "Manage budgets",
   "manage:tax-rates": "Manage tax rates",
   "manage:cost-centers": "Manage cost centers",
+  "manage:webhooks": "Manage webhooks",
+  "manage:approvals": "Manage approval workflows",
+  "manage:reports": "Manage saved and scheduled reports",
+  "manage:integrations": "Manage integrations & email sending",
+  "manage:time-tracking": "Track time",
+  "manage:purchases": "Manage purchase orders & requisitions",
+  "approve:purchases": "Approve purchases",
+  "manage:organization": "Edit organization settings",
+  "manage:members": "Manage people",
   "manage:teams": "Manage teams",
   "invite:members": "Invite people",
   "change:roles": "Change people's access level",
@@ -111,32 +103,14 @@ function formatPermission(p: string) {
 }
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<CustomRole[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ roles?: CustomRole[] }>("/api/v1/roles");
+  const roles = data?.roles ?? [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-
-  async function fetchRoles() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/roles", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.roles) setRoles(data.roles);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchRoles();
-  }, []);
 
   function openCreate() {
     setEditingRole(null);
@@ -187,7 +161,6 @@ export default function RolesPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setSheetOpen(false);
-      await fetchRoles();
       toast.success(editingRole ? "Role updated" : "Role created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save role");
@@ -205,7 +178,6 @@ export default function RolesPage() {
         headers: { "x-organization-id": orgId },
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchRoles();
       toast.success("Role deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete role");

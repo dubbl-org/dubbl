@@ -14,10 +14,11 @@ export interface AssistantTool {
   run: (input: unknown) => Promise<{ text: string; isError: boolean }>;
 }
 
-export interface AnthropicTool {
+/** A tool as offered to the model: a name, a description and a JSON Schema for its input. */
+export interface ModelTool {
   name: string;
   description: string;
-  input_schema: Record<string, unknown>;
+  parameters: Record<string, unknown>;
 }
 
 type McpResult = { content: { type: string; text?: string }[]; isError?: boolean };
@@ -131,17 +132,17 @@ export function collectTools(ctx: AuthContext): Map<string, AssistantTool> {
   return tools;
 }
 
-export function toAnthropicTool(tool: AssistantTool): AnthropicTool {
+export function toModelTool(tool: AssistantTool): ModelTool {
   const { $schema: _ignored, ...schema } = z.toJSONSchema(z.object(tool.shape), { io: "input" }) as Record<string, unknown>;
   void _ignored;
-  return { name: tool.name, description: tool.description, input_schema: schema };
+  return { name: tool.name, description: tool.description, parameters: schema };
 }
 
-export const FIND_TOOLS: AnthropicTool = {
+export const FIND_TOOLS: ModelTool = {
   name: "find_tools",
   description:
     "Search dubbl's full set of tools by keyword when none of your loaded tools fit (e.g. 'reminder', 'budget', 'payroll run', 'credit note'). Matching tools become available on your next step. Returns name, description and whether each tool needs the user's approval.",
-  input_schema: {
+  parameters: {
     type: "object",
     properties: {
       query: { type: "string", description: "A few keywords describing what you want to do" },
@@ -179,6 +180,6 @@ export function centsFields(tool: AssistantTool): string[] {
     if (n.items) walk(n.items, key);
     for (const v of n.anyOf ?? []) walk(v, key);
   };
-  walk(toAnthropicTool(tool).input_schema);
+  walk(toModelTool(tool).parameters);
   return [...found];
 }

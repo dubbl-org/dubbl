@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { document } from "@/lib/db/schema";
 import { getObjectBytes } from "@/lib/s3";
-import type { ApiBlock, ApiMessage, FileBlock, StoredMessage } from "./anthropic";
+import type { ApiBlock, ApiMessage, FileBlock, StoredMessage } from "./model";
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 export const TEXT_TYPES = ["text/csv", "text/plain", "application/json", "text/tab-separated-values"];
@@ -36,7 +36,7 @@ const note = (f: FileBlock) =>
 
 /**
  * Turn stored file references into blocks the model can read: images and PDFs
- * as base64, spreadsheets and text inline. Bytes are fetched from storage on
+ * as base64, spreadsheets and text inline as text. Bytes are fetched from storage on
  * each request and never kept in the conversation.
  */
 export async function expandFiles(messages: StoredMessage[], orgId: string): Promise<ApiMessage[]> {
@@ -66,20 +66,20 @@ export async function expandFiles(messages: StoredMessage[], orgId: string): Pro
     if (IMAGE_TYPES.includes(f.mimeType)) {
       return [
         { type: "text", text: note(f) },
-        { type: "image", source: { type: "base64", media_type: f.mimeType, data: Buffer.from(data).toString("base64") } },
+        { type: "image", mimeType: f.mimeType, data: Buffer.from(data).toString("base64") },
       ];
     }
     if (f.mimeType === "application/pdf") {
       return [
         { type: "text", text: note(f) },
-        { type: "document", title: f.fileName, source: { type: "base64", media_type: "application/pdf", data: Buffer.from(data).toString("base64") } },
+        { type: "pdf", fileName: f.fileName, data: Buffer.from(data).toString("base64") },
       ];
     }
     let text = new TextDecoder().decode(data);
     if (text.length > MAX_TEXT_CHARS) text = `${text.slice(0, MAX_TEXT_CHARS)}\n… (file truncated)`;
     return [
       { type: "text", text: note(f) },
-      { type: "document", title: f.fileName, source: { type: "text", media_type: "text/plain", data: text || "(empty file)" } },
+      { type: "text", text: `Contents of "${f.fileName}":\n\n${text || "(empty file)"}` },
     ];
   };
 

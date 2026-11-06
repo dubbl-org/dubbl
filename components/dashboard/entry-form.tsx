@@ -137,8 +137,8 @@ export function EntryForm({ accounts, onSubmit, loading, initial, onCancel, subm
         <div className="space-y-1">
           <Label>Entry lines</Label>
           <p className="text-xs text-muted-foreground">
-            Each line is money in (debit) or money out (credit). The Debit and
-            Credit columns must add up to the same total.
+            Debits increase what you own and your expenses; credits increase what
+            you owe, your equity and your income. The two columns must add up to the same total.
           </p>
         </div>
         <div className="overflow-x-auto rounded-lg border">

@@ -601,6 +601,7 @@ export async function build1099Report(
       id: true,
       name: true,
       taxIdentifier: true,
+      taxNumber: true,
       w9TaxClassification: true,
       backupWithholding: true,
     },
@@ -633,7 +634,8 @@ export async function build1099Report(
     return {
       contactId: v.id,
       name: v.name,
-      taxIdentifier: v.taxIdentifier ?? null,
+      // The W-9 TIN; falls back to the contact's general tax number field.
+      taxIdentifier: v.taxIdentifier || v.taxNumber || null,
       w9TaxClassification: v.w9TaxClassification ?? null,
       backupWithholding: v.backupWithholding,
       totalPaid: agg.total,

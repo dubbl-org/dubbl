@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, chartAccount } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { createCategorizationJournalEntry, resolveBaseRate } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { logAudit } from "@/lib/api/audit";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { MissingExchangeRateError } from "@/lib/currency/converter";
 import { z } from "zod";
 
@@ -53,6 +54,25 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { items } = bulkSchema.parse(body);
+
+    // Every cost center being newly set must be active. Checked up front so
+    // one bad pick rejects the batch (400) before anything posts; a cost center
+    // already saved on a transaction stays allowed.
+    const ccItems = items.filter((i) => i.costCenterId);
+    if (ccItems.length > 0) {
+      const saved = await db.query.bankTransaction.findMany({
+        where: inArray(
+          bankTransaction.id,
+          ccItems.map((i) => i.transactionId).filter((id) => z.string().uuid().safeParse(id).success)
+        ),
+        columns: { id: true, costCenterId: true },
+      });
+      const savedById = new Map(saved.map((t) => [t.id, t.costCenterId]));
+      await assertCostCentersActive(
+        ctx.organizationId,
+        ccItems.filter((i) => i.costCenterId !== savedById.get(i.transactionId)).map((i) => i.costCenterId)
+      );
+    }
 
     const results: ItemResult[] = [];
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AccountPicker } from "./account-picker";
+import { InventoryItemPicker, type InventoryItemOption } from "./inventory-item-picker";
+import { useApi } from "@/lib/query/use-api";
 
 export interface LineItem {
   description: string;
@@ -20,6 +21,8 @@ export interface LineItem {
   unitPrice: string;
   accountId: string;
   taxRateId: string;
+  /** Inventory item this line buys or sells (optional; only with `stockItems`). */
+  inventoryItemId?: string | null;
 }
 
 // Mirrors the tax-rates API row shape ({ taxRates: [...] } from GET /api/v1/tax-rates).
@@ -38,6 +41,12 @@ interface LineItemsEditorProps {
   accountTypeFilter?: string[];
   // Intent of the document, so we can surface purchase-side reclaim hints.
   taxContext?: "sales" | "purchase";
+  /** Show an inventory item picker on each line, so the line moves stock. */
+  stockItems?: boolean;
+  /** Account / tax rate a newly added line starts with (e.g. the contact's defaults). */
+  newLineDefaults?: { accountId?: string; taxRateId?: string };
+  /** The contact isn't charged tax: lines are fixed to "No tax". */
+  taxLocked?: boolean;
 }
 
 // Format a basis-point rate as a percentage (2000 -> "20", 1750 -> "17.5").
@@ -59,19 +68,11 @@ function reclaimHint(rate: TaxRateOption): string | null {
   return "reclaimable";
 }
 
-export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext }: LineItemsEditorProps) {
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
-
-  // Fetch the org's tax rates once (org via x-organization-id, mirroring the
-  // bank-flow tax dropdown). Best-effort: on failure only "No tax" is offered.
-  useEffect(() => {
-    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-    if (!orgId) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
-      .catch(() => {});
-  }, []);
+export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext, stockItems, newLineDefaults, taxLocked }: LineItemsEditorProps) {
+  // The org's tax rates, from the shared cache (mirroring the bank-flow tax
+  // dropdown). Best-effort: on failure only "No tax" is offered.
+  const { data: taxRatesData } = useApi<{ taxRates?: TaxRateOption[] }>("/api/v1/tax-rates");
+  const taxRates = taxRatesData?.taxRates ?? [];
 
   function updateLine(index: number, field: keyof LineItem, value: string) {
     const updated = lines.map((l, i) =>
@@ -80,10 +81,33 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
     onChange(updated);
   }
 
+  // Picking an item links the line to it and fills in a blank description and
+  // price (sale price on sales documents, purchase price on purchases).
+  function pickItem(index: number, itemId: string, item?: InventoryItemOption) {
+    const updated = lines.map((l, i) => {
+      if (i !== index) return l;
+      const next: LineItem = { ...l, inventoryItemId: itemId };
+      if (item) {
+        if (!l.description.trim()) next.description = item.name;
+        const cents = taxContext === "purchase" ? item.purchasePrice : item.salePrice;
+        if (!l.unitPrice && cents) next.unitPrice = (cents / 100).toFixed(2);
+        if (taxContext === "sales" && !l.accountId && item.revenueAccountId) next.accountId = item.revenueAccountId;
+      }
+      return next;
+    });
+    onChange(updated);
+  }
+
   function addLine() {
     onChange([
       ...lines,
-      { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
+      {
+        description: "",
+        quantity: "1",
+        unitPrice: "",
+        accountId: newLineDefaults?.accountId ?? "",
+        taxRateId: taxLocked ? "" : newLineDefaults?.taxRateId ?? "",
+      },
     ]);
   }
 
@@ -101,7 +125,7 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
   // Tax-EXCLUSIVE: tax is computed on top of qty*price, matching how the
   // invoice/bill routes post (taxAmount = round(amount * rateBp / 10000)).
   function lineTax(line: LineItem) {
-    if (!line.taxRateId) return 0;
+    if (taxLocked || !line.taxRateId) return 0;
     const rate = taxRates.find((t) => t.id === line.taxRateId);
     if (!rate || rate.rate <= 0) return 0;
     return Math.round((lineAmount(line) * 100 * rate.rate) / 10000) / 100;
@@ -139,6 +163,14 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
                   onChange={(e) => updateLine(i, "description", e.target.value)}
                   placeholder="Item description"
                 />
+                {stockItems && (
+                  <InventoryItemPicker
+                    value={line.inventoryItemId ?? ""}
+                    onChange={(id, item) => pickItem(i, id, item)}
+                    placeholder="Stock item (optional)"
+                    compact
+                  />
+                )}
                 <AccountPicker
                   value={line.accountId}
                   onChange={(v) => updateLine(i, "accountId", v)}
@@ -146,8 +178,9 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
                   placeholder="Account"
                 />
                 <Select
-                  value={line.taxRateId || "none"}
+                  value={taxLocked ? "none" : line.taxRateId || "none"}
                   onValueChange={(v) => updateLine(i, "taxRateId", v === "none" ? "" : v)}
+                  disabled={taxLocked}
                 >
                   <SelectTrigger className="h-8 text-sm">
                     <SelectValue placeholder="No tax" />
@@ -163,6 +196,9 @@ export function LineItemsEditor({ lines, onChange, accountTypeFilter, taxContext
                 </Select>
                 {hint && (
                   <p className="text-[11px] text-muted-foreground">{hint}</p>
+                )}
+                {taxLocked && i === 0 && (
+                  <p className="text-[11px] text-muted-foreground">This contact isn&apos;t charged tax</p>
                 )}
               </div>
               <Input

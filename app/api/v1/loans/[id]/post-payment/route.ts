@@ -13,6 +13,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertNotLocked } from "@/lib/api/period-lock";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -84,16 +85,21 @@ export async function POST(
       );
     }
 
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentDate = nextEntry.date || today;
+
+    // The payment is dated on its schedule date; refuse a locked period.
+    await assertNotLocked(ctx.organizationId, paymentDate, ctx);
+
     // Create journal entry
     const entryNumber = await getNextEntryNumber(ctx.organizationId);
-    const today = new Date().toISOString().slice(0, 10);
 
     const [je] = await db
       .insert(journalEntry)
       .values({
         organizationId: ctx.organizationId,
         entryNumber,
-        date: nextEntry.date || today,
+        date: paymentDate,
         description: `Loan payment #${nextEntry.periodNumber} for ${found.name}`,
         reference: `LOAN-${found.name}-${nextEntry.periodNumber}`,
         status: "posted",

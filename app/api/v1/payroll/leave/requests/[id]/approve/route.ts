@@ -1,10 +1,11 @@
 import { db } from "@/lib/db";
-import { leaveRequest, employeeLeaveBalance, member } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { leaveRequest, member } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { syncLeaveBalances } from "@/lib/api/leave-balances";
 
 export async function POST(
   request: Request,
@@ -46,20 +47,11 @@ export async function POST(
       ))
       .returning();
 
-    // Update leave balance
-    const year = new Date().getFullYear();
-    await db
-      .update(employeeLeaveBalance)
-      .set({
-        usedHours: sql`${employeeLeaveBalance.usedHours} + ${req.hours}`,
-        balance: sql`${employeeLeaveBalance.balance} - ${req.hours}`,
-        updatedAt: new Date(),
-      })
-      .where(and(
-        eq(employeeLeaveBalance.employeeId, req.employeeId),
-        eq(employeeLeaveBalance.policyId, req.policyId),
-        eq(employeeLeaveBalance.year, year)
-      ));
+    // Recalculate the employee's balances for the year the leave falls in.
+    await syncLeaveBalances(ctx.organizationId, {
+      employeeIds: [req.employeeId],
+      year: Number(req.startDate.slice(0, 4)),
+    });
 
     logAudit({ ctx, action: "approve", entityType: "leaveRequest", entityId: id, request });
 

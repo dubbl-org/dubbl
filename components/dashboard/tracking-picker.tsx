@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -9,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useApiRecords } from "@/lib/query/use-api";
 
-interface CostCenterOpt { id: string; code: string; name: string }
+interface CostCenterOpt { id: string; code: string; name: string; isActive: boolean }
 interface ProjectOpt { id: string; name: string }
 
 /**
@@ -29,21 +29,12 @@ export function TrackingPicker({
   projectId: string;
   onChange: (v: { costCenterId: string; projectId: string }) => void;
 }) {
-  const [centers, setCenters] = useState<CostCenterOpt[]>([]);
-  const [projects, setProjects] = useState<ProjectOpt[]>([]);
-
-  useEffect(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-    fetch("/api/v1/cost-centers?limit=200", { headers })
-      .then((r) => r.json())
-      .then((d) => setCenters((d.data ?? []).map((c: CostCenterOpt) => ({ id: c.id, code: c.code, name: c.name }))))
-      .catch(() => {});
-    fetch("/api/v1/projects?status=active&limit=200", { headers })
-      .then((r) => r.json())
-      .then((d) => setProjects((d.data ?? []).map((p: ProjectOpt) => ({ id: p.id, name: p.name }))))
-      .catch(() => {});
-  }, [orgId]);
+  // Pages through every cost centre and project (the API returns at most 100 per request).
+  const { rows: allCenters } = useApiRecords<CostCenterOpt>(orgId ? "/api/v1/cost-centers" : null);
+  const { rows: projects } = useApiRecords<ProjectOpt>(orgId ? "/api/v1/projects?status=active" : null);
+  // Inactive cost centres are hidden from the picker, except the one already
+  // selected (so an existing value still shows its name).
+  const centers = allCenters.filter((c) => c.isActive || c.id === costCenterId);
 
   if (centers.length === 0 && projects.length === 0) return null;
 
@@ -62,6 +53,7 @@ export function TrackingPicker({
               {centers.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="text-muted-foreground tabular-nums">{c.code}</span> {c.name}
+                  {!c.isActive && <span className="text-muted-foreground"> (inactive)</span>}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, TrendingUp, Check } from "lucide-react";
+import { ArrowLeft, Ban, TrendingUp, Check, FileText } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import Link from "next/link";
 
 interface RevenueEntry {
@@ -29,6 +30,9 @@ interface RevenueScheduleDetail {
   method: string;
   status: string;
   invoiceId: string | null;
+  invoiceNumber: string | null;
+  contactName: string | null;
+  currencyCode: string | null;
   entries: RevenueEntry[];
 }
 
@@ -55,36 +59,15 @@ const methodLabels: Record<string, string> = {
 export default function RevenueScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [rs, setRs] = useState<RevenueScheduleDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/revenue-schedules/${id}`;
+  const { data, loading } = useApi<{ schedule?: RevenueScheduleDetail }>(url);
+  const cache = useApiCache();
+  const rs = data?.schedule ?? null;
   const [recognizing, setRecognizing] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Sales · Revenue Schedule");
-
-  function refetch() {
-    if (!orgId) return;
-    fetch(`/api/v1/revenue-schedules/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.schedule) setRs(data.schedule);
-      });
-  }
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/revenue-schedules/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.schedule) setRs(data.schedule);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
 
   async function handleRecognize() {
     if (!orgId) return;
@@ -95,8 +78,8 @@ export default function RevenueScheduleDetailPage() {
         headers: { "x-organization-id": orgId },
       });
       if (res.ok) {
+        cache.invalidate(url);
         toast.success("Counted the next period as income");
-        refetch();
       } else {
         const data = await res.json();
         toast.error(typeof data.error === "string" ? data.error : "Couldn't count the next period");
@@ -110,7 +93,7 @@ export default function RevenueScheduleDetailPage() {
     if (!orgId) return;
     await confirm({
       title: "Cancel this schedule?",
-      description: "This stops any further income from being counted on this schedule. Periods already counted stay as they are. You can't undo this.",
+      description: "This stops the schedule. Income not counted yet goes back into your income today, and periods already counted stay as they are. You can't undo this.",
       confirmLabel: "Cancel schedule",
       destructive: true,
       onConfirm: async () => {
@@ -119,8 +102,8 @@ export default function RevenueScheduleDetailPage() {
           headers: { "x-organization-id": orgId },
         });
         if (res.ok) {
+          cache.invalidate(url);
           toast.success("Schedule cancelled");
-          refetch();
         } else {
           const data = await res.json();
           toast.error(typeof data.error === "string" ? data.error : "Couldn't cancel this schedule");
@@ -135,13 +118,22 @@ export default function RevenueScheduleDetailPage() {
   const sortedEntries = [...rs.entries].sort((a, b) => a.periodDate.localeCompare(b.periodDate));
   const nextEntry = sortedEntries.find((e) => !e.recognized);
   const remaining = rs.totalAmount - rs.recognizedAmount;
+  const money = (cents: number) => formatMoney(cents, rs.currencyCode ?? undefined);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Revenue schedule" description={`${rs.startDate} – ${rs.endDate} · ${methodLabels[rs.method] || rs.method}`}>
+      <PageHeader
+        title={rs.invoiceNumber ? `Revenue schedule · ${rs.invoiceNumber}` : "Revenue schedule"}
+        description={`${rs.contactName ? `${rs.contactName} · ` : ""}${rs.startDate} – ${rs.endDate} · ${methodLabels[rs.method] || rs.method}`}
+      >
         <Button variant="outline" size="sm" asChild>
           <Link href="/sales/revenue-schedules"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>
+        {rs.invoiceId && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/sales/${rs.invoiceId}`}><FileText className="mr-2 size-4" />View invoice</Link>
+          </Button>
+        )}
         {rs.status === "active" && nextEntry && (
           <Button
             size="sm"
@@ -150,7 +142,7 @@ export default function RevenueScheduleDetailPage() {
             className="bg-brand-600 hover:bg-brand-700"
             title="Count the next period's amount as income now"
           >
-            <TrendingUp className="mr-2 size-4" />Count next period
+            <TrendingUp className="mr-2 size-4" />{rs.method === "milestone" ? "Count next milestone" : "Count next period"}
           </Button>
         )}
         {rs.status === "active" && (
@@ -172,15 +164,15 @@ export default function RevenueScheduleDetailPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-xl font-bold font-mono">{formatMoney(rs.totalAmount)}</p>
+          <p className="text-xl font-bold font-mono">{money(rs.totalAmount)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Counted so far</p>
-          <p className="text-xl font-bold font-mono text-brand-600">{formatMoney(rs.recognizedAmount)}</p>
+          <p className="text-xl font-bold font-mono text-brand-600">{money(rs.recognizedAmount)}</p>
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Left to count</p>
-          <p className="text-xl font-bold font-mono text-amber-600">{formatMoney(remaining)}</p>
+          <p className="text-xl font-bold font-mono text-amber-600">{money(rs.status === "cancelled" ? 0 : remaining)}</p>
         </div>
       </div>
 
@@ -193,7 +185,7 @@ export default function RevenueScheduleDetailPage() {
         {sortedEntries.map((entry) => (
           <div key={entry.id} className="grid min-w-[400px] grid-cols-[1fr_140px_120px] gap-2 border-b px-4 py-2 last:border-b-0 items-center">
             <span className="text-sm">{entry.periodDate}</span>
-            <span className="text-right text-sm font-mono font-medium">{formatMoney(entry.amount)}</span>
+            <span className="text-right text-sm font-mono font-medium">{money(entry.amount)}</span>
             <span className="text-right text-sm">
               {entry.recognized ? (
                 <Badge variant="outline" className="border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300">

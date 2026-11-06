@@ -16,12 +16,13 @@ import {
  * Per-box drill-down for the VAT return / BAS.
  *
  * Returns the underlying posted journal lines that make up a single box for the
- * period — the output VAT (2200) control lines for box 1 / 1A, or the input VAT
- * (1500) control lines for box 4 / 1B — with each line's entry context
+ * period: the output VAT (2200) control lines for box 1 / 1A (box 2 for the
+ * reverse-charge part), or the input VAT (1500) control lines for box 4 / 1B,
+ * with each line's entry context
  * (entry number, date, reference, sourceType) and account.
  *
  * Query params:
- *   box        required — "1" | "4" (VAT) or "1A" | "1B" (BAS)
+ *   box        required: "1" | "2" | "4" (VAT) or "1A" | "1B" (BAS)
  *   periodId   optional — a tax_period to resolve start/end (and basis default)
  *   startDate  optional — required if periodId is not supplied
  *   endDate    optional — required if periodId is not supplied
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Box is not journal-line drillable. Only output VAT (1 / 1A) and input VAT (4 / 1B) boxes have underlying control-account lines.",
+            "Box is not journal-line drillable. Only output VAT (1 / 2 / 1A) and input VAT (4 / 1B) boxes have underlying control-account lines.",
         },
         { status: 400 }
       );

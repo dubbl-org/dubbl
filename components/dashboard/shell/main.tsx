@@ -15,6 +15,7 @@ export function ShellMain({ children }: { children: ReactNode }) {
   return (
     <main
       ref={ref}
+      data-shell="main"
       className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-content-bg md:rounded-xl md:border md:border-border/80 md:shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
     >
       {children}

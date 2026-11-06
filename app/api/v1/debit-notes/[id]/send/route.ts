@@ -60,6 +60,9 @@ export async function POST(
       );
     }
 
+    // Check the lock before emailing, so a blocked send doesn't still email.
+    await assertNotLocked(ctx.organizationId, found.issueDate, ctx);
+
     const rawBody = await request.json().catch(() => ({}));
     const emailParsed = sendBodySchema.safeParse(rawBody);
 
@@ -83,8 +86,6 @@ export async function POST(
       });
     }
 
-    await assertNotLocked(ctx.organizationId, found.issueDate);
-
     // Create journal entry
     const entry = await createDebitNoteJournalEntry(
       { organizationId: ctx.organizationId, userId: ctx.userId },
@@ -96,8 +97,10 @@ export async function POST(
           accountId: l.accountId,
           amount: l.amount,
           taxAmount: l.taxAmount,
+          taxRateId: l.taxRateId,
         })),
         date: found.issueDate,
+        currencyCode: found.currencyCode,
       }
     );
 

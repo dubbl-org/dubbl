@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import {
@@ -23,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface AuditEntry {
   id: string;
@@ -114,25 +114,8 @@ function ActivitySkeleton() {
 }
 
 export function ActivityFeed() {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const id = localStorage.getItem("activeOrgId");
-    if (!id) return;
-
-    fetch("/api/v1/audit-log?limit=5", {
-      headers: { "x-organization-id": id },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setEntries(data.data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, loading } = useApi<{ data?: AuditEntry[] }>("/api/v1/audit-log?limit=5");
+  const entries = data?.data ?? [];
 
   // Group entries by day
   const grouped = entries.reduce<{ label: string; items: AuditEntry[] }[]>((groups, entry) => {

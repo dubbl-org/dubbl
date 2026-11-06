@@ -61,7 +61,7 @@ const ACCOUNT_DEFS = {
  * Used for BOTH payrollItemTaxBreakdown.taxKind and (fallback) deduction-type
  * names so a FICA/Medicare line never lands in the income-tax bucket.
  */
-function classifyTaxKind(taxKind: string): string {
+export function classifyTaxKind(taxKind: string): string {
   const k = taxKind.toLowerCase();
   if (
     k.includes("social_security") ||
@@ -85,13 +85,13 @@ function classifyTaxKind(taxKind: string): string {
  * pre_tax deductions are typically pension/benefit/HSA style → 2245;
  * post_tax statutory items (garnishments) → 2236; payroll-tax-shaped names → 2235.
  */
-function classifyDeduction(name: string | null, category: string): string {
+export function classifyDeduction(name: string | null, category: string): string {
   const n = (name ?? "").toLowerCase();
   if (
     n.includes("social security") ||
     n.includes("medicare") ||
     n.includes("fica") ||
-    n.includes("nic") ||
+    /\bnic\b/.test(n) ||
     n.includes("national insurance") ||
     n.includes("payroll tax")
   ) {
@@ -101,7 +101,7 @@ function classifyDeduction(name: string | null, category: string): string {
     n.includes("paye") ||
     n.includes("income tax") ||
     n.includes("withholding") ||
-    n.includes("fit") ||
+    /\bfit\b/.test(n) ||
     n.includes("federal tax") ||
     n.includes("state tax")
   ) {
@@ -124,6 +124,34 @@ function classifyDeduction(name: string | null, category: string): string {
   }
   // garnishments, levies, union dues and other post-tax statutory deductions
   return OTHER_STATUTORY_PAYABLE_CODE;
+}
+
+/**
+ * Split what a pay item held back but didn't itemize (no tax or deduction
+ * rows, e.g. items created before those rows were stored) across liabilities:
+ * tax first to income tax payable (only when the item has no tax rows), then
+ * pre-tax deductions to pension & benefits, and the rest to other deductions.
+ * An item's deductions include its tax; older items may only carry the tax,
+ * so whichever is larger is what was held back. Pure; amounts in cents.
+ */
+export function splitUnitemizedWithholding(input: {
+  deductions: number;
+  taxAmount: number;
+  preTaxDeductions: number;
+  itemized: number;
+  hasTaxRows: boolean;
+}): { incomeTax: number; pensionBenefits: number; other: number } {
+  const held = Math.max(input.deductions, input.taxAmount);
+  let residual = held - input.itemized;
+  const out = { incomeTax: 0, pensionBenefits: 0, other: 0 };
+  if (residual <= 0) return out;
+  if (!input.hasTaxRows) {
+    out.incomeTax = Math.min(residual, Math.max(0, input.taxAmount));
+    residual -= out.incomeTax;
+  }
+  out.pensionBenefits = Math.min(residual, Math.max(0, input.preTaxDeductions));
+  out.other = residual - out.pensionBenefits;
+  return out;
 }
 
 /**
@@ -170,7 +198,14 @@ interface RunBuckets {
  */
 async function accumulateBaseBuckets(
   tx: Tx,
-  items: { id: string; grossAmount: number; fxRate: number | null }[]
+  items: {
+    id: string;
+    grossAmount: number;
+    fxRate: number | null;
+    deductions?: number | null;
+    taxAmount?: number | null;
+    preTaxDeductions?: number | null;
+  }[]
 ): Promise<RunBuckets> {
   const itemIds = items.map((i) => i.id);
   const itemRate = new Map<string, number>(items.map((i) => [i.id, i.fxRate ?? 1]));
@@ -235,6 +270,34 @@ async function accumulateBaseBuckets(
   // statutory FICA-shaped → 2235, income tax → 2220, garnishments/other → 2236).
   for (const d of deductionRows) {
     addLiability(classifyDeduction(d.name, d.category), toBase(d.payrollItemId, d.amount));
+  }
+
+  // Anything an item held back that isn't itemized above (items created before
+  // deduction lines were stored) still has to be credited somewhere, or the
+  // bank would be credited with more than the take-home pay. Tax goes to income
+  // tax payable, pre-tax deductions to pension & benefits, the rest to other
+  // deductions payable.
+  const itemizedByItem = new Map<string, number>();
+  const taxRowItems = new Set<string>();
+  for (const tb of taxBreakdowns) {
+    taxRowItems.add(tb.payrollItemId);
+    itemizedByItem.set(tb.payrollItemId, (itemizedByItem.get(tb.payrollItemId) ?? 0) + tb.amount);
+  }
+  for (const d of deductionRows) {
+    itemizedByItem.set(d.payrollItemId, (itemizedByItem.get(d.payrollItemId) ?? 0) + d.amount);
+  }
+  for (const it of items) {
+    if (it.deductions == null && it.taxAmount == null) continue;
+    const split = splitUnitemizedWithholding({
+      deductions: it.deductions ?? 0,
+      taxAmount: it.taxAmount ?? 0,
+      preTaxDeductions: it.preTaxDeductions ?? 0,
+      itemized: itemizedByItem.get(it.id) ?? 0,
+      hasTaxRows: taxRowItems.has(it.id),
+    });
+    addLiability(INCOME_TAX_PAYABLE_CODE, toBase(it.id, split.incomeTax));
+    addLiability(PENSION_BENEFITS_PAYABLE_CODE, toBase(it.id, split.pensionBenefits));
+    addLiability(OTHER_STATUTORY_PAYABLE_CODE, toBase(it.id, split.other));
   }
 
   const grossWages = items.reduce((sum, it) => sum + toBase(it.id, it.grossAmount), 0);
@@ -325,7 +388,10 @@ export async function postPayrollRun(
   // the gross-correction proportion, so each parent liability nets back in the
   // same proportion it was originally credited. Falls back to the correction
   // run's own breakdown if the parent has no posted gross/breakdown.
-  if (isCorrection && run.parentRunId) {
+  // The correction route already stores the parent's split, scaled, as the
+  // correction items' own breakdown rows; only fall back to scaling the parent
+  // here for corrections that carry no breakdown of their own.
+  if (isCorrection && run.parentRunId && own.liabilityByCode.size === 0 && own.employerTax === 0) {
     const parent = await tx.query.payrollRun.findFirst({
       where: and(
         eq(payrollRun.id, run.parentRunId),

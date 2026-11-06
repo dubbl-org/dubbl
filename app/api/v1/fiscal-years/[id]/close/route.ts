@@ -5,14 +5,13 @@ import {
   journalEntry,
   journalLine,
   chartAccount,
-  periodLock,
 } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, error, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { getRetainedEarningsAccount } from "@/lib/api/period-close";
+import { getRetainedEarningsAccount, lockThroughYearEnd } from "@/lib/api/period-close";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -186,17 +185,8 @@ export async function POST(
       .set({ isClosed: true })
       .where(eq(fiscalYear.id, fy.id));
 
-    // Upsert period lock with lockDate = fiscal year endDate
-    await db
-      .delete(periodLock)
-      .where(eq(periodLock.organizationId, ctx.organizationId));
-
-    await db.insert(periodLock).values({
-      organizationId: ctx.organizationId,
-      lockDate: fy.endDate,
-      lockedBy: ctx.userId,
-      reason: `Fiscal year ${fy.name} closed`,
-    });
+    // Lock past dates through the year end, never moving a later lock back.
+    await lockThroughYearEnd(ctx.organizationId, fy.endDate, ctx.userId, `Fiscal year ${fy.name} closed`);
 
     const updated = await db.query.fiscalYear.findFirst({
       where: eq(fiscalYear.id, fy.id),

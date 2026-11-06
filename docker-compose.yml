@@ -2,7 +2,7 @@ services:
   web:
     image: node:22-alpine
     working_dir: /app
-    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm db:push && (pnpm db:seed || true) && pnpm dev"
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm db:migrate && (pnpm db:seed || true) && pnpm dev"
     ports:
       - "3000:3000"
     volumes:
@@ -18,6 +18,8 @@ services:
     environment:
       DATABASE_URL: postgresql://dubbl:dubbl@postgres:5432/dubbl
       AUTH_SECRET: local-dev-secret-change-me-in-production
+      # Development only: encrypts saved SMTP passwords (openssl rand -hex 32 for real use)
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       WATCHPACK_POLLING: "true"
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
@@ -26,9 +28,21 @@ services:
       AUTH_APPLE_SECRET: ${AUTH_APPLE_SECRET:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_STANDARD_PRICE_ID: ${STRIPE_STANDARD_PRICE_ID:-}
+      STRIPE_STANDARD_ANNUAL_PRICE_ID: ${STRIPE_STANDARD_ANNUAL_PRICE_ID:-}
+      STRIPE_PREMIUM_PRICE_ID: ${STRIPE_PREMIUM_PRICE_ID:-}
+      STRIPE_PREMIUM_ANNUAL_PRICE_ID: ${STRIPE_PREMIUM_ANNUAL_PRICE_ID:-}
+      STRIPE_ULTIMATE_PRICE_ID: ${STRIPE_ULTIMATE_PRICE_ID:-}
+      STRIPE_ULTIMATE_ANNUAL_PRICE_ID: ${STRIPE_ULTIMATE_ANNUAL_PRICE_ID:-}
       STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-openai/gpt-6-luna}
+      ASSISTANT_REASONING_EFFORT: ${ASSISTANT_REASONING_EFFORT:-medium}
       S3_REGION: us-east-1
       S3_ENDPOINT: http://minio:9000
+      # The browser can't resolve "minio", so upload/download links use localhost
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY_ID: minioadmin
       S3_SECRET_ACCESS_KEY: minioadmin
       S3_BUCKET: dubbl

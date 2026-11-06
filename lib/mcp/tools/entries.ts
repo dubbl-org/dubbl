@@ -5,11 +5,15 @@ import { journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { reverseJournalEntry } from "@/lib/api/journal-automation";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkMonthlyLimit } from "@/lib/api/check-limit";
 import { logAudit } from "@/lib/api/audit";
+import { emitJournalPosted } from "@/lib/webhooks/events";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { approveEntity, assertApprovedIfRequired, rejectEntity, submitForApproval } from "@/lib/approvals/entities";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 
 export function registerEntryTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -264,7 +268,7 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "post_entry",
-    "Post a draft journal entry to make it final. Only draft entries can be posted. Posted entries affect account balances.",
+    "Post a draft journal entry to make it final. Only draft entries can be posted. Posted entries affect account balances. Blocked when the entry's date is in a locked period, and when an active approval workflow matches the entry until its approval request is fully approved (see submit_entry_for_approval).",
     {
       entryId: z.string().describe("The UUID of the draft entry to post"),
     },
@@ -283,6 +287,10 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
         if (entry.status !== "draft") {
           throw new Error("Only draft entries can be posted");
         }
+        // Same guards as the REST post route: the period must be open, and an
+        // entry an approval workflow applies to must be approved first.
+        await assertNotLocked(ctx.organizationId, entry.date, ctx);
+        await assertApprovedIfRequired(ctx, "journal_entry", params.entryId);
 
         const [updated] = await db
           .update(journalEntry)
@@ -294,6 +302,7 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
           .where(eq(journalEntry.id, params.entryId))
           .returning();
 
+        emitJournalPosted(ctx.organizationId, { id: updated.id });
         return { entry: updated };
       })
   );
@@ -451,6 +460,17 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
           throw new Error("Entry must have non-zero amounts");
         }
 
+        // Lines are replaced wholesale; cost centers already on the entry stay allowed.
+        const savedLines = await db.query.journalLine.findMany({
+          where: eq(journalLine.journalEntryId, params.entryId),
+          columns: { costCenterId: true },
+        });
+        await assertCostCentersActive(
+          ctx.organizationId,
+          params.lines.map((l) => l.costCenterId),
+          savedLines.map((l) => l.costCenterId)
+        );
+
         const updated = await db.transaction(async (tx) => {
           const [entry] = await tx
             .update(journalEntry)
@@ -502,6 +522,10 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
             },
           },
         });
+
+        // An approval covers the entry as it was: editing it cancels any
+        // pending or granted approval, so it has to be submitted again.
+        await cancelApprovalRequests(ctx.organizationId, "journal_entry", params.entryId);
 
         return { entry: updated };
       })
@@ -717,6 +741,11 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
           return { recoded: 0, entriesAffected: 0 };
         }
 
+        // A cost center being newly set on any line must be active.
+        if (patch.costCenterId && toChange.some((r) => r.costCenterId !== patch.costCenterId)) {
+          await assertCostCentersActive(ctx.organizationId, [patch.costCenterId]);
+        }
+
         await db.transaction(async (tx) => {
           for (const r of toChange) {
             await tx
@@ -763,6 +792,47 @@ export function registerEntryTools(server: McpServer, ctx: AuthContext) {
           recoded: toChange.length,
           entriesAffected: new Set(toChange.map((r) => r.entryId)).size,
         };
+      })
+  );
+
+  server.tool(
+    "submit_entry_for_approval",
+    "Send a draft journal entry to its approval workflow. Only needed when an active approval workflow for journal entries matches the entry (condition field: total = sum of debits in integer cents); then the entry can't be posted until every step approves. Opens an approval request and notifies the first approver; the entry stays a draft. Fails when no workflow applies or the entry is already waiting for / has approval. Returns the approval request.",
+    {
+      entryId: z.string().describe("The UUID of the draft journal entry"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const outcome = await submitForApproval(ctx, "journal_entry", params.entryId);
+        return { request: outcome.request };
+      })
+  );
+
+  server.tool(
+    "approve_entry",
+    "Approve the current step of a draft journal entry's approval request. Only the member named as that step's approver can act. After the last step the request is approved and the entry can be posted with post_entry. Returns the request and approved (true once every step has approved).",
+    {
+      entryId: z.string().describe("The UUID of the draft journal entry"),
+      comment: z.string().optional().describe("Optional comment recorded with the approval"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const outcome = await approveEntity(ctx, "journal_entry", params.entryId, params.comment);
+        return { request: outcome.request, approved: outcome.finalized };
+      })
+  );
+
+  server.tool(
+    "reject_entry",
+    "Reject a draft journal entry's approval request (current step's approver only). The whole request is rejected; the entry stays a draft that can be edited and submitted again. Returns the request.",
+    {
+      entryId: z.string().describe("The UUID of the draft journal entry"),
+      reason: z.string().optional().describe("Why the entry is rejected"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const outcome = await rejectEntity(ctx, "journal_entry", params.entryId, params.reason);
+        return { request: outcome.request };
       })
   );
 }

@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import { deal } from "@/lib/db/schema";
 import { eq, and, desc, asc, isNull, isNotNull, ilike } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
+import { CRM_PERMISSION, assertOrgUser, assertStageInPipeline, findPipeline } from "@/lib/api/crm-deals";
+import { dealStageChange } from "@/lib/crm/rules";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -95,15 +98,15 @@ export async function GET(request: Request) {
 }
 
 const createSchema = z.object({
-  pipelineId: z.string().uuid(),
+  pipelineId: z.guid(),
   stageId: z.string(),
-  contactId: z.string().uuid().nullable().optional(),
+  contactId: z.guid().nullable().optional(),
   title: z.string().min(1),
   valueCents: z.number().int().min(0).optional(),
   currency: currencyCodeSchema.optional(),
   probability: z.number().int().min(0).max(100).nullable().optional(),
   expectedCloseDate: z.string().nullable().optional(),
-  assignedTo: z.string().uuid().nullable().optional(),
+  assignedTo: z.guid().nullable().optional(),
   source: z.enum(["website", "referral", "cold_outreach", "event", "other"]).nullable().optional(),
   notes: z.string().nullable().optional(),
 });
@@ -111,14 +114,22 @@ const createSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, CRM_PERMISSION);
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
+    const p = await findPipeline(ctx, parsed.pipelineId);
+    assertStageInPipeline(p, parsed.stageId);
+    await assertOrgUser(ctx, parsed.assignedTo);
+
+    // A deal created straight into Won or Lost is closed from the start.
+    const closed = dealStageChange({ stageId: "", wonAt: null, lostAt: null, probability: null }, parsed.stageId);
     const [d] = await db
       .insert(deal)
       .values({
         organizationId: ctx.organizationId,
         ...parsed,
+        ...(closed.wonAt || closed.lostAt ? closed : {}),
       })
       .returning();
 

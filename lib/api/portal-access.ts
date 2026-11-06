@@ -23,6 +23,15 @@ export interface PortalAccessRow {
   activityCount: number;
 }
 
+/**
+ * Invoice statuses a customer must never see in their portal: drafts and
+ * documents still in (or rejected by) internal approval haven't been issued.
+ */
+export const PORTAL_HIDDEN_INVOICE_STATUSES = ["draft", "pending_approval", "rejected"] as const;
+
+/** Quote statuses hidden from the portal (drafts haven't been sent yet). */
+export const PORTAL_HIDDEN_QUOTE_STATUSES = ["draft"] as const;
+
 export class PortalAccessError extends Error {
   constructor(message: string, public status = 400) {
     super(message);

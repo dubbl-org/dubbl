@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { BankAccountSelect } from "@/components/dashboard/bank-account-select";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Send, DollarSign, Ban, Copy, Clock, Mail, Banknote, Download, AlertTriangle, X, Pencil, Loader2, FileX, Percent, Wallet, ThumbsUp, Bell } from "lucide-react";
@@ -38,10 +39,13 @@ import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApprovalPanel } from "@/components/dashboard/approval-panel";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
 import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
+import { TagPicker } from "@/components/dashboard/tag-picker";
 import Link from "next/link";
 
 interface InvoiceDetail {
@@ -165,6 +169,27 @@ interface PaymentRecord {
   method: string;
 }
 
+interface InvoiceResponse {
+  invoice?: InvoiceDetail;
+  payments?: PaymentRecord[];
+  base?: BaseAmounts;
+}
+
+interface ComplianceWarning {
+  field: string;
+  message: string;
+  severity: "error" | "warning";
+}
+
+interface SnapshotResponse {
+  sender?: Record<string, string | null>;
+  recipient?: Record<string, string | null>;
+}
+
+const NO_PAYMENTS: PaymentRecord[] = [];
+const NO_WARNINGS: ComplianceWarning[] = [];
+const NO_CREDITS: AvailableCredit[] = [];
+
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -183,19 +208,29 @@ export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [inv, setInv] = useState<InvoiceDetail | null>(null);
-  const [base, setBase] = useState<BaseAmounts | null>(null);
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const invoiceUrl = `/api/v1/invoices/${id}`;
+  const snapshotUrl = `/api/v1/invoices/${id}/snapshot`;
+  const cache = useApiCache();
+  const { data: invoiceData, loading } = useApi<InvoiceResponse>(invoiceUrl);
+  const inv = invoiceData?.invoice ?? null;
+  const base = invoiceData?.base ?? null;
+  const payments = invoiceData?.payments ?? NO_PAYMENTS;
+  const { data: complianceData } = useApi<{ warnings?: ComplianceWarning[] }>(`/api/v1/invoices/${id}/compliance`);
+  const complianceWarnings = complianceData?.warnings ?? NO_WARNINGS;
+  const { data: snapshotData } = useApi<SnapshotResponse>(snapshotUrl);
+  const senderSnapshot = snapshotData?.sender ?? null;
+  const recipientSnapshot = snapshotData?.recipient ?? null;
+  const { data: orgData } = useApi<{ organization?: { name?: string } }>("/api/v1/organization");
+  const orgName = orgData?.organization?.name || "";
+  const { data: creditsData } = useApi<{ credits?: AvailableCredit[] }>(`/api/v1/invoices/${id}/available-credits`);
+  const credits = Array.isArray(creditsData?.credits) ? creditsData.credits : NO_CREDITS;
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [payMethod, setPayMethod] = useState("bank_transfer");
   const [payOpen, setPayOpen] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payBankAccountId, setPayBankAccountId] = useState<string>("");
-  const [bankAccounts, setBankAccounts] = useState<{ id: string; name: string }[]>([]);
   const [duplicating, setDuplicating] = useState(false);
-  const [complianceWarnings, setComplianceWarnings] = useState<{ field: string; message: string; severity: "error" | "warning" }[]>([]);
   const [complianceDismissed, setComplianceDismissed] = useState(false);
   const [snapshotSheetOpen, setSnapshotSheetOpen] = useState(false);
   const [snapshotSaving, setSnapshotSaving] = useState(false);
@@ -209,17 +244,13 @@ export default function InvoiceDetailPage() {
   const [recipientAddress, setRecipientAddress] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientTaxNumber, setRecipientTaxNumber] = useState("");
-  const [senderSnapshot, setSenderSnapshot] = useState<Record<string, string | null> | null>(null);
-  const [recipientSnapshot, setRecipientSnapshot] = useState<Record<string, string | null> | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
-  const [orgName, setOrgName] = useState("");
   // Late fee / interest
   const [interestOpen, setInterestOpen] = useState(false);
   const [interestAmount, setInterestAmount] = useState("");
   const [interestLoading, setInterestLoading] = useState(false);
   // Available customer credits
-  const [credits, setCredits] = useState<AvailableCredit[]>([]);
   const [applyingCreditId, setApplyingCreditId] = useState<string | null>(null);
   // Approval actions (mirrors the bill detail flow)
   const [approving, setApproving] = useState(false);
@@ -230,77 +261,6 @@ export default function InvoiceDetailPage() {
 
   useEntityTitle(inv?.invoiceNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/invoices/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.invoice) setInv(data.invoice);
-        if (data.payments) setPayments(data.payments);
-        if (data.base) setBase(data.base);
-      })
-      .finally(() => setLoading(false));
-
-    fetch(`/api/v1/invoices/${id}/compliance`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.warnings) setComplianceWarnings(data.warnings);
-      })
-      .catch(() => {});
-
-    fetch(`/api/v1/invoices/${id}/snapshot`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.sender) setSenderSnapshot(data.sender);
-        if (data.recipient) setRecipientSnapshot(data.recipient);
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.organization?.name) setOrgName(data.organization.name);
-      })
-      .catch(() => {});
-
-    fetch(`/api/v1/invoices/${id}/available-credits`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.credits)) setCredits(data.credits);
-      })
-      .catch(() => {});
-  }, [id, orgId]);
-
-  // Re-pull the invoice (+ payments + base) and available credits after an
-  // action that changes balances (late fee, applying a credit).
-  function refetchInvoice() {
-    if (!orgId) return;
-    fetch(`/api/v1/invoices/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.invoice) setInv(data.invoice);
-        if (data.payments) setPayments(data.payments);
-        if (data.base) setBase(data.base);
-      })
-      .catch(() => {});
-    fetch(`/api/v1/invoices/${id}/available-credits`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.credits)) setCredits(data.credits);
-      })
-      .catch(() => {});
-  }
 
   async function handleChargeInterest() {
     if (!orgId) return;
@@ -326,7 +286,6 @@ export default function InvoiceDetailPage() {
         setInterestOpen(false);
         setInterestAmount("");
         toast.success("Late fee added as a new invoice");
-        refetchInvoice();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't add a late fee");
@@ -353,7 +312,6 @@ export default function InvoiceDetailPage() {
       });
       if (res.ok) {
         toast.success(`Applied ${formatMoney(amount, inv.currencyCode)} credit`);
-        refetchInvoice();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't apply this credit");
@@ -373,8 +331,9 @@ export default function InvoiceDetailPage() {
         headers: { "x-organization-id": orgId },
       });
       if (res.ok) {
-        toast.success("Invoice approved");
-        refetchInvoice();
+        const data = await res.json().catch(() => ({}));
+        // With more approval steps left, it only passes to the next approver.
+        toast.success(data.finalized === false ? "Approved. It's now with the next approver." : "Invoice approved");
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't approve this invoice");
@@ -398,7 +357,6 @@ export default function InvoiceDetailPage() {
         setRejectOpen(false);
         setRejectReason("");
         toast.success("Invoice rejected");
-        refetchInvoice();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't reject this invoice");
@@ -424,8 +382,7 @@ export default function InvoiceDetailPage() {
           });
           if (res.ok) {
             toast.success("Sent for approval");
-            refetchInvoice();
-          } else {
+              } else {
             const data = await res.json().catch(() => ({}));
             toast.error(typeof data.error === "string" ? data.error : "Couldn't send this invoice for approval");
           }
@@ -436,15 +393,6 @@ export default function InvoiceDetailPage() {
     });
   }
 
-  useEffect(() => {
-    if (!orgId || !payOpen) return;
-    fetch("/api/v1/bank-accounts", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setBankAccounts(data.data.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })));
-      })
-      .catch(() => {});
-  }, [orgId, payOpen]);
 
   function openSnapshotEdit() {
     setSenderName(senderSnapshot?.name || "");
@@ -486,8 +434,7 @@ export default function InvoiceDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setSenderSnapshot(data.sender);
-        setRecipientSnapshot(data.recipient);
+        cache.update<SnapshotResponse>(snapshotUrl, (prev) => ({ ...prev, sender: data.sender, recipient: data.recipient }));
         setSnapshotSheetOpen(false);
         toast.success("Invoice details updated");
       } else {
@@ -521,16 +468,7 @@ export default function InvoiceDetailPage() {
   }
 
   function handleSendComplete() {
-    // Re-fetch invoice to get updated status
-    if (!orgId) return;
-    fetch(`/api/v1/invoices/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.invoice) setInv(data.invoice);
-        if (data.payments) setPayments(data.payments);
-      });
+    // The send request refreshes the cached invoice (and its status) by itself.
     setEmailHistoryKey((k) => k + 1);
   }
 
@@ -555,10 +493,11 @@ export default function InvoiceDetailPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
-        if (data.payment) {
-          setPayments((prev) => [...prev, data.payment]);
-        }
+        cache.update<InvoiceResponse>(invoiceUrl, (prev) => ({
+          ...prev,
+          invoice: prev.invoice ? { ...prev.invoice, ...data.invoice } : prev.invoice,
+          payments: data.payment ? [...(prev.payments ?? []), data.payment] : prev.payments,
+        }));
         setPayOpen(false);
         setPayAmount("");
         toast.success("Payment recorded");
@@ -584,7 +523,7 @@ export default function InvoiceDetailPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
+          cache.update<InvoiceResponse>(invoiceUrl, (prev) => (prev.invoice ? { ...prev, invoice: { ...prev.invoice, ...data.invoice } } : prev));
           toast.success("Invoice cancelled");
         }
       },
@@ -606,7 +545,7 @@ export default function InvoiceDetailPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          setInv((prev) => prev ? { ...prev, ...data.invoice } : prev);
+          cache.update<InvoiceResponse>(invoiceUrl, (prev) => (prev.invoice ? { ...prev, invoice: { ...prev.invoice, ...data.invoice } } : prev));
           toast.success("Unpaid amount written off as a loss");
         } else {
           const data = await res.json().catch(() => ({}));
@@ -693,6 +632,7 @@ export default function InvoiceDetailPage() {
                 {inv.contact?.name || "Unknown contact"}
                 {inv.contact?.email && <span> · {inv.contact.email}</span>}
               </p>
+              <TagPicker entityType="invoice" entityId={inv.id} className="mt-1.5" />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -791,21 +731,12 @@ export default function InvoiceDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {bankAccounts.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>Bank Account</Label>
-                        <Select value={payBankAccountId} onValueChange={setPayBankAccountId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select bank account (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {bankAccounts.map((ba) => (
-                              <SelectItem key={ba.id} value={ba.id}>{ba.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <BankAccountSelect
+                      value={payBankAccountId}
+                      onChange={setPayBankAccountId}
+                      label="Paid into"
+                      hint="The bank account the money arrives in. The payment is posted to its ledger account."
+                    />
                     <Button onClick={handlePay} loading={payLoading} className="w-full bg-brand-600 hover:bg-brand-700">
                       Record Payment
                     </Button>
@@ -879,6 +810,11 @@ export default function InvoiceDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Approval workflow progress: who has approved and whose turn it is */}
+        {["draft", "pending_approval", "rejected"].includes(inv.status) && (
+          <ApprovalPanel entityType="invoice" entityId={id} mode="progress" />
+        )}
 
         {/* Compliance warnings */}
         {complianceWarnings.length > 0 && !complianceDismissed && (

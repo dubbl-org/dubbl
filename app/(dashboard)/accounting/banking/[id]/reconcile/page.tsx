@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowDownRight,
@@ -31,6 +31,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { ReconciliationReport, type ReconciliationData } from "../_components";
 import { AttachmentsButton } from "@/components/dashboard/receipt-attachments";
 
@@ -76,11 +77,6 @@ interface Reconciliation {
 export default function ReconcilePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [account, setAccount] = useState<BankAccountDetail | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
-  const [report, setReport] = useState<ReconciliationData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -102,52 +98,36 @@ export default function ReconcilePage() {
       : null;
 
   useDocumentTitle("Accounting \u00B7 Match statement to your books");
+
+  // Pull both the still-to-review lines (status=unreconciled) and the
+  // categorized/matched lines (status=reconciled — categorize/match flip the
+  // status while recording a journal entry) so the latter can be ticked off
+  // into a statement reconciliation. Lines already part of a completed
+  // statement reconciliation (reconciliationId set) are filtered out below.
+  const accountQuery = useApi<{ bankAccount?: BankAccountDetail }>(`/api/v1/bank-accounts/${id}`);
+  const unreconciledQuery = useApi<{ data?: Transaction[] }>(`/api/v1/bank-accounts/${id}/transactions?status=unreconciled&limit=100`);
+  const reconciledQuery = useApi<{ data?: Transaction[] }>(`/api/v1/bank-accounts/${id}/transactions?status=reconciled&limit=100`);
+  const recQuery = useApi<{ data?: Reconciliation[] }>(`/api/v1/bank-accounts/${id}/reconciliations`);
+  // Statement-vs-GL report: end balance, GL balance, running difference and
+  // the reconciled / unreconciled splits, scoped to the latest reconciliation.
+  const reportQuery = useApi<ReconciliationData & { bankAccountId?: string }>(`/api/v1/bank-accounts/${id}/reconciliation`);
+  const loading = accountQuery.loading || unreconciledQuery.loading || reconciledQuery.loading || recQuery.loading || reportQuery.loading;
+  const account = accountQuery.data?.bankAccount ?? null;
   const cur = account?.currencyCode ?? "USD";
+  const transactions = useMemo(() => {
+    const unreconciled: Transaction[] = unreconciledQuery.data?.data ?? [];
+    // Categorized lines that haven't yet been rolled into a completed
+    // statement reconciliation.
+    const categorized: Transaction[] = (reconciledQuery.data?.data ?? []).filter(
+      (t: Transaction) => t.journalEntryId && !t.reconciliationId
+    );
+    return [...unreconciled, ...categorized];
+  }, [unreconciledQuery.data, reconciledQuery.data]);
+  const reconciliations = recQuery.data?.data ?? [];
+  const report: ReconciliationData | null = reportQuery.data && reportQuery.data.bankAccountId ? reportQuery.data : null;
 
-  const fetchData = useCallback(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    // Pull both the still-to-review lines (status=unreconciled) and the
-    // categorized/matched lines (status=reconciled — categorize/match flip the
-    // status while recording a journal entry) so the latter can be ticked off
-    // into a statement reconciliation. Lines already part of a completed
-    // statement reconciliation (reconciliationId set) are filtered out below.
-    Promise.all([
-      fetch(`/api/v1/bank-accounts/${id}`, { headers }).then((r) => r.json()),
-      fetch(`/api/v1/bank-accounts/${id}/transactions?status=unreconciled&limit=100`, {
-        headers,
-      }).then((r) => r.json()),
-      fetch(`/api/v1/bank-accounts/${id}/transactions?status=reconciled&limit=100`, {
-        headers,
-      }).then((r) => r.json()),
-      fetch(`/api/v1/bank-accounts/${id}/reconciliations`, {
-        headers,
-      }).then((r) => r.json()),
-      // Statement-vs-GL report: end balance, GL balance, running difference and
-      // the reconciled / unreconciled splits, scoped to the latest reconciliation.
-      fetch(`/api/v1/bank-accounts/${id}/reconciliation`, { headers })
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
-    ])
-      .then(([accountData, unreconciledData, reconciledData, recData, reportData]) => {
-        if (accountData.bankAccount) setAccount(accountData.bankAccount);
-        const unreconciled: Transaction[] = unreconciledData.data ?? [];
-        // Categorized lines that haven't yet been rolled into a completed
-        // statement reconciliation.
-        const categorized: Transaction[] = (reconciledData.data ?? []).filter(
-          (t: Transaction) => t.journalEntryId && !t.reconciliationId
-        );
-        setTransactions([...unreconciled, ...categorized]);
-        if (recData.data) setReconciliations(recData.data);
-        setReport(reportData && reportData.bankAccountId ? reportData : null);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const refetchReport = reportQuery.refetch;
+  const fetchData = useCallback(() => void refetchReport(), [refetchReport]);
 
   const filteredTransactions = transactions.filter((t) => {
     if (!search) return true;
@@ -213,7 +193,6 @@ export default function ReconcilePage() {
     toast.success(`${label} ${success} transaction${success !== 1 ? "s" : ""}`);
     setSelectedIds(new Set());
     setActing(false);
-    fetchData();
   }
 
   async function createReconciliation() {
@@ -237,7 +216,6 @@ export default function ReconcilePage() {
       toast.success("Statement check started");
       setSheetOpen(false);
       setRecForm({ startDate: "", endDate: "", startBalance: "", endBalance: "" });
-      fetchData();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Couldn't start the statement check"
@@ -281,7 +259,6 @@ export default function ReconcilePage() {
         `Statement check finished — ${data.reconciledCount} line${data.reconciledCount === 1 ? "" : "s"} matched`
       );
       setSelectedIds(new Set());
-      fetchData();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Couldn't finish the statement check"

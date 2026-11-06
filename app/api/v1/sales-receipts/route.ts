@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { db } from "@/lib/db";
 import { salesReceipt, salesReceiptLine } from "@/lib/db/schema";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -117,6 +119,14 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertLineStockRefs(ctx.organizationId, parsed.lines);
+    // The contact's defaults (Contacts > Bookkeeping): account and tax rate for
+    // lines that don't set one, and no tax for a contact marked "Don't charge tax".
+    parsed.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+      parsed.lines,
+      await loadContactDefaults(ctx.organizationId, parsed.contactId),
+      "sales"
+    ));
 
     await assertNotLocked(ctx.organizationId, parsed.date);
 

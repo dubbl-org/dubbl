@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Truck, Link2, Unlink } from "lucide-react";
@@ -23,12 +23,15 @@ import {
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 export default function InventoryItemSuppliersPage() {
   const { id } = useParams<{ id: string }>();
+  const url = `/api/v1/inventory/${id}/suppliers`;
+  const cache = useApiCache();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: any[] }>(url);
+  const suppliers = data?.data ?? [];
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [linkOpen, setLinkOpen] = useState(false);
@@ -38,23 +41,6 @@ export default function InventoryItemSuppliersPage() {
   const [price, setPrice] = useState("");
   const [preferred, setPreferred] = useState(false);
   useDocumentTitle("Inventory · Suppliers");
-
-  function fetchSuppliers() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch(`/api/v1/inventory/${id}/suppliers`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setSuppliers(data.data); })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    fetchSuppliers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   async function handleLink() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -82,7 +68,6 @@ export default function InventoryItemSuppliersPage() {
       }
 
       setLinkOpen(false);
-      fetchSuppliers();
       setContactId("");
       setSupplierCode("");
       setLeadDays("");
@@ -112,7 +97,8 @@ export default function InventoryItemSuppliersPage() {
         headers: { "x-organization-id": orgId },
       });
       if (!res.ok) throw new Error("Failed to unlink");
-      setSuppliers((prev) => prev.filter((s) => s.id !== supplierId));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cache.update<{ data?: any[] }>(url, (d) => ({ ...d, data: d.data?.filter((s) => s.id !== supplierId) }));
       toast.success("Supplier unlinked");
     } catch {
       toast.error("Failed to unlink supplier");

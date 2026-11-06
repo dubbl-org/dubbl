@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { taxRate, taxComponent } from "@/lib/db/schema";
+import { compoundRate } from "@/lib/tax/compound";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { components, ...parsed } = createSchema.parse(body);
+    // A compound rate charges the sum of its parts.
+    if (components && components.length > 0) parsed.rate = compoundRate(components);
 
     const created = await db.transaction(async (tx) => {
       // An org can only have one default tax rate. If this one is being made the

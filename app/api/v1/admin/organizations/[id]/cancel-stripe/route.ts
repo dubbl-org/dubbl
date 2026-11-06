@@ -39,6 +39,7 @@ export async function POST(
       .update(subscription)
       .set({
         status: "canceled",
+        plan: "free",
         stripeSubscriptionId: null,
         stripePriceId: null,
         cancelAtPeriodEnd: false,

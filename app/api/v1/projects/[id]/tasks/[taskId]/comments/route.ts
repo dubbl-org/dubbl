@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask, taskComment } from "@/lib/db/schema";
+import { projectTask, taskComment } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireProjectAccess } from "@/lib/api/project-access";
 import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -19,15 +19,17 @@ export async function GET(
     const { id, taskId } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(eq(project.id, id), eq(project.organizationId, ctx.organizationId), notDeleted(project.deletedAt)),
+    await requireProjectAccess(ctx, id, "view");
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+      columns: { id: true },
     });
-    if (!proj) return notFound("Project");
+    if (!task) return notFound("Task");
 
     const comments = await db.query.taskComment.findMany({
       where: eq(taskComment.taskId, taskId),
       orderBy: desc(taskComment.createdAt),
-      with: { author: true },
+      with: { author: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     return NextResponse.json({ comments });
@@ -45,10 +47,7 @@ export async function POST(
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(eq(project.id, id), eq(project.organizationId, ctx.organizationId), notDeleted(project.deletedAt)),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "contribute");
 
     const task = await db.query.projectTask.findFirst({
       where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
@@ -70,24 +69,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id, taskId } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(eq(project.id, id), eq(project.organizationId, ctx.organizationId), notDeleted(project.deletedAt)),
-    });
-    if (!proj) return notFound("Project");
+    const { access } = await requireProjectAccess(ctx, id, "contribute");
 
     const url = new URL(request.url);
     const commentId = url.searchParams.get("commentId");
     if (!commentId) return NextResponse.json({ error: "commentId required" }, { status: 400 });
 
-    // Only allow deleting own comments (or admin)
+    // Only the author, or a project manager, can delete a comment.
     const comment = await db.query.taskComment.findFirst({
-      where: eq(taskComment.id, commentId),
+      where: and(eq(taskComment.id, commentId), eq(taskComment.taskId, taskId)),
     });
     if (!comment) return notFound("Comment");
-    if (comment.authorId !== ctx.userId) {
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+      columns: { id: true },
+    });
+    if (!task) return notFound("Task");
+    if (comment.authorId !== ctx.userId && access !== "manage") {
       return NextResponse.json({ error: "Can only delete your own comments" }, { status: 403 });
     }
 

@@ -9,6 +9,8 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { getNextNumber } from "@/lib/api/numbering";
 import { logAudit } from "@/lib/api/audit";
+import { preloadTaxRates } from "@/lib/api/tax-calculator";
+import { buildRequisitionLines } from "@/lib/api/requisition-lines";
 import { z } from "zod";
 
 const lineSchema = z.object({
@@ -91,21 +93,9 @@ export async function POST(request: Request) {
       "REQ"
     );
 
-    let subtotal = 0;
-    const processedLines = parsed.lines.map((l, i) => {
-      const amount = Math.round(l.quantity * l.unitPrice * 100);
-      subtotal += amount;
-      return {
-        description: l.description,
-        quantity: Math.round(l.quantity * 100),
-        unitPrice: Math.round(l.unitPrice * 100),
-        accountId: l.accountId || null,
-        taxRateId: l.taxRateId || null,
-        taxAmount: 0,
-        amount,
-        sortOrder: i,
-      };
-    });
+    // New requisitions use the column default currency (USD), like purchase orders
+    const ratesMap = await preloadTaxRates(parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[]);
+    const { lines: processedLines, subtotal, taxTotal, total } = buildRequisitionLines(parsed.lines, "USD", ratesMap);
 
     const [created] = await db
       .insert(purchaseRequisition)
@@ -118,8 +108,8 @@ export async function POST(request: Request) {
         reference: parsed.reference || null,
         notes: parsed.notes || null,
         subtotal,
-        taxTotal: 0,
-        total: subtotal,
+        taxTotal,
+        total,
         requestedBy: ctx.userId,
       })
       .returning();

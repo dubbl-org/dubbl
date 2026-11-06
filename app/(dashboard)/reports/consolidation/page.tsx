@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -11,7 +11,6 @@ import {
   TrendingDown,
   DollarSign,
   ChevronsUpDown,
-  Check,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -43,8 +42,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoney } from "@/lib/money";
+import { formatMoney as formatMoneyIn } from "@/lib/money";
+import { CurrencySelect } from "@/components/ui/currency-select";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface UserOrg {
   id: string;
@@ -64,6 +75,7 @@ interface ConsolidationGroup {
   id: string;
   name: string;
   parentOrgId: string;
+  presentationCurrency?: string;
   members: ConsolidationGroupMember[];
   createdAt: string;
 }
@@ -92,8 +104,24 @@ interface AccountRow {
   byEntity: Record<string, number>;
 }
 
+interface EliminationRule {
+  id: string;
+  name: string;
+  kind: "ar_ap" | "sales_cogs" | "investment_equity" | "custom";
+  debitAccountMatch: string | null;
+  creditAccountMatch: string | null;
+  description: string | null;
+}
+
+const RULE_KINDS: Record<EliminationRule["kind"], string> = {
+  ar_ap: "Money they owe each other (receivables vs payables)",
+  sales_cogs: "Sales between them (income vs costs)",
+  investment_equity: "Investment in each other (not calculated yet)",
+  custom: "Custom accounts",
+};
+
 interface ConsolidatedReport {
-  group: { id: string; name: string };
+  group: { id: string; name: string; presentationCurrency?: string };
   members: { orgId: string; label: string; orgName: string }[];
   startDate: string;
   endDate: string;
@@ -131,12 +159,12 @@ function apiFetch(url: string, options: RequestInit = {}) {
 
 export default function ConsolidationPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState<ConsolidationGroup[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [report, setReport] = useState<ConsolidatedReport | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
+  const cache = useApiCache();
+  const { data: groupsData, loading } = useApi<{ groups?: ConsolidationGroup[] }>("/api/v1/consolidation/groups");
+  const groups = groupsData?.groups || [];
+  // The picked group, or the first one until the user picks.
+  const [pickedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const selectedGroupId = (pickedGroupId && groups.some((g) => g.id === pickedGroupId) ? pickedGroupId : groups[0]?.id) ?? null;
   const [tab, setTab] = useState<"pnl" | "balance-sheet">("pnl");
 
   const [newGroupName, setNewGroupName] = useState("");
@@ -147,6 +175,16 @@ export default function ConsolidationPage() {
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
 
   const activeOrgId = getOrgId();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
+  const reportQuery = useApi<ConsolidatedReport>(
+    selectedGroupId ? `/api/v1/consolidation/groups/${selectedGroupId}/report?${new URLSearchParams({ startDate, endDate })}` : null,
+    { keepPrevious: true }
+  );
+  // Keep the last figures while the dates change, but not another group's.
+  const otherGroup = !!reportQuery.data && reportQuery.data.group?.id !== selectedGroupId;
+  const report = selectedGroupId && !otherGroup ? reportQuery.data ?? null : null;
+  const reportLoading = reportQuery.loading || otherGroup;
 
   useEffect(() => {
     fetch("/api/v1/organization")
@@ -159,43 +197,6 @@ export default function ConsolidationPage() {
       .catch(() => {});
   }, []);
 
-  const fetchGroups = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch("/api/v1/consolidation/groups");
-      const data = await res.json();
-      setGroups(data.groups || []);
-      setSelectedGroupId((prev) => {
-        if (!prev && data.groups?.length > 0) return data.groups[0].id;
-        return prev;
-      });
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, []);
-
-  const fetchReport = useCallback(async () => {
-    if (!selectedGroupId) return;
-    setReportLoading(true);
-    try {
-      const params = new URLSearchParams({ startDate, endDate });
-      const res = await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/report?${params}`);
-      const data = await res.json();
-      setReport(data);
-    } finally {
-      setReportLoading(false);
-    }
-  }, [selectedGroupId, startDate, endDate]);
-
-  useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-
-  useEffect(() => {
-    if (selectedGroupId) fetchReport();
-  }, [selectedGroupId, fetchReport]);
-
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
     const res = await apiFetch("/api/v1/consolidation/groups", {
@@ -204,7 +205,7 @@ export default function ConsolidationPage() {
     });
     const data = await res.json();
     if (data.group) {
-      setGroups((prev) => [{ ...data.group, members: [] }, ...prev]);
+      cache.update<{ groups?: ConsolidationGroup[] }>("/api/v1/consolidation/groups", (d) => ({ ...d, groups: [{ ...data.group, members: [] }, ...(d.groups || [])] }));
       setSelectedGroupId(data.group.id);
       setNewGroupName("");
     }
@@ -212,23 +213,19 @@ export default function ConsolidationPage() {
 
   const deleteGroup = async (groupId: string) => {
     await apiFetch(`/api/v1/consolidation/groups/${groupId}`, { method: "DELETE" });
-    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    cache.update<{ groups?: ConsolidationGroup[] }>("/api/v1/consolidation/groups", (d) => ({ ...d, groups: (d.groups || []).filter((g) => g.id !== groupId) }));
     if (selectedGroupId === groupId) {
       setSelectedGroupId(groups.find((g) => g.id !== groupId)?.id || null);
-      setReport(null);
     }
   };
 
   const addMember = async (orgId: string, label: string) => {
     if (!selectedGroupId || !orgId) return;
-    const res = await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/members`, {
+    // The cache refreshes the group and its report once this lands.
+    await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/members`, {
       method: "POST",
       body: JSON.stringify({ orgId, label: label || undefined }),
     });
-    if (res.ok) {
-      await fetchGroups();
-      await fetchReport();
-    }
   };
 
   const removeMember = async (orgId: string) => {
@@ -237,20 +234,76 @@ export default function ConsolidationPage() {
       method: "DELETE",
       body: JSON.stringify({ orgId }),
     });
-    await fetchGroups();
-    await fetchReport();
   };
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId);
+  const currency = report?.group?.presentationCurrency || selectedGroup?.presentationCurrency || "USD";
+  const formatMoney = (cents: number) => formatMoneyIn(cents, currency);
+
+  const rulesQuery = useApi<{ rules?: EliminationRule[] }>(
+    selectedGroupId ? `/api/v1/consolidation/groups/${selectedGroupId}/elimination-rules` : null
+  );
+  const rules = rulesQuery.data?.rules || [];
+  const [ruleName, setRuleName] = useState("");
+  const [ruleKind, setRuleKind] = useState<EliminationRule["kind"]>("ar_ap");
+  const [ruleDebit, setRuleDebit] = useState("1200");
+  const [ruleCredit, setRuleCredit] = useState("2000");
+
+  const setGroupCurrency = async (code: string) => {
+    if (!selectedGroupId) return;
+    const res = await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ presentationCurrency: code }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || "Couldn't change the currency");
+    }
+  };
+
+  const addRule = async () => {
+    if (!selectedGroupId || !ruleName.trim()) return;
+    const res = await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/elimination-rules`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: ruleName.trim(),
+        kind: ruleKind,
+        debitAccountMatch: ruleDebit.trim() || null,
+        creditAccountMatch: ruleCredit.trim() || null,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || "Couldn't add the rule");
+      return;
+    }
+    setRuleName("");
+    toast.success("Rule added");
+  };
+
+  const deleteRule = (rule: EliminationRule) => {
+    if (!selectedGroupId) return;
+    confirm({
+      title: `Remove "${rule.name}"?`,
+      description: "These amounts will no longer be removed from the combined reports.",
+      confirmLabel: "Remove rule",
+      destructive: true,
+      onConfirm: async () => {
+        await apiFetch(`/api/v1/consolidation/groups/${selectedGroupId}/elimination-rules/${rule.id}`, { method: "DELETE" });
+      },
+    });
+  };
+
   const pnl = report?.consolidatedPnL;
   const bs = report?.consolidatedBalanceSheet;
 
-  // Filter out orgs that are already members or the active (parent) org
+  // Every business you belong to can join, this one included (a parent
+  // company is usually part of its own group). Hide the ones already in it.
   const availableOrgs = useMemo(() => {
     const memberOrgIds = new Set(selectedGroup?.members.map((m) => m.orgId) || []);
-    return userOrgs.filter(
-      (o) => o.id !== activeOrgId && !memberOrgIds.has(o.id)
-    );
+    return userOrgs
+      .filter((o) => !memberOrgIds.has(o.id))
+      .sort((a, b) => (a.id === activeOrgId ? -1 : b.id === activeOrgId ? 1 : 0));
   }, [userOrgs, activeOrgId, selectedGroup?.members]);
 
   // Build export data
@@ -293,10 +346,11 @@ export default function ConsolidationPage() {
     return ["type", "code", "name", ...memberCols, "total"];
   }, [report]);
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
+      {confirmDialog}
       <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="size-3.5" /> Back to reports
       </Link>
@@ -309,6 +363,7 @@ export default function ConsolidationPage() {
           <ExportButton
             data={exportData}
             columns={exportColumns}
+            moneyColumns={exportColumns.filter((c) => c !== "type" && c !== "code" && c !== "name")}
             filename={`consolidation-${tab}`}
           />
         )}
@@ -360,7 +415,13 @@ export default function ConsolidationPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteGroup(g.id);
+                    confirm({
+                      title: `Delete the group "${g.name}"?`,
+                      description: "Only the group is deleted. The businesses in it and their books are not changed.",
+                      confirmLabel: "Delete group",
+                      destructive: true,
+                      onConfirm: () => deleteGroup(g.id),
+                    });
                   }}
                   className="ml-1 rounded p-0.5 hover:bg-red-100 dark:hover:bg-red-950/40"
                 >
@@ -412,7 +473,10 @@ export default function ConsolidationPage() {
                         >
                           <Building2 className="size-4 mr-2 shrink-0 text-muted-foreground" />
                           <div className="flex flex-col min-w-0">
-                            <span className="truncate text-sm">{org.name}</span>
+                            <span className="truncate text-sm">
+                              {org.name}
+                              {org.id === activeOrgId ? " (this business)" : ""}
+                            </span>
                             <span className="truncate text-xs text-muted-foreground">
                               {org.slug}{org.country ? ` · ${org.country}` : ""}
                             </span>
@@ -426,9 +490,7 @@ export default function ConsolidationPage() {
             </Popover>
           ) : (
             <p className="text-xs text-muted-foreground">
-              {userOrgs.length <= 1
-                ? "You only belong to one organization. Create another org to add it here."
-                : "All your organizations have been added to this group."}
+              All your businesses are in this group.
             </p>
           )}
 
@@ -462,6 +524,104 @@ export default function ConsolidationPage() {
               No businesses added yet. Add one above to include it in the combined reports.
             </p>
           )}
+        </div>
+      )}
+
+      {/* Currency and elimination rules */}
+      {selectedGroup && (
+        <div className="rounded-xl border border-border/50 bg-card/80 p-4 sm:p-6 space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Report currency</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Every business is converted into this currency for the combined reports.
+              </p>
+            </div>
+            <CurrencySelect
+              value={selectedGroup.presentationCurrency || currency}
+              onValueChange={setGroupCurrency}
+              className="w-full sm:w-56"
+            />
+          </div>
+
+          <div className="h-px bg-border" />
+
+          <div>
+            <h2 className="text-sm font-semibold">Amounts to remove between your businesses</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Each rule names two account codes (or the start of them). When your businesses owe or sell to each
+              other, the matching amounts are taken out so the combined reports don&apos;t count them twice.
+            </p>
+          </div>
+
+          {rules.length > 0 ? (
+            <div className="divide-y divide-border/50 rounded-lg border border-border/50">
+              {rules.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{r.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {RULE_KINDS[r.kind]}
+                      {r.debitAccountMatch || r.creditAccountMatch
+                        ? ` · accounts ${r.debitAccountMatch || "any"} against ${r.creditAccountMatch || "any"}`
+                        : ""}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Remove ${r.name}`}
+                    onClick={() => deleteRule(r)}
+                    className="text-muted-foreground hover:text-red-500"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No rules yet, so nothing is removed.</p>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-[1.2fr_1.4fr_0.7fr_0.7fr_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Rule name</Label>
+              <Input value={ruleName} onChange={(e) => setRuleName(e.target.value)} placeholder="Owed between companies" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">What it removes</Label>
+              <Select
+                value={ruleKind}
+                onValueChange={(v) => {
+                  const kind = v as EliminationRule["kind"];
+                  setRuleKind(kind);
+                  if (kind === "ar_ap") { setRuleDebit("1200"); setRuleCredit("2000"); }
+                  if (kind === "sales_cogs") { setRuleDebit("4"); setRuleCredit("5"); }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(RULE_KINDS) as EliminationRule["kind"][]).map((k) => (
+                    <SelectItem key={k} value={k}>{RULE_KINDS[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">First account code</Label>
+              <Input value={ruleDebit} onChange={(e) => setRuleDebit(e.target.value)} placeholder="1200" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Second account code</Label>
+              <Input value={ruleCredit} onChange={(e) => setRuleCredit(e.target.value)} placeholder="2000" />
+            </div>
+            <Button size="sm" onClick={addRule} disabled={!ruleName.trim()}>
+              <Plus className="size-4 mr-1" />
+              Add rule
+            </Button>
+          </div>
         </div>
       )}
 
@@ -564,6 +724,7 @@ export default function ConsolidationPage() {
                     title="Account breakdown"
                     accounts={pnl.accounts}
                     members={report!.members}
+                    currency={currency}
                   />
                 </div>
               )}
@@ -616,6 +777,7 @@ export default function ConsolidationPage() {
                     title="Account breakdown"
                     accounts={bs.accounts}
                     members={report!.members}
+                    currency={currency}
                   />
                 </div>
               )}
@@ -631,10 +793,12 @@ function AccountDetailTable({
   title,
   accounts,
   members,
+  currency,
 }: {
   title: string;
   accounts: AccountRow[];
   members: { orgId: string; label: string; orgName: string }[];
+  currency: string;
 }) {
   if (accounts.length === 0) return null;
 
@@ -673,7 +837,7 @@ function AccountDetailTable({
         </TableHeader>
         <TableBody>
           {Array.from(grouped.entries()).map(([type, typeAccounts]) => (
-            <GroupSection key={type} type={type} label={typeLabels[type] || type} accounts={typeAccounts} members={members} />
+            <GroupSection key={type} type={type} label={typeLabels[type] || type} accounts={typeAccounts} members={members} currency={currency} />
           ))}
         </TableBody>
       </Table>
@@ -685,12 +849,15 @@ function GroupSection({
   label,
   accounts,
   members,
+  currency,
 }: {
   type: string;
   label: string;
   accounts: AccountRow[];
   members: { orgId: string; label: string; orgName: string }[];
+  currency: string;
 }) {
+  const formatMoney = (cents: number) => formatMoneyIn(cents, currency);
   const groupTotal = accounts.reduce((sum, a) => sum + a.total, 0);
   const entityTotals: Record<string, number> = {};
   for (const m of members) {

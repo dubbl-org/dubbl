@@ -6,6 +6,8 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { downloadFile } from "@/components/dashboard/download-link";
 import { BackToReports, ReportHelp, BasisToggle } from "../_components";
 
 /** What's inside the bundle, described in plain language. */
@@ -21,6 +23,7 @@ export default function ReportPackPage() {
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [basis, setBasis] = useState<"accrual" | "cash">("accrual");
+  const [downloading, setDownloading] = useState(false);
 
   const downloadUrl = `/api/v1/reports/pack?${new URLSearchParams({
     startDate,
@@ -79,11 +82,22 @@ export default function ReportPackPage() {
             ))}
           </ul>
 
-          <Button asChild className="mt-5 bg-brand-600 hover:bg-brand-700">
-            <a href={downloadUrl}>
-              <FileSpreadsheet className="mr-1.5 size-4" />
-              Download the bundle (spreadsheet)
-            </a>
+          <Button
+            className="mt-5 bg-brand-600 hover:bg-brand-700"
+            disabled={downloading}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                await downloadFile(downloadUrl, `report-pack-${startDate}-to-${endDate}.xlsx`);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Couldn't download the bundle");
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            <FileSpreadsheet className="mr-1.5 size-4" />
+            {downloading ? "Preparing..." : "Download the bundle (spreadsheet)"}
           </Button>
         </div>
       </ContentReveal>

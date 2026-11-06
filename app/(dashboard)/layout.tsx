@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Topbar, TopbarActionProvider } from "@/components/dashboard/topbar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { OrgLoader } from "@/components/dashboard/org-loader";
+import { DataProvider } from "@/components/dashboard/data-provider";
 import { CreateDrawerProvider } from "@/components/dashboard/create-drawer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ShellProvider } from "@/components/dashboard/shell/shell-context";
@@ -23,38 +24,40 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const bare = pathname === "/assistant" || pathname === "/documents";
   return (
-    <OrgLoader>
-      <ShellProvider>
-        <CreateDrawerProvider>
-          <TooltipProvider delayDuration={150}>
-            <AssistantProvider>
-              <TopbarActionProvider>
-                <div className="flex h-svh overflow-hidden bg-shell">
-                  <ShellRail />
-                  <ShellPanel />
-                  <div className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
-                    <ShellMain>
-                      <Topbar />
-                      <div
-                        className={
-                          bare
-                            ? "flex min-h-0 w-full flex-1 flex-col"
-                            : "w-full flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7"
-                        }
-                      >
-                        {children}
-                      </div>
-                    </ShellMain>
+    <DataProvider>
+      <OrgLoader>
+        <ShellProvider>
+          <CreateDrawerProvider>
+            <TooltipProvider delayDuration={150}>
+              <AssistantProvider>
+                <TopbarActionProvider>
+                  <div data-shell="root" className="flex h-svh overflow-hidden bg-shell">
+                    <ShellRail />
+                    <ShellPanel />
+                    <div data-shell="main-col" className="flex min-w-0 flex-1 flex-col md:py-2 md:pr-2">
+                      <ShellMain>
+                        <Topbar />
+                        <div
+                          className={
+                            bare
+                              ? "flex min-h-0 w-full flex-1 flex-col"
+                              : "w-full flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7"
+                          }
+                        >
+                          {children}
+                        </div>
+                      </ShellMain>
+                    </div>
+                    <AssistantDock />
                   </div>
-                  <AssistantDock />
-                </div>
-                <ShellMobileNav />
-                <CommandPalette />
-              </TopbarActionProvider>
-            </AssistantProvider>
-          </TooltipProvider>
-        </CreateDrawerProvider>
-      </ShellProvider>
-    </OrgLoader>
+                  <ShellMobileNav />
+                  <CommandPalette />
+                </TopbarActionProvider>
+              </AssistantProvider>
+            </TooltipProvider>
+          </CreateDrawerProvider>
+        </ShellProvider>
+      </OrgLoader>
+    </DataProvider>
   );
 }

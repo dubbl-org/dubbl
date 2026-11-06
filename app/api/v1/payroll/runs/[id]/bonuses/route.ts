@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, created, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { addBonusToRun } from "@/lib/api/payroll-run-actions";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -44,6 +45,12 @@ export async function GET(
   }
 }
 
+/**
+ * Add a bonus to an unfinished run. The employee's pay item is recalculated
+ * with the bonus included in gross and taxed with it, and the run totals are
+ * updated, so the bonus is paid and posted when the run is finished. Adding a
+ * bonus clears any sign-off, since the figures changed.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -56,14 +63,11 @@ export async function POST(
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const [bonus] = await db
-      .insert(payrollBonus)
-      .values({ payrollRunId: id, ...parsed })
-      .returning();
+    const result = await addBonusToRun(ctx, id, parsed);
 
-    logAudit({ ctx, action: "create", entityType: "payrollBonus", entityId: bonus.id, request });
+    logAudit({ ctx, action: "create", entityType: "payrollBonus", entityId: result.bonus.id, request });
 
-    return created({ bonus });
+    return created(result);
   } catch (err) {
     return handleError(err);
   }

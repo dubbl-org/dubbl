@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Play, ArrowUpRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton } from "@/components/dashboard/explorer/action-button";
 import { DateCell, MoneyCell, MutedCell, NumberCell, StatusPill, formatDay, parseDay, toDayKey } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApi } from "@/lib/query/use-api";
+import { DEPRECIATION_METHODS } from "@/lib/fixed-assets/labels";
 
 interface FixedAsset {
   id: string;
@@ -55,12 +57,10 @@ const STATUSES: ExplorerStatus[] = [
   { value: "disposed", label: "Sold or written off", color: "#D4D4D8", hint: "No longer yours: sold, scrapped or written off" },
 ];
 
-const METHODS: Record<string, string> = {
-  straight_line: "Evenly each month",
-  declining_balance: "More at the start",
-  sum_of_years_digits: "Faster early on",
-  units_of_production: "Based on usage",
-};
+// Same names as the asset categories and asset detail screens.
+const METHODS: Record<string, string> = Object.fromEntries(
+  DEPRECIATION_METHODS.map((m) => [m.value, m.name])
+);
 
 const OWNED = (a: FixedAsset) => a.status !== "disposed";
 
@@ -104,24 +104,15 @@ function DepreciationBar({ cost, nbv, className }: { cost: number; nbv: number; 
 export default function FixedAssetsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [categories, setCategories] = useState<Record<string, string>>({});
-  const [version, setVersion] = useState(0);
+  const { data: categoryData } = useApi<{ data?: { id: string; name: string }[] }>("/api/v1/asset-categories?limit=100");
+  // Category names, so assets can be grouped and filtered by them
+  const categories = useMemo<Record<string, string>>(
+    () => Object.fromEntries((categoryData?.data ?? []).map((c) => [c.id, c.name])),
+    [categoryData]
+  );
   const [running, setRunning] = useState(false);
 
   useDocumentTitle("Accounting · Fixed Assets");
-
-  // Category names, so assets can be grouped and filtered by them
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/asset-categories?limit=100", { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        const list = (json?.data ?? []) as { id: string; name: string }[];
-        setCategories(Object.fromEntries(list.map((c) => [c.id, c.name])));
-      })
-      .catch(() => {});
-  }, []);
 
   useTopbarAction(
     useMemo(() => {
@@ -134,7 +125,6 @@ export default function FixedAssetsPage() {
           const data = await res.json().catch(() => ({}));
           if (res.ok) {
             toast.success(`Value drops recorded for ${data.processed} item${data.processed === 1 ? "" : "s"}`);
-            setVersion((v) => v + 1);
           } else {
             toast.error(typeof data.error === "string" ? data.error : "Couldn't record this period's value drops");
           }
@@ -302,31 +292,13 @@ export default function FixedAssetsPage() {
     };
   }, [categories, openDrawer, router]);
 
-  return <Explorer key={version} config={config} />;
+  return <Explorer config={config} />;
 }
 
 /** The value drops recorded so far for one asset, newest first. */
 function DepreciationHistory({ id }: { id: string }) {
-  const [state, setState] = useState<{ id: string; rows: DepreciationRow[] } | null>(null);
-  const loading = state?.id !== id;
-
-  useEffect(() => {
-    let cancelled = false;
-    const orgId = localStorage.getItem("activeOrgId");
-    fetch(`/api/v1/fixed-assets/${id}`, { headers: orgId ? { "x-organization-id": orgId } : {} })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled) setState({ id, rows: ((json?.asset?.depreciationEntries as DepreciationRow[] | undefined) ?? []).slice().reverse() });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ id, rows: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  const rows = !loading && state ? state.rows : [];
+  const { data, loading } = useApi<{ asset?: { depreciationEntries?: DepreciationRow[] } }>(`/api/v1/fixed-assets/${id}`);
+  const rows = useMemo(() => (loading ? [] : (data?.asset?.depreciationEntries ?? []).slice().reverse()), [data, loading]);
   return (
     <div className="mt-6">
       <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">

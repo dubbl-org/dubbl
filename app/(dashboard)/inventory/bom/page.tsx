@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Plus, Trash2, MoreHorizontal, ExternalLink, Layers, Calculator, ListChecks } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +16,22 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { formatMoney } from "@/lib/money";
+import { decimalToCents, formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
+import { sendJson } from "@/components/dashboard/assembly-order-sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface BOM {
   id: string;
@@ -27,37 +42,118 @@ interface BOM {
   laborCostCents: number;
   overheadCostCents: number;
   isActive: boolean;
+  costBreakdown?: { totalCost: number };
+}
+
+/** "New bill of materials": the finished item, a name, and per-unit labour and overhead. */
+function NewBomSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const router = useRouter();
+  const [itemId, setItemId] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [labor, setLabor] = useState("");
+  const [overhead, setOverhead] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!itemId) return toast.error("Pick the item this makes");
+    if (!name.trim()) return toast.error("Give it a name");
+    setSaving(true);
+    try {
+      const res = await sendJson<{ bom?: { id: string } }>("/api/v1/inventory/bom", "POST", {
+        assemblyItemId: itemId,
+        name: name.trim(),
+        description: description.trim() || null,
+        laborCostCents: labor ? decimalToCents(labor) : 0,
+        overheadCostCents: overhead ? decimalToCents(overhead) : 0,
+      });
+      toast.success("Bill of materials created. Now add its parts.");
+      onOpenChange(false);
+      setItemId("");
+      setName("");
+      setDescription("");
+      setLabor("");
+      setOverhead("");
+      if (res.bom?.id) router.push(`/inventory/bom/${res.bom.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create it");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>New bill of materials</SheetTitle>
+          <SheetDescription>The recipe for an item you build. You add the parts on the next page.</SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 px-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Makes *</Label>
+            <InventoryItemPicker
+              value={itemId}
+              placeholder="Pick the finished item"
+              onChange={(id, item) => {
+                setItemId(id);
+                if (item && !name.trim()) setName(item.name);
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Standing desk, standard build" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Description</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Optional" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Labour per unit</Label>
+              <CurrencyInput prefix="$" value={labor} onChange={setLabor} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Overhead per unit</Label>
+              <CurrencyInput prefix="$" value={overhead} onChange={setOverhead} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Labour and overhead are added to the cost of each finished item when you build it.
+          </p>
+        </div>
+        <SheetFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>Create</Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 export default function BOMListPage() {
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [boms, setBoms] = useState<BOM[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: BOM[] }>("/api/v1/inventory/bom");
+  const boms = data?.data ?? [];
+  const [sheetOpen, setSheetOpen] = useState(false);
   useDocumentTitle("Inventory · Bills of Materials");
-
-  function getHeaders() {
-    const orgId = localStorage.getItem("activeOrgId") || "";
-    return { "x-organization-id": orgId };
-  }
-
-  useEffect(() => {
-    fetch("/api/v1/inventory/bom", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setBoms(data.data); })
-      .finally(() => setLoading(false));
-  }, []);
 
   async function handleDelete(bom: BOM) {
     await confirm({
       title: `Delete "${bom.name}"?`,
-      description: "This bill of materials will be permanently deleted.",
+      description: "The recipe is moved to the trash. Built items and past assembly orders stay as they are.",
       confirmLabel: "Delete",
       destructive: true,
       onConfirm: async () => {
-        await fetch(`/api/v1/inventory/bom/${bom.id}`, { method: "DELETE", headers: getHeaders() });
-        toast.success("BOM deleted");
-        setBoms((prev) => prev.filter((b) => b.id !== bom.id));
+        try {
+          await sendJson(`/api/v1/inventory/bom/${bom.id}`, "DELETE");
+          toast.success("Bill of materials deleted");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Couldn't delete it");
+          throw err;
+        }
       },
     });
   }
@@ -67,13 +163,17 @@ export default function BOMListPage() {
   return (
     <ContentReveal>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">Bill of Materials</h2>
+            <h2 className="text-lg font-semibold">Bills of materials</h2>
             <p className="text-sm text-muted-foreground">
-              Define how finished products are assembled from components.
+              The parts that go into each item you build.
             </p>
           </div>
+          <Button size="sm" onClick={() => setSheetOpen(true)}>
+            <Plus className="mr-1.5 size-3.5" />
+            New bill of materials
+          </Button>
         </div>
 
         {boms.length === 0 ? (
@@ -171,10 +271,7 @@ export default function BOMListPage() {
         ) : (
           <div className="space-y-2">
             {boms.map((bom) => {
-              const componentCost = bom.components.reduce((sum, c) => {
-                return sum + parseFloat(c.quantity) * (c.componentItem?.purchasePrice || 0);
-              }, 0);
-              const totalCost = Math.round(componentCost) + bom.laborCostCents + bom.overheadCostCents;
+              const totalCost = bom.costBreakdown?.totalCost ?? bom.laborCostCents + bom.overheadCostCents;
 
               return (
                 <div
@@ -190,7 +287,7 @@ export default function BOMListPage() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {bom.assemblyItem?.name || "Unknown item"} · {bom.components.length} components · Est. {formatMoney(totalCost)}
+                      {bom.assemblyItem?.name || "Unknown item"} · {bom.components.length} {bom.components.length === 1 ? "part" : "parts"} · Est. {formatMoney(totalCost)} each
                     </p>
                   </div>
                   <DropdownMenu>
@@ -214,6 +311,7 @@ export default function BOMListPage() {
           </div>
         )}
 
+        <NewBomSheet open={sheetOpen} onOpenChange={setSheetOpen} />
         {confirmDialog}
       </div>
     </ContentReveal>

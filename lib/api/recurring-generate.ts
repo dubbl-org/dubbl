@@ -1,42 +1,17 @@
 import { db } from "@/lib/db";
-import { recurringTemplate, recurringTemplateLine, invoice, invoiceLine, bill, billLine, expenseClaim, expenseItem, contact, journalEntry, journalLine } from "@/lib/db/schema";
+import { recurringTemplate, recurringTemplateLine, invoice, invoiceLine, bill, billLine, expenseClaim, expenseItem, contact, journalEntry, journalLine, organization } from "@/lib/db/schema";
+import { resolveTermsDays } from "@/lib/payment-terms";
 import { eq, and, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { getNextNumber } from "@/lib/api/numbering";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { getNextEntryNumber, createInvoiceJournalEntry, createCogsJournalEntry } from "@/lib/api/journal-automation";
 import { assertNotLocked, PeriodLockedError } from "@/lib/api/period-lock";
+import { advanceDate } from "@/lib/api/recurring-schedule";
 import { buildSenderSnapshot, buildRecipientSnapshot } from "@/lib/documents/snapshots";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
-
-/**
- * Advance a date by the given frequency.
- */
-function advanceDate(date: string, frequency: string): string {
-  const d = new Date(date + "T00:00:00Z");
-  switch (frequency) {
-    case "weekly":
-      d.setUTCDate(d.getUTCDate() + 7);
-      break;
-    case "fortnightly":
-      d.setUTCDate(d.getUTCDate() + 14);
-      break;
-    case "monthly":
-      d.setUTCMonth(d.getUTCMonth() + 1);
-      break;
-    case "quarterly":
-      d.setUTCMonth(d.getUTCMonth() + 3);
-      break;
-    case "semi_annual":
-      d.setUTCMonth(d.getUTCMonth() + 6);
-      break;
-    case "annual":
-      d.setUTCFullYear(d.getUTCFullYear() + 1);
-      break;
-  }
-  return d.toISOString().split("T")[0];
-}
+import { emitInvoiceCreated, emitBillCreated, emitExpenseCreated } from "@/lib/webhooks/events";
 
 type RecurringTemplateRow = typeof recurringTemplate.$inferSelect;
 type RecurringTemplateLineRow = typeof recurringTemplateLine.$inferSelect;
@@ -183,6 +158,7 @@ async function autoSendRecurringInvoice(
         accountId: l.accountId,
         amount: l.amount,
         taxAmount: l.taxAmount,
+        taxRateId: l.taxRateId,
       })),
       date: inv.issueDate,
       currencyCode: inv.currencyCode,
@@ -372,6 +348,7 @@ export async function processRecurringTemplates(
             createdBy: tmpl.createdBy,
           })
           .returning();
+        emitBillCreated(organizationId, [createdBill.id]);
 
         if (billLines.length > 0) {
           await db.insert(billLine).values(
@@ -410,6 +387,7 @@ export async function processRecurringTemplates(
             currencyCode: tmpl.currencyCode,
           })
           .returning();
+        emitExpenseCreated(organizationId, [createdClaim.id]);
 
         if (expenseItems.length > 0) {
           await db.insert(expenseItem).values(
@@ -435,12 +413,17 @@ export async function processRecurringTemplates(
 
       const invoiceNumber = await getNextNumber(organizationId, "invoice", "invoice_number", "INV");
 
-      // Use contact payment terms for due date
+      // Due date: the contact's payment terms, else the organization's default
+      // terms (same rule as a hand-made invoice), else 30 days.
       const invContact = await db.query.contact.findFirst({
         where: eq(contact.id, tmpl.contactId),
         columns: { paymentTermsDays: true },
       });
-      const invTermsDays = invContact?.paymentTermsDays ?? 30;
+      const invOrg = await db.query.organization.findFirst({
+        where: eq(organization.id, organizationId),
+        columns: { defaultPaymentTerms: true },
+      });
+      const invTermsDays = resolveTermsDays(invContact?.paymentTermsDays, invOrg?.defaultPaymentTerms);
       const dueDate = new Date(nextRun + "T00:00:00Z");
       dueDate.setUTCDate(dueDate.getUTCDate() + invTermsDays);
       const dueDateStr = dueDate.toISOString().split("T")[0];
@@ -492,6 +475,7 @@ export async function processRecurringTemplates(
           createdBy: tmpl.createdBy,
         })
         .returning();
+      emitInvoiceCreated(organizationId, [created.id]);
 
       if (processedLines.length > 0) {
         await db.insert(invoiceLine).values(

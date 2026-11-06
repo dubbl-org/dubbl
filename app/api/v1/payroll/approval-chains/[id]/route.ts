@@ -3,9 +3,10 @@ import { approvalChain, approvalChainStep } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, ok, notFound } from "@/lib/api/response";
+import { handleError, ok, notFound, validationError } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { approversInOrg } from "@/lib/api/payroll-run-actions";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -33,7 +34,7 @@ export async function GET(
         eq(approvalChain.organizationId, ctx.organizationId),
         notDeleted(approvalChain.deletedAt)
       ),
-      with: { steps: { with: { approver: true } } },
+      with: { steps: { with: { approver: { with: { user: { columns: { name: true, email: true } } } } } } },
     });
 
     if (!chain) return notFound("Approval chain");
@@ -55,27 +56,42 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
+    const existing = await db.query.approvalChain.findFirst({
+      where: and(
+        eq(approvalChain.id, id),
+        eq(approvalChain.organizationId, ctx.organizationId),
+        notDeleted(approvalChain.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!existing) return notFound("Approval chain");
+
     const { steps, ...chainUpdate } = parsed;
-
-    if (Object.keys(chainUpdate).length > 0) {
-      await db
-        .update(approvalChain)
-        .set(chainUpdate)
-        .where(eq(approvalChain.id, id));
+    if (steps && !(await approversInOrg(ctx.organizationId, steps.map((s) => s.approverId)))) {
+      return validationError("Every approver must be a member of this workspace");
     }
 
-    if (steps) {
-      await db.delete(approvalChainStep).where(eq(approvalChainStep.chainId, id));
-      if (steps.length > 0) {
-        await db.insert(approvalChainStep).values(
-          steps.map((s) => ({ chainId: id, ...s }))
-        );
+    await db.transaction(async (tx) => {
+      if (Object.keys(chainUpdate).length > 0) {
+        await tx
+          .update(approvalChain)
+          .set(chainUpdate)
+          .where(eq(approvalChain.id, id));
       }
-    }
+
+      if (steps) {
+        await tx.delete(approvalChainStep).where(eq(approvalChainStep.chainId, id));
+        if (steps.length > 0) {
+          await tx.insert(approvalChainStep).values(
+            steps.map((s) => ({ chainId: id, ...s }))
+          );
+        }
+      }
+    });
 
     const chain = await db.query.approvalChain.findFirst({
       where: eq(approvalChain.id, id),
-      with: { steps: { with: { approver: true } } },
+      with: { steps: { with: { approver: { with: { user: { columns: { name: true, email: true } } } } } } },
     });
 
     logAudit({ ctx, action: "update", entityType: "approvalChain", entityId: id, changes: parsed, request });

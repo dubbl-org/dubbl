@@ -9,14 +9,19 @@ import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
-const createSchema = z.object({
-  name: z.string().min(1),
-  level: z.string().optional(),
-  minSalary: z.number().int(),
-  midSalary: z.number().int(),
-  maxSalary: z.number().int(),
-  currency: currencyCodeSchema.optional(),
-});
+// Salaries are annual amounts in cents
+const createSchema = z
+  .object({
+    name: z.string().min(1),
+    level: z.string().optional(),
+    minSalary: z.number().int().min(0),
+    midSalary: z.number().int().min(0),
+    maxSalary: z.number().int().min(0),
+    currency: currencyCodeSchema.optional(),
+  })
+  .refine((b) => b.minSalary <= b.midSalary && b.midSalary <= b.maxSalary, {
+    message: "Salaries must be in order: min ≤ mid ≤ max",
+  });
 
 export async function GET(request: Request) {
   try {

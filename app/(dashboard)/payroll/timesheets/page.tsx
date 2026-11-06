@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { motion, MotionConfig } from "motion/react";
 import { toast } from "sonner";
-import { Clock, Plus, Search, X } from "lucide-react";
+import { Clock, Plus, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface Timesheet {
   id: string;
@@ -44,35 +44,21 @@ const statusColors: Record<string, string> = {
 
 export default function TimesheetsPage() {
   const router = useRouter();
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newTs, setNewTs] = useState({ employeeId: "", periodStart: "", periodEnd: "" });
-  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   useDocumentTitle("Payroll · Timesheets");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchData = useCallback(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    Promise.all([
-      fetch("/api/v1/payroll/timesheets", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/employees", { headers }).then((r) => r.json()),
-    ])
-      .then(([tsData, empData]) => {
-        if (tsData.data) setTimesheets(tsData.data);
-        if (empData.data) setEmployees(empData.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const { data: tsData, loading: tsLoading } = useApi<{ data?: Timesheet[] }>("/api/v1/payroll/timesheets");
+  const { data: empData, loading: empLoading } = useApi<{ data?: { id: string; name: string }[] }>("/api/v1/payroll/employees");
+  const loading = tsLoading || empLoading;
+  const timesheets = tsData?.data ?? [];
+  const employees = useMemo(() => (empData?.data ?? []).map((e) => ({ id: e.id, name: e.name })), [empData]);
 
   const filtered = timesheets.filter((ts) => {
     if (statusFilter !== "all" && ts.status !== statusFilter) return false;

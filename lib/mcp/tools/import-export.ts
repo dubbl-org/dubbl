@@ -2,20 +2,25 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  bulkImportJob, chartAccount, contact, inventoryItem,
-  invoice, invoiceLine, bill, billLine,
-  journalEntry, journalLine, bankTransaction, bankAccount,
+  bulkImportJob,
+  chartAccount,
+  contact,
+  inventoryItem,
+  journalEntry,
+  journalLine,
 } from "@/lib/db/schema";
 import { eq, and, desc, ilike, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { wrapTool } from "@/lib/mcp/errors";
 import { getMapping } from "@/lib/import-export/mappings";
 import { generateCSV, centsToDecimal } from "@/lib/import-export/csv-utils";
+import { parseCsvObjects } from "@/lib/import-export/csv-parse";
+import { importInvoices } from "@/lib/import-export/invoice-import";
 import { parseMoney } from "@/lib/import-export/transformers";
-import { resolveContactByName, resolveAccountByCode } from "@/lib/import-export/reference-resolver";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import type { AuthContext } from "@/lib/api/auth-context";
 import type { SourceSystem, ImportEntity } from "@/lib/import-export/types";
+import { emitJournalPosted, emitContactCreated } from "@/lib/webhooks/events";
 
 export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -45,11 +50,11 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "import_csv_data",
-    "Import CSV data for a specific entity type. Parses CSV content, maps columns using source-specific aliases, validates, and imports rows. Amounts should be in decimal format (e.g. '125.50'). Returns a job summary with processed/error counts.",
+    "Import CSV data for a specific entity type. Parses the CSV properly (quoted fields may contain commas, quotes and line breaks), maps columns using source-specific aliases (or the dubbl field names for source 'custom'), validates, and imports rows. A bad row is skipped and reported; the other rows still import. Amounts in the CSV are decimals (e.g. '125.50'). For invoices: one row per invoice line; rows sharing an invoiceNumber become one draft invoice. Columns: invoiceNumber, contactName or contactEmail (customer must already exist), issueDate, dueDate (optional, else the contact's or organization's payment terms), reference, currencyCode, lineDescription, lineQuantity, lineUnitPrice, lineAmount, lineAccountCode (code or name), lineTaxRate (name or percent). The contact's default income account and tax rate fill blanks. Returns a job summary with processed/error counts and the first errors with row numbers.",
     {
       entityType: z
-        .enum(["accounts", "contacts", "products"])
-        .describe("Type of entity to import. Currently supports accounts, contacts, and products for direct CSV import."),
+        .enum(["accounts", "contacts", "products", "invoices"])
+        .describe("Type of entity to import: accounts, contacts, products or invoices."),
       csvContent: z
         .string()
         .describe("Raw CSV content as a string, with headers in the first row"),
@@ -61,11 +66,12 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        // Parse CSV
-        const lines = params.csvContent.split("\n").map(l => l.trim()).filter(Boolean);
-        if (lines.length < 2) throw new Error("CSV must have at least a header row and one data row");
-
-        const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        // Parse CSV (RFC 4180 quoting)
+        const parsedCsv = parseCsvObjects(params.csvContent);
+        if (parsedCsv.headers.length === 0 || parsedCsv.rows.length === 0) {
+          throw new Error("CSV must have at least a header row and one data row");
+        }
+        const headers = parsedCsv.headers;
         const aliases = getMapping(params.source as SourceSystem, params.entityType as ImportEntity);
 
         // Map headers to target fields
@@ -78,15 +84,33 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
 
         const headerMapping = headers.map(h => {
           const lower = h.toLowerCase();
-          return aliasMap.get(lower) || lower;
+          // Invoice fields are camelCase (contactName, lineAmount, ...).
+          return aliasMap.get(lower) || (params.entityType === "invoices" ? h : lower);
         });
 
-        const rows = lines.slice(1).map(line => {
-          const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+        const rows = parsedCsv.rows.map(values => {
           const row: Record<string, string> = {};
-          headerMapping.forEach((field, i) => { row[field] = values[i] || ""; });
+          headerMapping.forEach((field, i) => { row[field] = values[headers[i]] || ""; });
           return row;
         });
+
+        if (params.entityType === "invoices") {
+          const { jobId, result } = await importInvoices(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            "mcp-import-invoices.csv",
+            rows,
+            params.source as SourceSystem
+          );
+          return {
+            jobId,
+            totalRows: result.totalRows,
+            processedRows: result.processedRows,
+            errorRows: result.errorRows,
+            invoicesCreated: result.invoicesCreated,
+            status: result.processedRows === 0 ? "failed" : "completed",
+            errors: result.errorDetails.slice(0, 10),
+          };
+        }
 
         // Import based on entity type
         const [job] = await db.insert(bulkImportJob).values({
@@ -115,14 +139,15 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
                 description: row.description || null,
               });
             } else if (params.entityType === "contacts") {
-              await db.insert(contact).values({
+              const [created] = await db.insert(contact).values({
                 organizationId: ctx.organizationId,
                 name: row.name || "",
                 email: row.email || null,
                 phone: row.phone || null,
                 type: (row.type as "customer" | "supplier" | "both") || "customer",
                 taxNumber: row.taxNumber || null,
-              });
+              }).returning({ id: contact.id });
+              emitContactCreated(ctx.organizationId, [created.id]);
             } else if (params.entityType === "products") {
               await db.insert(inventoryItem).values({
                 organizationId: ctx.organizationId,
@@ -146,7 +171,7 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
           processedRows,
           errorRows,
           errorDetails: errorDetails.length > 0 ? errorDetails : null,
-          status: errorRows === rows.length ? "failed" : "completed",
+          status: processedRows === 0 ? "failed" : "completed",
           completedAt: new Date(),
         }).where(eq(bulkImportJob.id, job.id));
 
@@ -155,7 +180,7 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
           totalRows: rows.length,
           processedRows,
           errorRows,
-          status: errorRows === rows.length ? "failed" : "completed",
+          status: processedRows === 0 ? "failed" : "completed",
           errors: errorDetails.slice(0, 10),
         };
       })
@@ -317,6 +342,7 @@ export function registerImportExportTools(server: McpServer, ctx: AuthContext) {
             await db.insert(journalLine).values(
               lines.map(l => ({ journalEntryId: created.id, ...l }))
             );
+            if (post) emitJournalPosted(ctx.organizationId, { id: created.id });
             processedRows++;
           } catch (err) {
             errorRows++;

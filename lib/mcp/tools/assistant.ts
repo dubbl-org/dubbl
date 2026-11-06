@@ -8,7 +8,7 @@ import {
   renameConversation,
   transcriptText,
 } from "@/lib/assistant/conversations";
-import type { StoredMessage } from "@/lib/assistant/anthropic";
+import type { StoredMessage } from "@/lib/assistant/model";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /** Tilly's chat history. These are left out of Tilly's own toolset. */

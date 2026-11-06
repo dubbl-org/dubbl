@@ -17,8 +17,15 @@ const itemSchema = z.object({
   amount: z.number().min(0),
   category: z.string().nullable().optional(),
   accountId: z.string().nullable().optional(),
+  // Tax applied to this line; the amount is tax-inclusive (same as create).
+  taxRateId: z.string().nullable().optional(),
   receiptFileKey: z.string().nullable().optional(),
   receiptFileName: z.string().nullable().optional(),
+  // Mileage capture (same as create): distanceMiles is miles x 100, mileageRate
+  // is cents per mile. Sent back unchanged so an edit doesn't drop them.
+  isMileage: z.boolean().optional(),
+  distanceMiles: z.number().int().min(0).nullable().optional(),
+  mileageRate: z.number().int().min(0).nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -42,8 +49,8 @@ export async function GET(
         notDeleted(expenseClaim.deletedAt)
       ),
       with: {
-        submittedByUser: true,
-        approvedByUser: true,
+        submittedByUser: { columns: { id: true, name: true, email: true, image: true } },
+        approvedByUser: { columns: { id: true, name: true, email: true, image: true } },
         items: {
           with: { account: true },
           orderBy: (items, { asc }) => [asc(items.sortOrder)],
@@ -103,6 +110,10 @@ export async function PATCH(
           amount,
           category: item.category || null,
           accountId: item.accountId || null,
+          taxRateId: item.taxRateId || null,
+          isMileage: item.isMileage ?? false,
+          distanceMiles: item.isMileage ? (item.distanceMiles ?? null) : null,
+          mileageRate: item.isMileage ? (item.mileageRate ?? null) : null,
           receiptFileKey: item.receiptFileKey || null,
           receiptFileName: item.receiptFileName || null,
           sortOrder: i,

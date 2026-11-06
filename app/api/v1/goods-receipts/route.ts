@@ -28,7 +28,7 @@ import {
   recordInventoryReceipt,
   type ValuedItem,
 } from "@/lib/api/inventory-valuation";
-import { derivePurchaseOrderStatusAfterReceipt } from "@/lib/api/procurement";
+import { derivePurchaseOrderStatus } from "@/lib/api/procurement";
 import { z } from "zod";
 
 /**
@@ -306,9 +306,10 @@ export async function POST(request: Request) {
         return {
           quantity: l.quantity,
           quantityReceived: l.quantityReceived + (recv?.qtyScaled ?? 0),
+          quantityBilled: l.quantityBilled,
         };
       });
-      const newPoStatus = derivePurchaseOrderStatusAfterReceipt(updatedLines);
+      const newPoStatus = derivePurchaseOrderStatus(updatedLines);
       // Don't downgrade a PO already closed (fully billed) by receipt status.
       if (po.status !== "closed") {
         await tx

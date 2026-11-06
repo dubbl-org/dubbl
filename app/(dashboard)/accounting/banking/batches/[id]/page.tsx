@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -29,6 +29,8 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { BankAccountSelect } from "@/components/dashboard/bank-account-select";
 
 interface BatchItemDetail {
   id: string;
@@ -76,6 +78,8 @@ interface BatchDetail {
   submittedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  bankAccountId: string | null;
+  bankAccount: { id: string; accountName: string; currencyCode: string } | null;
   items: BatchItemDetail[];
 }
 
@@ -94,8 +98,8 @@ export default function BatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [batch, setBatch] = useState<BatchDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: batchData, loading } = useApi<{ batch?: BatchDetail | null }>(id ? `/api/v1/payment-batches/${id}` : null);
+  const batch = batchData?.batch || null;
   const [submitting, setSubmitting] = useState(false);
   const [remittanceOpen, setRemittanceOpen] = useState(false);
   const [remittanceLoading, setRemittanceLoading] = useState(false);
@@ -110,20 +114,6 @@ export default function BatchDetailPage() {
       : null;
 
   useDocumentTitle("Accounting \u00B7 Batch Details");
-
-  const fetchBatch = useCallback(() => {
-    if (!orgId || !id) return;
-    fetch(`/api/v1/payment-batches/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setBatch(data.batch || null))
-      .finally(() => setLoading(false));
-  }, [orgId, id]);
-
-  useEffect(() => {
-    fetchBatch();
-  }, [fetchBatch]);
 
   async function handleSubmit() {
     if (!orgId || !batch) return;
@@ -153,10 +143,16 @@ export default function BatchDetailPage() {
         return;
       }
 
-      toast.success(
-        `Batch submitted - ${data.processed}/${data.total} payments processed`
-      );
-      fetchBatch();
+      const failures: { error: string }[] = data.failures ?? [];
+      if (failures.length > 0) {
+        toast.warning(
+          `${data.processed}/${data.total} payments processed. ${failures.length} failed: ${failures[0].error}`
+        );
+      } else {
+        toast.success(
+          `Batch submitted - ${data.processed}/${data.total} payments processed`
+        );
+      }
     } catch {
       toast.error("Failed to submit batch");
     } finally {
@@ -235,6 +231,24 @@ export default function BatchDetailPage() {
     }
   }
 
+  async function handleBankAccountChange(bankAccountId: string) {
+    if (!orgId || !batch) return;
+    const res = await fetch(`/api/v1/payment-batches/${batch.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-organization-id": orgId,
+      },
+      body: JSON.stringify({ bankAccountId: bankAccountId || null }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Failed to change the bank account");
+      return;
+    }
+    toast.success("Bank account updated");
+  }
+
   async function handleRemoveItem(itemId: string) {
     if (!orgId || !batch) return;
 
@@ -254,7 +268,6 @@ export default function BatchDetailPage() {
       }
 
       toast.success("Item removed from batch");
-      fetchBatch();
     } catch {
       toast.error("Failed to remove item");
     }
@@ -400,6 +413,23 @@ export default function BatchDetailPage() {
           </>
         )}
       </div>
+
+      {batch.status === "draft" ? (
+        <BankAccountSelect
+          value={batch.bankAccountId ?? ""}
+          onChange={handleBankAccountChange}
+          labelClassName="text-xs"
+          className="space-y-2 max-w-sm"
+          hint="Every payment in the batch leaves this account when you submit it."
+        />
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Paid from{" "}
+          <span className="font-medium text-foreground">
+            {batch.bankAccount?.accountName ?? "Default bank account"}
+          </span>
+        </p>
+      )}
 
       {/* Items */}
       <div>

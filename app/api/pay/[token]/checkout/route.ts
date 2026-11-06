@@ -30,8 +30,8 @@ export async function POST(
   const baseUrl = `${url.protocol}//${url.host}`;
 
   const session = await stripe.checkout.sessions.create({
+    // The invoice total already includes its tax, so no Stripe Tax on top
     mode: "payment",
-    automatic_tax: { enabled: true },
     payment_method_types: ["card"],
     line_items: [
       {

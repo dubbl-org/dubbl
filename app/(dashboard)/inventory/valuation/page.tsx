@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   Package,
   DollarSign,
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { motion } from "motion/react";
@@ -31,7 +32,8 @@ interface ValuationItem {
   name: string;
   category: string | null;
   quantityOnHand: number;
-  purchasePrice: number;
+  /** Book cost per unit, cents. */
+  unitCost: number;
   salePrice: number;
   totalCost: number;
   totalValue: number;
@@ -41,7 +43,8 @@ interface ValuationItem {
 interface ValuationSummary {
   totalItems: number;
   totalCost: number;
-  totalRetailValue: number;
+  /** What the stock on hand would sell for, cents. */
+  totalValue: number;
   totalMargin: number;
 }
 
@@ -50,7 +53,7 @@ type SortKey =
   | "name"
   | "category"
   | "quantityOnHand"
-  | "purchasePrice"
+  | "unitCost"
   | "totalCost"
   | "salePrice"
   | "totalValue"
@@ -61,54 +64,29 @@ const COLUMNS: { key: SortKey; label: string; align?: "right" }[] = [
   { key: "name", label: "Name" },
   { key: "category", label: "Category" },
   { key: "quantityOnHand", label: "Qty On Hand", align: "right" },
-  { key: "purchasePrice", label: "Unit Cost", align: "right" },
+  { key: "unitCost", label: "Unit Cost", align: "right" },
   { key: "totalCost", label: "Total Cost", align: "right" },
   { key: "salePrice", label: "Sale Price", align: "right" },
   { key: "totalValue", label: "Total Value", align: "right" },
   { key: "marginPercent", label: "Margin %", align: "right" },
 ];
 
+const EMPTY_SUMMARY: ValuationSummary = {
+  totalItems: 0,
+  totalCost: 0,
+  totalValue: 0,
+  totalMargin: 0,
+};
+
 export default function InventoryValuationPage() {
   const { open: openDrawer } = useCreateDrawer();
-  const [items, setItems] = useState<ValuationItem[]>([]);
-  const [summary, setSummary] = useState<ValuationSummary>({
-    totalItems: 0,
-    totalCost: 0,
-    totalRetailValue: 0,
-    totalMargin: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ items?: ValuationItem[]; summary?: ValuationSummary }>("/api/v1/reports/inventory-valuation");
+  const items = data?.items ?? [];
+  const summary = data?.summary ?? EMPTY_SUMMARY;
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
   useDocumentTitle("Inventory · Stock value");
-
-  const orgId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("activeOrgId")
-      : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-
-    fetch("/api/v1/reports/inventory-valuation", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.items) setItems(data.items);
-        if (data.summary) setSummary(data.summary);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -164,7 +142,7 @@ export default function InventoryValuationPage() {
       i.name,
       i.category || "",
       i.quantityOnHand,
-      (i.purchasePrice / 100).toFixed(2),
+      (i.unitCost / 100).toFixed(2),
       (i.totalCost / 100).toFixed(2),
       (i.salePrice / 100).toFixed(2),
       (i.totalValue / 100).toFixed(2),
@@ -187,12 +165,12 @@ export default function InventoryValuationPage() {
 
   if (loading) return <BrandLoader />;
 
-  const profitAmount = summary.totalRetailValue - summary.totalCost;
+  const profitAmount = summary.totalValue - summary.totalCost;
 
   const stats = [
     { label: "Total Items", value: String(summary.totalItems), icon: Package },
     { label: "What it cost you", value: formatMoney(summary.totalCost), icon: DollarSign },
-    { label: "What it could sell for", value: formatMoney(summary.totalRetailValue), icon: BarChart3, color: "text-brand-600 dark:text-brand-400" },
+    { label: "What it could sell for", value: formatMoney(summary.totalValue), icon: BarChart3, color: "text-brand-600 dark:text-brand-400" },
     {
       label: "Avg profit margin",
       value: summary.totalMargin > 0 ? `${summary.totalMargin.toFixed(1)}%` : "-",
@@ -252,21 +230,21 @@ export default function InventoryValuationPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">What it could sell for</p>
-              <p className="text-2xl font-bold font-mono tabular-nums truncate text-brand-600 dark:text-brand-400">{formatMoney(summary.totalRetailValue)}</p>
+              <p className="text-2xl font-bold font-mono tabular-nums truncate text-brand-600 dark:text-brand-400">{formatMoney(summary.totalValue)}</p>
             </div>
           </div>
           {/* Margin bar */}
-          {summary.totalRetailValue > 0 && (
+          {summary.totalValue > 0 && (
             <div className="space-y-1.5">
               <div className="flex h-2 rounded-full overflow-hidden bg-muted">
                 <div
                   className="bg-brand-500 transition-all duration-500"
-                  style={{ width: `${Math.min((summary.totalCost / summary.totalRetailValue) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((summary.totalCost / summary.totalValue) * 100, 100)}%` }}
                 />
                 {profitAmount > 0 && (
                   <div
                     className="bg-brand-300 dark:bg-brand-700 transition-all duration-500"
-                    style={{ width: `${(profitAmount / summary.totalRetailValue) * 100}%` }}
+                    style={{ width: `${(profitAmount / summary.totalValue) * 100}%` }}
                   />
                 )}
               </div>
@@ -412,7 +390,7 @@ export default function InventoryValuationPage() {
                     {item.quantityOnHand}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">
-                    {formatMoney(item.purchasePrice)}
+                    {formatMoney(item.unitCost)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums">
                     {formatMoney(item.totalCost)}

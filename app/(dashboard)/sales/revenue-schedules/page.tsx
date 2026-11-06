@@ -26,6 +26,9 @@ interface RevenueEntry {
 interface RevenueSchedule {
   id: string;
   invoiceId: string;
+  invoiceNumber: string | null;
+  contactName: string | null;
+  currencyCode: string | null;
   invoiceLineId: string | null;
   totalAmount: number;
   recognizedAmount: number;
@@ -51,6 +54,7 @@ const METHODS: Record<string, string> = {
 };
 
 const methodOf = (s: RevenueSchedule) => METHODS[s.method] ?? s.method;
+const invoiceOf = (s: RevenueSchedule) => s.invoiceNumber ?? "Invoice";
 const leftOf = (s: RevenueSchedule) => (s.status === "cancelled" ? 0 : Math.max(0, s.totalAmount - s.recognizedAmount));
 const pctOf = (s: RevenueSchedule) => (s.totalAmount > 0 ? Math.round((s.recognizedAmount / s.totalAmount) * 100) : 0);
 
@@ -97,10 +101,22 @@ export default function RevenueSchedulesPage() {
       date: { get: (s) => s.startDate, label: "Start date" },
       amount: (s) => s.totalAmount,
       amountLabel: "Scheduled",
-      search: (s) => [methodOf(s), s.startDate, s.endDate, periodLabel(s), STATUSES.find((o) => o.value === s.status)?.label],
+      search: (s) => [s.invoiceNumber, s.contactName, methodOf(s), s.startDate, s.endDate, periodLabel(s), STATUSES.find((o) => o.value === s.status)?.label],
       defaultSort: { key: "start", dir: "desc" },
       facets: [{ key: "method", label: "How it's spread", value: methodOf }],
       columns: [
+        {
+          key: "invoice",
+          label: "Invoice",
+          className: "w-44",
+          value: invoiceOf,
+          render: (s) => (
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{invoiceOf(s)}</span>
+              {s.contactName && <span className="block truncate text-[11.5px] text-muted-foreground">{s.contactName}</span>}
+            </span>
+          ),
+        },
         {
           key: "period",
           label: "Period",
@@ -239,19 +255,20 @@ export default function RevenueSchedulesPage() {
         const entries = sortedEntries(s);
         return (
           <DocumentPreview
-            number={periodLabel(s)}
-          plainTitle
+            number={`${invoiceOf(s)} · ${periodLabel(s)}`}
+            plainTitle
             status={s.status}
             statusOptions={STATUSES}
             amount={leftOf(s) > 0 ? leftOf(s) : s.totalAmount}
             amountLabel={leftOf(s) > 0 ? "left to count" : "total"}
             facts={[
+              { label: "Invoice", value: s.contactName ? `${invoiceOf(s)} · ${s.contactName}` : invoiceOf(s) },
               { label: "Starts", value: formatDay(s.startDate) },
               { label: "Ends", value: formatDay(s.endDate) },
               { label: "How it's spread", value: methodOf(s) },
               { label: "Next to count", value: next ? <DueCell value={next.periodDate} open lateWord="behind" /> : "—" },
-              { label: "Total", value: formatMoney(s.totalAmount) },
-              { label: "Counted so far", value: `${formatMoney(s.recognizedAmount)} · ${pctOf(s)}%` },
+              { label: "Total", value: formatMoney(s.totalAmount, s.currencyCode ?? undefined) },
+              { label: "Counted so far", value: `${formatMoney(s.recognizedAmount, s.currencyCode ?? undefined)} · ${pctOf(s)}%` },
             ]}
             actions={
               <>
@@ -294,7 +311,7 @@ export default function RevenueSchedulesPage() {
                         <span className="text-[12px] text-muted-foreground">
                           {e.recognized ? "Counted" : passed && s.status === "active" ? "Ready to count" : "Not yet"}
                         </span>
-                        <span className={cn("w-24 text-right tabular-nums", e.recognized ? "text-foreground/80" : "text-muted-foreground")}>{formatMoney(e.amount)}</span>
+                        <span className={cn("w-24 text-right tabular-nums", e.recognized ? "text-foreground/80" : "text-muted-foreground")}>{formatMoney(e.amount, s.currencyCode ?? undefined)}</span>
                       </div>
                     );
                   })}

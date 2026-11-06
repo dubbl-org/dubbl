@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { assistantConversation } from "@/lib/db/schema";
-import type { StoredMessage } from "./anthropic";
+import type { StoredMessage } from "./model";
 
 export type Conversation = typeof assistantConversation.$inferSelect;
 

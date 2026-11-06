@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invoice, emailConfig, organization, reminderLog } from "@/lib/db/schema";
+import { invoice, organization, reminderLog } from "@/lib/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getAuthContext, type AuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { sendEmail } from "@/lib/email/smtp-client";
+import { reminderMailer } from "@/lib/email/reminder-processor";
 import { renderTemplate } from "@/lib/email/template-engine";
 import { logAudit } from "@/lib/api/audit";
 import { formatMoney } from "@/lib/money";
@@ -63,20 +63,11 @@ async function handleSendReminder(
   // reminder rules + processor use.
   requireRole(ctx, "manage:recurring");
 
-  // SMTP must be configured + verified or nothing can go out.
-  const config = await db.query.emailConfig.findFirst({
-    where: eq(emailConfig.organizationId, ctx.organizationId),
-  });
-  if (!config || !config.isVerified) {
-    return NextResponse.json(
-      { error: "Email is not set up yet. Connect and verify your email to send reminders." },
-      { status: 400 }
-    );
-  }
-
   const org = await db.query.organization.findFirst({
     where: eq(organization.id, ctx.organizationId),
   });
+  // The org's own mail server if verified, otherwise dubbl's shared sender
+  const send = await reminderMailer(ctx.organizationId, org?.contactEmail);
 
   // Org-scoped load of just the requested invoices, with the contact for the
   // recipient email + name.
@@ -127,7 +118,7 @@ async function handleSendReminder(
     const html = renderTemplate(DEFAULT_BODY, vars);
 
     try {
-      await sendEmail(config, { to: recipient, subject, html });
+      await send({ to: recipient, subject, html });
       await db.insert(reminderLog).values({
         organizationId: ctx.organizationId,
         reminderRuleId: null,

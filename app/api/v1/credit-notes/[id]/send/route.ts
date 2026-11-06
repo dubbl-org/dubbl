@@ -138,6 +138,7 @@ export async function POST(
             accountId: l.accountId,
             amount: l.amount,
             taxAmount: l.taxAmount,
+            taxRateId: l.taxRateId,
           })),
           date: found.issueDate,
           currencyCode: found.currencyCode,

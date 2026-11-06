@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMilestone } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { projectMilestone } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { syncProjectBilling } from "@/lib/api/project-billing";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -24,19 +24,13 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
+    // Invoiced amounts come from live invoices (voided/deleted ones release them).
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     const milestones = await db.query.projectMilestone.findMany({
       where: eq(projectMilestone.projectId, id),
-      orderBy: asc(projectMilestone.sortOrder),
+      orderBy: [asc(projectMilestone.sortOrder), asc(projectMilestone.createdAt)],
     });
 
     return NextResponse.json({ milestones });
@@ -52,20 +46,11 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     const [created] = await db
       .insert(projectMilestone)

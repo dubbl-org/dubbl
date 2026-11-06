@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Lock, Plus, Search, X } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useApi } from "@/lib/query/use-api";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 interface Account {
@@ -43,37 +44,13 @@ const ALL_TYPES = ["asset", "liability", "equity", "revenue", "expense"] as cons
 export default function AccountsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ accounts?: Account[] }>("/api/v1/accounts");
+  const accounts = useMemo(() => data?.accounts ?? [], [data]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sort, setSort] = useState("code:asc");
 
   useDocumentTitle("Accounting \u00B7 Chart of Accounts");
-
-  function fetchAccounts() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/accounts", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.accounts) setAccounts(data.accounts);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  useEffect(() => {
-    const handler = () => fetchAccounts();
-    window.addEventListener("accounts-changed", handler);
-    return () => window.removeEventListener("accounts-changed", handler);
-  }, []);
 
   const filtered = useMemo(() => {
     let result = accounts;

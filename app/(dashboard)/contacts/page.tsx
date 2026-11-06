@@ -265,7 +265,7 @@ export default function ContactsPage() {
           { key: "tax", label: "No tax charged", color: "#A1A1AA", value: noTax.toString(), note: `${tracked1099} tracked for 1099`, hint: "Contacts you don't charge tax to, and US contractors you track for a year-end 1099." },
         ];
       },
-      preview: (c, helpers) => {
+      preview: (c) => {
         const owes = c.owesYou ?? 0;
         const owe = c.youOwe ?? 0;
         const cur = c.currencyCode || "USD";
@@ -337,7 +337,6 @@ export default function ContactsPage() {
                           throw new Error("delete failed");
                         }
                         toast.success("Contact deleted");
-                        helpers.refresh();
                       },
                     })
                   }

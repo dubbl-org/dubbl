@@ -12,7 +12,6 @@ import {
   payment,
   paymentAllocation,
   invoice,
-  chartAccount,
   creditNote,
   creditNoteLine,
   organization,
@@ -25,6 +24,7 @@ import { getNextNumber } from "@/lib/api/numbering";
 // Non-null wrapper - callers (webhook handlers) already guard for null stripe
 const stripe = _stripeClient!;
 import { sendNotification } from "@/lib/notifications/send";
+import { emitContactCreated, emitPaymentReceived } from "@/lib/webhooks/events";
 
 type Integration = typeof stripeIntegration.$inferSelect;
 
@@ -123,6 +123,7 @@ async function resolveContact(
       type: "customer",
     })
     .returning();
+  emitContactCreated(integration.organizationId, [newContact.id]);
 
   if (customerId) {
     await insertEntityMap(
@@ -1273,7 +1274,7 @@ export async function handleInvoicePaid(
         "PAY"
       );
 
-      await db.insert(payment).values({
+      const [created] = await db.insert(payment).values({
         organizationId: integration.organizationId,
         contactId,
         paymentNumber,
@@ -1286,7 +1287,8 @@ export async function handleInvoicePaid(
         journalEntryId: entry.id,
         stripePaymentIntentId: invoicePIId,
         createdBy: integration.connectedBy,
-      });
+      }).returning({ id: payment.id });
+      emitPaymentReceived(integration.organizationId, [created.id]);
     }
   }
 
@@ -1388,6 +1390,7 @@ export async function handleCustomerCreated(
         : undefined,
     })
     .returning();
+  emitContactCreated(integration.organizationId, [newContact.id]);
 
   await insertEntityMap(
     integration.organizationId,

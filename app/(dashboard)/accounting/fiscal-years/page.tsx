@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CalendarCheck2, Loader2, Lock, LockOpen, Plus } from "lucide-react";
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDay, parseDay, toDayKey } from "@/components/dashboard/explorer/cells";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface FiscalYear {
   id: string;
@@ -48,28 +49,18 @@ function suggestNext(years: FiscalYear[], startMonth: number) {
 export default function FiscalYearsPage() {
   useDocumentTitle("Accounting · Financial years");
   const { confirm, dialog } = useConfirm();
-  const [years, setYears] = useState<FiscalYear[] | null>(null);
-  const [startMonth, setStartMonth] = useState(1);
+  const fy = useApi<{ fiscalYears?: FiscalYear[] }>("/api/v1/fiscal-years");
+  const org = useApi<{ organization?: { fiscalYearStartMonth?: number }; fiscalYearStartMonth?: number }>("/api/v1/organization");
+  const years = useMemo<FiscalYear[] | null>(() => (fy.data ? (fy.data.fiscalYears ?? []) : fy.error ? [] : null), [fy.data, fy.error]);
+  const startMonth = org.data?.organization?.fiscalYearStartMonth ?? org.data?.fiscalYearStartMonth ?? 1;
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "" });
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [fy, org] = await Promise.all([
-      fetch("/api/v1/fiscal-years", { headers: headers() }).then((r) => r.json()),
-      fetch("/api/v1/organization", { headers: headers() }).then((r) => r.json()).catch(() => ({})),
-    ]);
-    setYears(fy.fiscalYears ?? []);
-    const month = org.organization?.fiscalYearStartMonth ?? org.fiscalYearStartMonth;
-    if (month) setStartMonth(month);
-  }, []);
-
+  const loadFailed = !!fy.error && !fy.data;
   useEffect(() => {
-    load().catch(() => {
-      setYears([]);
-      toast.error("Couldn't load your financial years");
-    });
-  }, [load]);
+    if (loadFailed) toast.error("Couldn't load your financial years");
+  }, [loadFailed]);
 
   const today = toDayKey(new Date());
   const sorted = useMemo(() => [...(years ?? [])].sort((a, b) => b.startDate.localeCompare(a.startDate)), [years]);
@@ -89,7 +80,6 @@ export default function FiscalYearsPage() {
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Couldn't add the year");
       toast.success(`${form.name} added`);
       setAdding(false);
-      await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't add the year");
     } finally {
@@ -122,7 +112,6 @@ export default function FiscalYearsPage() {
         throw new Error(msg === "Cannot close: draft entries exist" ? "There are draft entries dated in this year. Post or delete them first." : msg);
       }
       toast.success(action === "close" ? `${year.name} closed` : `${year.name} reopened`);
-      await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

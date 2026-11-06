@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import {
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 
 type SortKey = "name" | "code" | "expected" | "counted" | "discrepancy";
@@ -77,17 +78,17 @@ const STATUS_CONFIG: Record<
   { label: string; className: string }
 > = {
   draft: {
-    label: "Draft",
+    label: "Not started",
     className:
       "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300",
   },
   in_progress: {
-    label: "In Progress",
+    label: "Counting",
     className:
       "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   },
   completed: {
-    label: "Completed",
+    label: "Done",
     className:
       "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
   },
@@ -205,8 +206,12 @@ function CounterCell({
 export default function StockTakeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [stockTake, setStockTake] = useState<StockTakeDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/stock-takes/${id}`;
+  const cache = useApiCache();
+  const { data: detail, loading, refetch } = useApi<{ stockTake?: StockTakeDetail }>(url);
+  const stockTake = detail?.stockTake ?? null;
+  const setStockTake = (fn: (prev: StockTakeDetail) => StockTakeDetail) =>
+    cache.update<{ stockTake?: StockTakeDetail }>(url, (d) => (d.stockTake ? { ...d, stockTake: fn(d.stockTake) } : d));
   const [actionLoading, setActionLoading] = useState(false);
   const [blindMode, setBlindMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -224,19 +229,6 @@ export default function StockTakeDetailPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  useEffect(() => {
-    if (!orgId) return;
-
-    fetch(`/api/v1/stock-takes/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.stockTake) setStockTake(data.stockTake);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
   async function handleStartCount() {
     if (!orgId) return;
     setActionLoading(true);
@@ -249,9 +241,12 @@ export default function StockTakeDetailPage() {
         },
         body: JSON.stringify({ status: "in_progress" }),
       });
-      if (!res.ok) throw new Error("Failed to start count");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to start count");
+      }
       const data = await res.json();
-      setStockTake(data.stockTake);
+      cache.set(url, { stockTake: data.stockTake });
       toast.success("Stock take started");
     } catch (err) {
       toast.error(
@@ -267,7 +262,7 @@ export default function StockTakeDetailPage() {
     const confirmed = await confirm({
       title: "Finalize & post adjustment?",
       description:
-        "This corrects on-hand inventory to your counted quantities and posts the value of any difference to the ledger. The stock take will be marked completed and this cannot be undone.",
+        "Stock is set to your counted quantities (at this location, if the count is for one location) and the value of every difference is posted to the ledger. Items you didn't count are left alone. This can't be undone.",
       confirmLabel: "Finalize & post",
       destructive: false,
     });
@@ -285,16 +280,8 @@ export default function StockTakeDetailPage() {
       }
       const data = await res.json();
 
-      // Refetch the full detail so lines, badges and totals reflect the post.
-      const refetch = await fetch(`/api/v1/stock-takes/${id}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      if (refetch.ok) {
-        const fresh = await refetch.json();
-        if (fresh.stockTake) setStockTake(fresh.stockTake);
-      } else if (data.stockTake) {
-        setStockTake(data.stockTake);
-      }
+      // Wait for the full detail so lines, badges and totals reflect the post.
+      await refetch();
 
       const count = typeof data.adjustedCount === "number" ? data.adjustedCount : 0;
       toast.success(
@@ -315,7 +302,7 @@ export default function StockTakeDetailPage() {
     if (!orgId) return;
     const confirmed = await confirm({
       title: "Cancel this stock take?",
-      description: "This will mark the stock take as cancelled.",
+      description: "Nothing is posted and stock levels stay as they are.",
       confirmLabel: "Cancel Stock Take",
       destructive: true,
     });
@@ -331,9 +318,12 @@ export default function StockTakeDetailPage() {
         },
         body: JSON.stringify({ status: "cancelled" }),
       });
-      if (!res.ok) throw new Error("Failed to cancel");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to cancel");
+      }
       const data = await res.json();
-      setStockTake(data.stockTake);
+      cache.set(url, { stockTake: data.stockTake });
       toast.success("Stock take cancelled");
     } catch (err) {
       toast.error(
@@ -379,7 +369,6 @@ export default function StockTakeDetailPage() {
 
     // Optimistic update
     setStockTake((prev) => {
-      if (!prev) return prev;
       return {
         ...prev,
         lines: prev.lines.map((line) =>
@@ -410,7 +399,6 @@ export default function StockTakeDetailPage() {
       const data = await res.json();
 
       setStockTake((prev) => {
-        if (!prev) return prev;
         return {
           ...prev,
           lines: prev.lines.map((line) =>
@@ -429,13 +417,7 @@ export default function StockTakeDetailPage() {
         err instanceof Error ? err.message : "Failed to update count"
       );
       // Revert on error - refetch
-      fetch(`/api/v1/stock-takes/${id}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.stockTake) setStockTake(data.stockTake);
-        });
+      void refetch();
     } finally {
       setSavingLines((prev) => {
         const next = new Set(prev);

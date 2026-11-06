@@ -123,3 +123,75 @@ export function calculatePayrollItem(params: {
     netAmount,
   };
 }
+
+// ─── Per-deduction lines for a pay item ─────────────────────────────
+
+/** An employee's assigned deduction, with its type's defaults. */
+export interface AssignedDeduction {
+  deductionTypeId: string;
+  name: string;
+  category: "pre_tax" | "post_tax";
+  /** Employee override, cents. */
+  amount: number | null;
+  /** Employee override, percent of gross (e.g. 5 = 5%). */
+  percent: number | null;
+  defaultAmount: number | null;
+  defaultPercent: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface DeductionLine {
+  deductionTypeId: string;
+  name: string;
+  category: "pre_tax" | "post_tax";
+  amount: number; // cents
+}
+
+/**
+ * Turn an employee's assigned deductions into the lines withheld from one pay
+ * item. The employee's own amount or percent wins over the type's default; a
+ * deduction whose start/end dates don't overlap the pay period is skipped.
+ * Pre-tax lines can never add up to more than gross.
+ */
+export function computeDeductionLines(
+  grossAmount: number,
+  deductions: AssignedDeduction[],
+  periodStart: string,
+  periodEnd: string
+): DeductionLine[] {
+  const lines: DeductionLine[] = [];
+  for (const d of deductions) {
+    if (d.startDate && d.startDate > periodEnd) continue;
+    if (d.endDate && d.endDate < periodStart) continue;
+
+    let amount = 0;
+    if (d.amount != null) amount = d.amount;
+    else if (d.percent != null) amount = Math.round((grossAmount * d.percent) / 100);
+    else if (d.defaultAmount != null) amount = d.defaultAmount;
+    else if (d.defaultPercent != null) amount = Math.round((grossAmount * d.defaultPercent) / 100);
+    if (amount <= 0) continue;
+
+    lines.push({ deductionTypeId: d.deductionTypeId, name: d.name, category: d.category, amount });
+  }
+
+  const preTax = lines.filter((l) => l.category === "pre_tax");
+  const postTax = lines.filter((l) => l.category === "post_tax");
+  return [...capLines(preTax, Math.max(0, grossAmount)), ...postTax];
+}
+
+/**
+ * Trim lines, in order, so they add up to no more than `limit` cents. Lines
+ * that end up at 0 are dropped. Used to stop deductions pushing take-home pay
+ * below zero.
+ */
+export function capLines<T extends { amount: number }>(lines: T[], limit: number): T[] {
+  let room = Math.max(0, limit);
+  const out: T[] = [];
+  for (const l of lines) {
+    const amount = Math.min(l.amount, room);
+    room -= amount;
+    if (amount > 0) out.push({ ...l, amount });
+  }
+  return out;
+}

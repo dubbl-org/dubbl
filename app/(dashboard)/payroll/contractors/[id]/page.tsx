@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowLeft, Briefcase, Plus, Play, Trash2 } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
@@ -11,13 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
@@ -25,6 +17,7 @@ import { CurrencySelect } from "@/components/ui/currency-select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface ContractorDetail {
   id: string;
@@ -54,58 +47,56 @@ const statusColors: Record<string, string> = {
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
 };
 
-const anim = (delay: number) => ({
-  initial: { opacity: 0, y: 12 } as const,
-  animate: { opacity: 1, y: 0 } as const,
-  transition: { duration: 0.3, delay } as const,
-});
+interface ContractorForm {
+  name: string;
+  email: string;
+  company: string;
+  taxId: string;
+  hourlyRate: string;
+  bankAccount: string;
+}
+
+function toContractorForm(c: ContractorDetail | null): ContractorForm {
+  return {
+    name: c?.name ?? "",
+    email: c?.email || "",
+    company: c?.company || "",
+    taxId: c?.taxId || "",
+    hourlyRate: c?.hourlyRate ? (c.hourlyRate / 100).toFixed(2) : "",
+    bankAccount: c?.bankAccountNumber || "",
+  };
+}
 
 export default function ContractorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [contractor, setContractor] = useState<ContractorDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ contractor?: ContractorDetail }>(`/api/v1/payroll/contractors/${id}`);
+  const contractor = data?.contractor ?? null;
   const [saving, setSaving] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // Edit form
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [hourlyRate, setHourlyRate] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
+  // Edit form (seeded from the contractor until edited)
+  const [draft, setDraft] = useState<ContractorForm | null>(null);
+  const form = draft ?? toContractorForm(contractor);
+  const setField = (key: keyof ContractorForm) => (value: string) =>
+    setDraft((d) => ({ ...(d ?? toContractorForm(contractor)), [key]: value }));
+  const { name, email, company, taxId, hourlyRate, bankAccount } = form;
+  const setName = setField("name");
+  const setEmail = setField("email");
+  const setCompany = setField("company");
+  const setTaxId = setField("taxId");
+  const setHourlyRate = setField("hourlyRate");
+  const setBankAccount = setField("bankAccount");
 
   // New payment
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDesc, setPaymentDesc] = useState("");
   const [paymentInvoice, setPaymentInvoice] = useState("");
-  const [paymentCurrency, setPaymentCurrency] = useState("");
+  const [paymentCurrencyDraft, setPaymentCurrency] = useState<string | null>(null);
+  const paymentCurrency = paymentCurrencyDraft ?? (contractor ? contractor.currency || "USD" : "");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Contractor Details");
-
-  function fetchContractor() {
-    if (!orgId) return;
-    fetch(`/api/v1/payroll/contractors/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.contractor) {
-          const c = data.contractor;
-          setContractor(c);
-          setName(c.name);
-          setEmail(c.email || "");
-          setCompany(c.company || "");
-          setHourlyRate(c.hourlyRate ? (c.hourlyRate / 100).toFixed(2) : "");
-          setBankAccount(c.bankAccountNumber || "");
-          setPaymentCurrency(c.currency || "USD");
-        }
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => { fetchContractor(); }, [id, orgId]);
 
   async function handleSave() {
     if (!orgId) return;
@@ -118,12 +109,16 @@ export default function ContractorDetailPage() {
           name,
           email: email || null,
           company: company || null,
+          taxId: taxId.trim() || null,
           hourlyRate: hourlyRate ? Math.round(parseFloat(hourlyRate) * 100) : null,
           bankAccountNumber: bankAccount || null,
         }),
       });
-      if (res.ok) toast.success("Contractor updated");
-      else toast.error("Failed to update");
+      if (res.ok) {
+        toast.success("Contractor updated");
+        await refetch();
+        setDraft(null);
+      } else toast.error("Failed to update");
     } finally {
       setSaving(false);
     }
@@ -143,8 +138,10 @@ export default function ContractorDetailPage() {
     });
     if (res.ok) {
       toast.success("Payment added");
-      setPaymentAmount(""); setPaymentDesc(""); setPaymentInvoice("");
-      fetchContractor();
+      setPaymentAmount(""); setPaymentDesc(""); setPaymentInvoice(""); setPaymentCurrency(null);
+      await refetch();
+    } else {
+      toast.error("Failed to add payment");
     }
   }
 
@@ -163,7 +160,7 @@ export default function ContractorDetailPage() {
     });
     if (res.ok) {
       toast.success("Payment processed");
-      fetchContractor();
+      await refetch();
     } else {
       toast.error("Failed to process payment");
     }
@@ -235,6 +232,10 @@ export default function ContractorDetailPage() {
             <div className="space-y-1.5">
               <Label className="text-xs">Company</Label>
               <Input value={company} onChange={(e) => setCompany(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tax ID</Label>
+              <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="EIN or SSN for the 1099" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Hourly Rate</Label>

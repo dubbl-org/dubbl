@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, FolderKanban, Clock, DollarSign, Target, Users } from "lucide-react";
+import { Plus, FolderKanban, Clock, DollarSign, Target, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -11,12 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface ProjectMember {
   id: string;
@@ -165,41 +165,37 @@ const columns: Column<Project>[] = [
   },
 ];
 
+const PAGE_SIZE = 25;
+
 export default function ProjectsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilterState] = useState("all");
+  const [page, setPage] = useState(1);
+  const setStatusFilter = (v: string) => { setStatusFilterState(v); setPage(1); };
   useDocumentTitle("Projects · All Projects");
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+  if (statusFilter !== "all") params.set("status", statusFilter);
+  const { data, loading } = useApi<{
+    data?: Project[];
+    pagination?: { page: number; totalPages: number; total: number };
+    summary?: { total: number; active: number; totalBudget: number; totalBilled: number; totalHours: number; teamMembers: number };
+  }>(`/api/v1/projects?${params}`, { keepPrevious: true });
+  const projects = data?.data ?? [];
+  const totalPages = data?.pagination?.totalPages ?? 1;
 
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-
-    fetch(`/api/v1/projects?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setProjects(data.data);
-      })
-      .then(() => devDelay())
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
-
-  const activeProjects = projects.filter((p) => p.status === "active");
-  const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
-  const totalBilled = projects.reduce((sum, p) => sum + p.totalBilled, 0);
-  const totalHours = projects.reduce((sum, p) => sum + p.totalHours, 0);
-  const totalMembers = new Set(projects.flatMap(p => p.members.map(m => m.member.id))).size;
+  // Org-wide figures from the server, so they cover every project, not just this page.
+  const summary = data?.summary;
+  const activeCount = summary?.active ?? 0;
+  const totalBudget = summary?.totalBudget ?? 0;
+  const totalBilled = summary?.totalBilled ?? 0;
+  const totalHours = summary?.totalHours ?? 0;
+  const totalMembers = summary?.teamMembers ?? 0;
 
   if (loading) return <BrandLoader />;
 
-  if (!loading && projects.length === 0 && statusFilter === "all") {
+  if (!loading && projects.length === 0 && statusFilter === "all" && page === 1) {
     return (
       <ContentReveal className="space-y-10">
         <Section title="Projects" description="Create your first project to start tracking time, tasks, and billing.">
@@ -227,9 +223,9 @@ export default function ProjectsPage() {
       <Section title="Overview" description="A summary of your projects and resource allocation.">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <StatCard title="Active" value={activeProjects.length.toString()} icon={FolderKanban} />
+            <StatCard title="Active" value={activeCount.toString()} icon={FolderKanban} />
             <StatCard title="Total Budget" value={formatMoney(totalBudget)} icon={DollarSign} />
-            <StatCard title="Total Billed" value={formatMoney(totalBilled)} icon={Target}
+            <StatCard title="Billed" value={formatMoney(totalBilled)} icon={Target}
               change={totalBudget > 0 ? `${Math.round((totalBilled / totalBudget) * 100)}% of budget` : undefined}
             />
             <StatCard title="Hours Logged" value={formatHours(totalHours)} icon={Clock} />
@@ -259,6 +255,7 @@ export default function ProjectsPage() {
                 <TabsTrigger value="active">Active</TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
                 <TabsTrigger value="on_hold">On Hold</TabsTrigger>
+                <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
                 <TabsTrigger value="archived">Archived</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -271,6 +268,23 @@ export default function ProjectsPage() {
               emptyMessage="No projects found."
               onRowClick={(r) => router.push(`/projects/${r.id}`)}
             />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                Page {page} of {totalPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft className="size-3 mr-1" />
+                  Previous
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                  <ChevronRight className="size-3 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Section>
     </div>

@@ -8,7 +8,6 @@ import {
   bankAccount,
   bankReconciliation,
   chartAccount,
-  costCenter,
   taxRate,
   invoice,
   bill,
@@ -33,6 +32,7 @@ import {
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { getNextNumber } from "@/lib/api/numbering";
 import { findMatches, type MatchCandidate } from "@/lib/banking/reconciliation-matcher";
 import { suggestAccounts } from "@/lib/banking/account-suggestions";
@@ -45,10 +45,18 @@ import {
   ensureControlAccount,
   splitGrossTax,
   assertBaseRateAvailable,
+  orgIsUsSalesTax,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { postReconciliationAdjustment } from "@/lib/api/bank-reconciliation";
+import {
+  commitBankStatementImport,
+  previewBankStatementImport,
+} from "@/lib/banking/importer";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -290,8 +298,9 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           });
           if (linkedPayment)
             throw new Error("This line is matched to an invoice or bill. Reverse it with unreconcile_bank_transaction first.");
-          await assertNotLocked(ctx.organizationId, transaction.date, ctx);
         }
+        // Nothing is posted into (or re-coded in) a locked or closed period.
+        await assertNotLocked(ctx.organizationId, transaction.date, ctx);
 
         // Connect the bank account to its ledger account automatically (older
         // accounts self-heal on first use) so categorizing never dead-ends.
@@ -304,6 +313,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           ),
         });
         if (!target) throw new Error("Account not found");
+        await assertCostCentersActive(ctx.organizationId, [params.costCenterId], [transaction.costCenterId]);
 
         const currencyCode = transaction.currencyCode || account.currencyCode;
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
@@ -675,6 +685,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         }
 
         const paymentDate = params.date || transaction.date;
+        await assertNotLocked(ctx.organizationId, paymentDate, ctx);
         const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
         const newAmountPaid = found.amountPaid + params.amount;
@@ -698,6 +709,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               createdBy: ctx.userId,
             })
             .returning();
+          emitPaymentReceived(ctx.organizationId, [created.id]);
 
           await tx.insert(paymentAllocation).values({
             paymentId: created.id,
@@ -752,6 +764,8 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           changes: { invoiceId: params.invoiceId, paymentId: created.id, amount: params.amount },
         });
 
+        await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
+
         return {
           transactionId: params.transactionId,
           payment: { id: created.id, paymentNumber },
@@ -804,6 +818,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         }
 
         const paymentDate = params.date || transaction.date;
+        await assertNotLocked(ctx.organizationId, paymentDate, ctx);
         const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
         const newAmountPaid = found.amountPaid + params.amount;
@@ -827,6 +842,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               createdBy: ctx.userId,
             })
             .returning();
+          emitPaymentReceived(ctx.organizationId, [created.id]);
 
           await tx.insert(paymentAllocation).values({
             paymentId: created.id,
@@ -1029,6 +1045,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           : sourceGlAccountId;
 
         const currencyCode = transaction.currencyCode || sourceAccount.currencyCode;
+        await assertNotLocked(ctx.organizationId, transaction.date, ctx);
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
         const reference = transaction.reference || transaction.description;
@@ -1210,21 +1227,8 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         });
         if (targets.length !== accountIds.length) throw new Error("Account not found");
 
-        // Verify referenced cost centers belong to this org.
-        const costCenterIds = [
-          ...new Set(params.allocations.map((a) => a.costCenterId).filter((v): v is string => !!v)),
-        ];
-        if (costCenterIds.length > 0) {
-          const ccs = await db.query.costCenter.findMany({
-            where: and(
-              eq(costCenter.organizationId, ctx.organizationId),
-              inArray(costCenter.id, costCenterIds),
-              notDeleted(costCenter.deletedAt)
-            ),
-            columns: { id: true },
-          });
-          if (ccs.length !== costCenterIds.length) throw new Error("Cost center not found");
-        }
+        // Verify referenced cost centers belong to this org and are active.
+        await assertCostCentersActive(ctx.organizationId, params.allocations.map((a) => a.costCenterId));
 
         // Load referenced tax rates (org-scoped).
         const taxRateIds = [
@@ -1240,6 +1244,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         const taxById = new Map(taxRows.map((t) => [t.id, t]));
 
         const currencyCode = transaction.currencyCode || account.currencyCode;
+        await assertNotLocked(ctx.organizationId, transaction.date, ctx);
         await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
         const moneyIn = transaction.amount > 0;
@@ -1310,7 +1315,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
               const net = gross - taxAmt;
               const control = await ensureControlAccount(
                 ctx.organizationId,
-                isUsSalesTax ? "salesTaxPayable" : "outputVat",
+                isUsSalesTax || (await orgIsUsSalesTax(ctx.organizationId)) ? "salesTaxPayable" : "outputVat",
                 currency,
                 tx
               );
@@ -1463,6 +1468,7 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
             const bankGlAccountId = await ensureBankLedgerAccount(ctx.organizationId, account);
 
             const currencyCode = transaction.currencyCode || account.currencyCode;
+            await assertNotLocked(ctx.organizationId, transaction.date, ctx);
             await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
             const { entry } = await db.transaction(async (tx) => {
@@ -1627,6 +1633,12 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
           ),
           with: { allocations: true },
         });
+
+        // Undoing voids what the line posted, so its period must still be open.
+        await assertNotLocked(ctx.organizationId, transaction.date, ctx);
+        if (linkedPayment && linkedPayment.date !== transaction.date) {
+          await assertNotLocked(ctx.organizationId, linkedPayment.date, ctx);
+        }
 
         const { result } = await db.transaction(async (tx) => {
           let linkedPaymentId: string | null = null;
@@ -1959,6 +1971,128 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
             total: sumAmount(unreconciled),
             transactions: unreconciled,
           },
+        };
+      })
+  );
+
+  // -------------------------------------------------------------------------
+  // write_off_reconciliation_difference — mirrors POST
+  // /bank-accounts/[id]/reconciliation { action: "adjustment" }.
+  // -------------------------------------------------------------------------
+  server.tool(
+    "write_off_reconciliation_difference",
+    "Write off a small leftover difference between a bank statement and the books (the UI's 'Write off the difference'). Posts one balanced journal entry dated `date`: when amount > 0 (statement shows more) DR the bank's ledger account / CR 'Bank Reconciliation Adjustments (Income)'; when amount < 0 (books show more) DR 'Bank Reconciliation Adjustments (Expense)' / CR the bank. Those accounts are created on demand (or pass adjustmentAccountId to use your own). With reconciliationId, the write-off is also added as a reconciled line on that statement check so the difference becomes zero. Usually pass the `difference` from reconciliation_report as amount and the statement end date as date. Only use it for small amounts that can't be traced; a large difference usually means lines are not categorized yet. Fails if the date is in a locked period. Amounts in integer cents.",
+    {
+      bankAccountId: z.string().describe("UUID of the bank account being reconciled"),
+      amount: z
+        .number()
+        .int()
+        .refine((v) => v !== 0, "amount must be non-zero")
+        .describe("Signed difference to write off, in integer cents: statement balance minus balance in the books (e.g. -350 = books show $3.50 more)"),
+      date: z.string().describe("Date of the write-off entry (YYYY-MM-DD), normally the statement end date"),
+      description: z.string().optional().describe("Memo for the entry, e.g. 'Bank rounding difference'. Defaults to 'Bank reconciliation adjustment'"),
+      reconciliationId: z.string().optional().describe("UUID of the statement check (bank reconciliation) to attach the write-off line to"),
+      adjustmentAccountId: z.string().optional().describe("UUID of a chart account to post the other side to instead of the Bank Reconciliation Adjustments account"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:banking");
+
+        const account = await db.query.bankAccount.findFirst({
+          where: and(
+            eq(bankAccount.id, params.bankAccountId),
+            eq(bankAccount.organizationId, ctx.organizationId),
+            notDeleted(bankAccount.deletedAt)
+          ),
+        });
+        if (!account) return { error: "Bank account not found" };
+
+        const result = await postReconciliationAdjustment(ctx, account, params);
+        if (!result.ok) return { error: result.error };
+        return {
+          journalEntryId: result.journalEntryId,
+          adjustmentAccountId: result.adjustmentAccountId,
+          amount: result.amount,
+        };
+      })
+  );
+
+  // -------------------------------------------------------------------------
+  // preview_bank_statement_import / import_bank_statement — mirror POST
+  // /bank-accounts/[id]/transactions/import (mode preview / commit).
+  // -------------------------------------------------------------------------
+  const statementImportShape = {
+    bankAccountId: z.string().describe("UUID of the bank account to import into"),
+    content: z.string().min(1).describe("The statement file's text content (CSV, TSV, QIF, OFX/QFX/QBO, CAMT.052/053/054, MT940/942 or BAI2)"),
+    fileName: z.string().optional().describe("Original file name, e.g. 'october.csv'. Helps detect the format"),
+    format: z
+      .enum(["csv", "tsv", "qif", "ofx", "qfx", "qbo", "camt052", "camt053", "camt054", "mt940", "mt942", "bai2"])
+      .optional()
+      .describe("Statement format. Omit to auto-detect"),
+  };
+
+  server.tool(
+    "preview_bank_statement_import",
+    "Parse a bank statement without saving anything: returns the detected format, row count, the first 100 parsed lines (amounts in integer cents, negative = money out), any warnings and the lines that would be skipped as duplicates of lines already imported. Run this before import_bank_statement to check the file reads correctly.",
+    statementImportShape,
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:banking");
+        const account = await db.query.bankAccount.findFirst({
+          where: and(
+            eq(bankAccount.id, params.bankAccountId),
+            eq(bankAccount.organizationId, ctx.organizationId),
+            notDeleted(bankAccount.deletedAt)
+          ),
+          columns: { id: true },
+        });
+        if (!account) return { error: "Bank account not found" };
+        const preview = await previewBankStatementImport(params.bankAccountId, {
+          fileName: params.fileName,
+          content: params.content,
+          format: params.format,
+        });
+        return { preview };
+      })
+  );
+
+  server.tool(
+    "import_bank_statement",
+    "Import a bank statement into a bank account. New lines are added as to-do (status 'unreconciled'); lines already imported are skipped as duplicates; the account balance is set to the statement's closing balance. The org's active bank rules then run on the new lines, exactly like apply_bank_rules: a split rule, or a rule with autoReconcile and an account, posts the categorization journal entry and marks the line reconciled; other matches only fill in the suggested account / contact / tax rate. Returns imported and duplicate counts, the import id and the rule counts (applied, reconciled, split, skipped). Amounts in integer cents.",
+    statementImportShape,
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:banking");
+        const account = await db.query.bankAccount.findFirst({
+          where: and(
+            eq(bankAccount.id, params.bankAccountId),
+            eq(bankAccount.organizationId, ctx.organizationId),
+            notDeleted(bankAccount.deletedAt)
+          ),
+          columns: { id: true },
+        });
+        if (!account) return { error: "Bank account not found" };
+        const result = await commitBankStatementImport(
+          ctx.organizationId,
+          params.bankAccountId,
+          { fileName: params.fileName, content: params.content, format: params.format },
+          ctx.userId
+        );
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "import",
+          entityType: "bank_transaction",
+          entityId: ctx.organizationId,
+          changes: { count: result.imported, importId: result.importId, format: result.format, fileName: params.fileName ?? null, duplicates: result.duplicateCount, rules: result.rules },
+        });
+        return {
+          importId: result.importId,
+          format: result.format,
+          imported: result.imported,
+          duplicateCount: result.duplicateCount,
+          rules: result.rules,
+          warnings: result.warnings,
         };
       })
   );

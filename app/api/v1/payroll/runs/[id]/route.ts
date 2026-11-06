@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payrollRun, payrollItem } from "@/lib/db/schema";
+import { payrollRun } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { handleError, notFound, validationError } from "@/lib/api/response";
+import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { voidPayrollRun, deleteDraftPayrollRun } from "@/lib/api/payroll-run-actions";
 
 export async function GET(
   request: Request,
@@ -25,8 +26,19 @@ export async function GET(
       ),
       with: {
         items: {
-          with: { employee: true },
+          with: {
+            employee: true,
+            taxBreakdowns: true,
+            employerTaxBreakdowns: true,
+            deductionBreakdowns: { with: { deductionType: { columns: { name: true } } } },
+          },
         },
+        // Sign-off history (who approved or sent it back, and why).
+        approvalRecords: {
+          columns: { id: true, status: true, comment: true, decidedAt: true },
+          with: { approver: { columns: { id: true }, with: { user: { columns: { name: true, email: true } } } } },
+        },
+        journalEntry: { columns: { id: true, entryNumber: true, voidedAt: true, voidReason: true } },
       },
     });
 
@@ -37,6 +49,10 @@ export async function GET(
   }
 }
 
+/**
+ * Delete an unfinished run, or void a finished one. Voiding posts a reversing
+ * journal entry so the books net back to zero; pass an optional ?reason=.
+ */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -57,30 +73,25 @@ export async function DELETE(
     if (!run) return notFound("Payroll run");
 
     if (run.status === "completed") {
-      // Void instead of delete
-      await db
-        .update(payrollRun)
-        .set({ status: "void" })
-        .where(eq(payrollRun.id, id));
+      const reason = new URL(request.url).searchParams.get("reason");
+      const result = await voidPayrollRun(ctx, id, reason);
 
       logAudit({
         ctx,
-        action: "delete",
+        action: "void",
         entityType: "payroll_run",
         entityId: id,
-        changes: run as Record<string, unknown>,
+        changes: { reversalEntryId: result.reversalEntryId, reason },
         request,
       });
 
-      return NextResponse.json({ success: true, voided: true });
+      return NextResponse.json({ success: true, voided: true, ...result });
+    }
+    if (run.status === "void") {
+      return validationError("This payroll run is already void");
     }
 
-    // Delete items and soft-delete run
-    await db.delete(payrollItem).where(eq(payrollItem.payrollRunId, id));
-    await db
-      .update(payrollRun)
-      .set(softDelete())
-      .where(eq(payrollRun.id, id));
+    await deleteDraftPayrollRun(ctx, id);
 
     logAudit({
       ctx,

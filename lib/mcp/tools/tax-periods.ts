@@ -1,17 +1,24 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { taxPeriod, taxReturnLine } from "@/lib/db/schema";
+import { taxPeriod } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
-import { createVatReturnClearingJournalEntry } from "@/lib/api/journal-automation";
+import { fileTaxPeriod } from "@/lib/reports/tax-filing";
 import {
+  boxTransactions,
+  computeBas,
+  computeVatReturn,
   getOrgTaxConfig,
+  isDrillableBox,
   resolveBasis,
-  controlAccountMovement,
-  computeEcSales,
 } from "@/lib/reports/tax-return";
+import { computeSalesTaxReport } from "@/lib/reports/sales-tax-report";
+import { filingDeadline } from "@/lib/tax/filing-deadline";
+import { buildScheduleC } from "@/lib/tax/schedule-c";
+import { aggregateByDateRange } from "@/lib/reports/gl-query";
+import { organization } from "@/lib/db/schema";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /**
@@ -30,7 +37,7 @@ import type { AuthContext } from "@/lib/api/auth-context";
 export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_tax_periods",
-    "List the organization's VAT/GST tax periods (filing-tracking records), newest start date first, each with its frozen return lines (box figures). Tax-return line amounts are in integer cents. Returns the tax periods.",
+    "List the organization's VAT/GST tax periods (filing-tracking records), newest start date first, each with its frozen return lines (box figures) and its filing deadline `dueDate` (YYYY-MM-DD, worked out from the period end and the organization's country: UK one month and 7 days after; Australia the 21st or 28th of the next month, December quarter 28 February; US the 20th of the next month; otherwise the end of the next month). Tax-return line amounts are in integer cents in `currency`. Returns { currency, taxPeriods }.",
     {},
     () =>
       wrapTool(ctx, async () => {
@@ -39,14 +46,21 @@ export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
           orderBy: desc(taxPeriod.startDate),
           with: { lines: true },
         });
+        const config = await getOrgTaxConfig(ctx.organizationId);
 
-        return { taxPeriods: periods };
+        return {
+          currency: config.baseCurrency,
+          taxPeriods: periods.map((p) => ({
+            ...p,
+            dueDate: filingDeadline(p.endDate, config.country, p.type),
+          })),
+        };
       })
   );
 
   server.tool(
     "get_tax_period",
-    "Get a single VAT/GST tax period by ID, including its frozen return lines (box figures). Tax-return line amounts are in integer cents. Returns the tax period.",
+    "Get a single VAT/GST tax period by ID, including its frozen return lines (box figures) and its filing deadline `dueDate` (YYYY-MM-DD). Tax-return line amounts are in integer cents in `currency`. Returns { currency, taxPeriod }.",
     {
       taxPeriodId: z.string().describe("The UUID of the tax period"),
     },
@@ -60,7 +74,11 @@ export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
           with: { lines: true },
         });
         if (!found) throw new Error("Tax period not found");
-        return { taxPeriod: found };
+        const config = await getOrgTaxConfig(ctx.organizationId);
+        return {
+          currency: config.baseCurrency,
+          taxPeriod: { ...found, dueDate: filingDeadline(found.endDate, config.country, found.type) },
+        };
       })
   );
 
@@ -110,7 +128,7 @@ export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "file_tax_period",
-    "File an open VAT/GST tax period. Computes the box figures on the chosen basis (defaults to the org's vatScheme: 'accrual' or 'cash'), FREEZES them into the period's return lines (boxes 1-5, 8, 9) so the filed numbers are auditable and do not drift if entries are later backdated into the period, and posts the VAT-return clearing journal entry against those SAME figures — zeroing the period's Output VAT (2200, box 1) and Input VAT (1500, box 4) control-account balances and booking the net to the VAT Suspense / return-clearing account (2240): credit suspense when net is payable to the authority, debit when it's a refund. Marks the period filed (only an open period can be filed). Returns the clearing journalEntryId, the basis used, the net amount in integer cents (positive = payable to authority, negative = refund), the output/input VAT in integer cents, and the frozen box lines. All amounts are in integer cents. (To record the cash payment/refund of a filed return, use record_vat_settlement.)",
+    "File an open VAT/GST tax period. Computes the return on the chosen basis (defaults to the org's vatScheme: 'accrual' recognises VAT on the document date; 'cash' recognises invoices and bills pro rata to the payments made in the period), FREEZES the figures into the period's return lines (all nine VAT boxes 1-9, Box 2 reverse-charge VAT included; or the BAS fields G1, G2, G3, G10, G11, 1A, 1B and NET for an Australian organization) so the filed numbers are auditable and do not drift if entries are later backdated into the period, and posts the VAT-return clearing journal entry against those SAME figures: debits Output VAT (2200) by Box 3 / 1A, credits Input VAT (1500) by Box 4 / 1B, and books the net to the VAT Suspense / return-clearing account (2240): credit when payable to the authority, debit when it's a refund. On the cash basis VAT on unpaid invoices and bills stays in 2200/1500 for the period it is paid in. Marks the period filed (only an open period can be filed). Returns the clearing journalEntryId, the basis used, the net amount in integer cents (positive = payable to authority, negative = refund), the output/input VAT cleared in integer cents, and the frozen lines. All amounts are in integer cents. (To record the cash payment/refund of a filed return, use record_vat_settlement.)",
     {
       taxPeriodId: z
         .string()
@@ -128,136 +146,209 @@ export function registerTaxPeriodTools(server: McpServer, ctx: AuthContext) {
         .int()
         .positive()
         .optional()
-        .describe("Optional flat-rate percentage in basis points (1000 = 10.00%) for the flat-rate scheme. When supplied, boxes 1 and 4 are frozen at 0 (the flat-rate box 1 is computed from gross turnover in the report, not here) so nothing is cleared from 2200/1500."),
+        .describe("Optional flat-rate percentage in basis points (1450 = 14.50%) for the UK flat-rate scheme. When supplied, Box 1 is frozen as that percentage of VAT-inclusive turnover, Box 4 as 0, and nothing is cleared from 2200/1500."),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:tax-config");
 
-        const period = await db.query.taxPeriod.findFirst({
+        // Shared with the REST file route (app/api/v1/tax-periods/[id]/file),
+        // so the frozen figures match the live VAT return / BAS report.
+        const filed = await fileTaxPeriod(ctx, params.taxPeriodId, {
+          basis: params.basis,
+          flatRatePercent: params.flatRatePercent ?? null,
+          filedReference: params.filedReference ?? null,
+        });
+
+        return {
+          taxPeriod: filed.taxPeriod,
+          clearingJournalEntryId: filed.clearingJournalEntryId,
+          net: filed.net,
+          outputVat: filed.outputVat,
+          inputVat: filed.inputVat,
+          basis: filed.basis,
+          filedLines: filed.filedLines,
+        };
+      })
+  );
+
+  server.tool(
+    "delete_tax_period",
+    "Delete an open VAT/GST tax period. Submitted (filed) periods cannot be deleted. Returns { deleted: true, taxPeriodId }.",
+    {
+      taxPeriodId: z.string().describe("UUID of the open tax period to delete."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:tax-config");
+        const found = await db.query.taxPeriod.findFirst({
           where: and(
             eq(taxPeriod.id, params.taxPeriodId),
             eq(taxPeriod.organizationId, ctx.organizationId)
           ),
         });
-        if (!period) throw new Error("Tax period not found");
-        if (period.status !== "open") {
-          throw new Error("Only open tax periods can be filed");
-        }
+        if (!found) throw new Error("Tax period not found");
+        if (found.status !== "open") throw new Error("Only open tax periods can be deleted");
+        await db
+          .delete(taxPeriod)
+          .where(and(eq(taxPeriod.id, found.id), eq(taxPeriod.organizationId, ctx.organizationId)));
+        return { deleted: true, taxPeriodId: found.id };
+      })
+  );
 
-        // Compute the box figures NOW so we can freeze them at filing time. Use
-        // the org's vatScheme unless the caller overrides the basis. Mirrors the
-        // REST file route (app/api/v1/tax-periods/[id]/file/route.ts).
+  server.tool(
+    "vat_return_report",
+    "Run the UK-style nine-box VAT return for a date range (read only, nothing is filed). Box 1 output VAT on sales, Box 2 VAT on reverse-charge purchases, Box 3 = 1 + 2, Box 4 input VAT reclaimed, Box 5 net (positive = payable, negative = refund), Boxes 6 and 7 sales and purchases excluding VAT, Boxes 8 and 9 the cross-border part. Basis 'accrual' counts documents on their date; 'cash' counts invoices and bills pro rata to the payments made in the range. All amounts are integer cents in `currency`. Returns { boxes, basis, vatScheme, currency, period }.",
+    {
+      startDate: z.string().describe("Start date (YYYY-MM-DD), inclusive."),
+      endDate: z.string().describe("End date (YYYY-MM-DD), inclusive."),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe("'accrual' or 'cash'. Defaults to the organization's VAT scheme."),
+      flatRatePercent: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("UK flat-rate percentage in basis points (1450 = 14.50%). When set, Box 1 is that percentage of VAT-inclusive turnover and Box 4 is 0."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
         const config = await getOrgTaxConfig(ctx.organizationId);
         const basis = resolveBasis(params.basis, config);
-        const flatRateApplied =
-          params.flatRatePercent != null && params.flatRatePercent > 0;
-
-        const [outputMovement, inputMovement, ec] = await Promise.all([
-          controlAccountMovement(ctx.organizationId, "2200", period.startDate, period.endDate, basis),
-          controlAccountMovement(ctx.organizationId, "1500", period.startDate, period.endDate, basis),
-          computeEcSales(ctx.organizationId, period.startDate, period.endDate, config.country),
-        ]);
-
-        const box1 = flatRateApplied
-          ? 0 // flat-rate box 1 is computed from gross turnover in the report; not frozen here without turnover read
-          : outputMovement.credits - outputMovement.debits;
-        const box4 = flatRateApplied ? 0 : inputMovement.debits - inputMovement.credits;
-        const box2 = 0;
-        const box3 = box1 + box2;
-        const box5 = box3 - box4;
-        const box8 = ec.ecSalesNet;
-        const box9 = ec.ecAcquisitionsNet;
-
-        const frozenLines: {
-          boxNumber: string;
-          label: string;
-          amount: number;
-          sortOrder: number;
-        }[] = [
-          { boxNumber: "1", label: "VAT due on sales", amount: box1, sortOrder: 1 },
-          { boxNumber: "2", label: "VAT due on EU acquisitions", amount: box2, sortOrder: 2 },
-          { boxNumber: "3", label: "Total VAT due (Box 1 + 2)", amount: box3, sortOrder: 3 },
-          { boxNumber: "4", label: "VAT reclaimed on purchases", amount: box4, sortOrder: 4 },
-          { boxNumber: "5", label: "Net VAT to pay/reclaim (Box 3 - 4)", amount: box5, sortOrder: 5 },
-          { boxNumber: "8", label: "Total supplies to EU ex-VAT", amount: box8, sortOrder: 8 },
-          { boxNumber: "9", label: "Total acquisitions from EU ex-VAT", amount: box9, sortOrder: 9 },
-        ];
-
-        const result = await db.transaction(async (tx) => {
-          // Post the clearing entry against the SAME basis-aware figures we
-          // freeze into the return (box1 = output balance, box4 = input
-          // balance), so the 2200/1500 clearing exactly matches the filed boxes
-          // — including the cash-basis case (and flat-rate, where both are 0 →
-          // nothing to clear). Without this, the helper would re-derive on the
-          // accrual basis and drift from the filed return.
-          const clearing = await createVatReturnClearingJournalEntry(
-            { organizationId: ctx.organizationId, userId: ctx.userId },
-            {
-              date: period.endDate,
-              periodStartDate: period.startDate,
-              periodEndDate: period.endDate,
-              reference: params.filedReference || period.name,
-              outputBalance: box1,
-              inputBalance: box4,
-            },
-            tx
-          );
-
-          const [updated] = await tx
-            .update(taxPeriod)
-            .set({
-              status: "filed",
-              filedAt: new Date(),
-              filedBy: ctx.userId,
-              filedReference: params.filedReference || null,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(taxPeriod.id, params.taxPeriodId),
-                eq(taxPeriod.organizationId, ctx.organizationId),
-                eq(taxPeriod.status, "open")
-              )
-            )
-            .returning();
-
-          if (!updated) return { clearing, updated: null, lines: [] };
-
-          // Freeze the box figures: clear any prior calculated lines for this
-          // period (e.g. from a re-file after an amendment) and persist the set.
-          await tx
-            .delete(taxReturnLine)
-            .where(eq(taxReturnLine.taxPeriodId, params.taxPeriodId));
-          const lines = await tx
-            .insert(taxReturnLine)
-            .values(
-              frozenLines.map((l) => ({
-                taxPeriodId: params.taxPeriodId,
-                boxNumber: l.boxNumber,
-                label: l.label,
-                amount: l.amount,
-                isCalculated: true,
-                sourceDescription: `Filed ${basis}-basis${flatRateApplied ? " (flat-rate)" : ""}`,
-                sortOrder: l.sortOrder,
-              }))
-            )
-            .returning();
-
-          return { clearing, updated, lines };
+        const { boxes } = await computeVatReturn(ctx.organizationId, params.startDate, params.endDate, basis, {
+          flatRatePercent: params.flatRatePercent ?? null,
+          config,
         });
-
-        if (!result.updated) throw new Error("Tax period not found");
-
         return {
-          taxPeriod: result.updated,
-          clearingJournalEntryId: result.clearing?.entry.id ?? null,
-          net: result.clearing?.net ?? 0,
-          outputVat: result.clearing?.outputBalance ?? 0,
-          inputVat: result.clearing?.inputBalance ?? 0,
+          boxes,
           basis,
-          filedLines: result.lines,
+          vatScheme: config.vatScheme,
+          currency: config.baseCurrency,
+          period: { startDate: params.startDate, endDate: params.endDate },
         };
+      })
+  );
+
+  server.tool(
+    "bas_report",
+    "Run the Australian Business Activity Statement (GST) for a date range (read only, nothing is lodged). Fields: G1 total sales including GST, G2 export sales, G3 other GST-free sales, G10 capital purchases including GST, G11 other purchases including GST, 1A GST on sales, 1B GST on purchases, NET = 1A - 1B (positive = payable, negative = refund). Basis 'accrual' counts documents on their date; 'cash' counts invoices and bills pro rata to the payments made in the range. All amounts are integer cents in `currency`. Returns { fields, basis, vatScheme, currency, period }.",
+    {
+      startDate: z.string().describe("Start date (YYYY-MM-DD), inclusive."),
+      endDate: z.string().describe("End date (YYYY-MM-DD), inclusive."),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe("'accrual' or 'cash'. Defaults to the organization's GST scheme."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        const config = await getOrgTaxConfig(ctx.organizationId);
+        const basis = resolveBasis(params.basis, config);
+        const { fields } = await computeBas(ctx.organizationId, params.startDate, params.endDate, basis, config);
+        return {
+          fields,
+          basis,
+          vatScheme: config.vatScheme,
+          currency: config.baseCurrency,
+          period: { startDate: params.startDate, endDate: params.endDate },
+        };
+      })
+  );
+
+  server.tool(
+    "vat_box_transactions",
+    "List the ledger lines behind one VAT return or BAS box for a date range, so a figure can be checked line by line. Supported boxes: '1' (output VAT, reverse charge excluded), '2' (reverse-charge VAT), '4' (input VAT), '1A' (GST on sales), '1B' (GST on purchases). On the cash basis each part payment shows as its own row for the share of the document it settled. Amounts are integer cents; the sum of `amount` equals the box. Returns { box, basis, total, count, transactions }.",
+    {
+      box: z.enum(["1", "2", "4", "1A", "1B"]).describe("The box to explain: '1', '2', '4' (VAT) or '1A', '1B' (BAS)."),
+      taxPeriodId: z
+        .string()
+        .optional()
+        .describe("UUID of a tax period whose dates to use. Give this or startDate and endDate."),
+      startDate: z.string().optional().describe("Start date (YYYY-MM-DD), inclusive. Required without taxPeriodId."),
+      endDate: z.string().optional().describe("End date (YYYY-MM-DD), inclusive. Required without taxPeriodId."),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe("'accrual' or 'cash'. Defaults to the organization's VAT/GST scheme."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        if (!isDrillableBox(params.box)) throw new Error("This box has no ledger lines behind it");
+        let startDate = params.startDate ?? "";
+        let endDate = params.endDate ?? "";
+        if (params.taxPeriodId) {
+          const period = await db.query.taxPeriod.findFirst({
+            where: and(
+              eq(taxPeriod.id, params.taxPeriodId),
+              eq(taxPeriod.organizationId, ctx.organizationId)
+            ),
+            columns: { startDate: true, endDate: true },
+          });
+          if (!period) throw new Error("Tax period not found");
+          startDate = period.startDate;
+          endDate = period.endDate;
+        }
+        if (!startDate || !endDate) throw new Error("Give taxPeriodId, or startDate and endDate");
+        const config = await getOrgTaxConfig(ctx.organizationId);
+        const basis = resolveBasis(params.basis, config);
+        const transactions = await boxTransactions(ctx.organizationId, params.box, startDate, endDate, basis);
+        return {
+          box: params.box,
+          basis,
+          period: { startDate, endDate },
+          total: transactions.reduce((s, t) => s + t.amount, 0),
+          count: transactions.length,
+          transactions,
+        };
+      })
+  );
+
+  server.tool(
+    "sales_tax_report",
+    "Run the sales tax report for a date range: tax collected on invoices issued and cash sales (sales receipts) made in the range, less credit notes issued in it, grouped by tax rate and converted to the base currency. Lines with no tax rate, an exempt or no-tax rate, or a customer marked \"Don't charge tax\" count only as exempt sales, never in the by-rate breakdown. All amounts are integer cents in `currency`. Returns { breakdown (per rate: taxableAmount, taxCollected, invoiceCount = number of documents), exemptAmount, exemptCustomerAmount, totalTaxable, totalCollected, invoiceCount, documentCounts { invoices, salesReceipts, creditNotes }, currency, period }.",
+    {
+      startDate: z.string().describe("Start date (YYYY-MM-DD), inclusive."),
+      endDate: z.string().describe("End date (YYYY-MM-DD), inclusive."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        return computeSalesTaxReport(ctx.organizationId, params.startDate, params.endDate);
+      })
+  );
+
+  server.tool(
+    "schedule_c_report",
+    "Run the IRS Schedule C (Form 1040) worksheet for a date range (a tax prep worksheet, not a filing). Revenue and expense accounts are mapped to Schedule C lines by sub type, type and name: Line 1 gross receipts, Line 2 returns and allowances, Line 3 = 1 - 2, Line 4 cost of goods sold, Line 5 gross profit, Line 6 other income, Line 7 gross income, Lines 8 to 27a expenses, Line 28 total expenses, Line 29 / 31 net profit. Income tax, unrealised currency movements and gains or losses on selling assets are left out. Each line lists the accounts behind it. All amounts are integer cents in `currency`. Returns { lines, totalIncome, totalExpenses, netProfit, basis, currency }.",
+    {
+      startDate: z.string().describe("Start date (YYYY-MM-DD), inclusive. Usually January 1."),
+      endDate: z.string().describe("End date (YYYY-MM-DD), inclusive. Usually December 31."),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe("Accounting method: 'accrual' (default) or 'cash' (invoices and bills count when paid)."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        const basis = params.basis ?? "accrual";
+        const [accounts, org] = await Promise.all([
+          aggregateByDateRange(
+            ctx.organizationId,
+            { startDate: params.startDate, endDate: params.endDate },
+            { basis, accountTypes: ["revenue", "expense"] }
+          ),
+          db.query.organization.findFirst({
+            where: eq(organization.id, ctx.organizationId),
+            columns: { defaultCurrency: true },
+          }),
+        ]);
+        return { ...buildScheduleC(accounts), basis, currency: org?.defaultCurrency ?? "USD" };
       })
   );
 }

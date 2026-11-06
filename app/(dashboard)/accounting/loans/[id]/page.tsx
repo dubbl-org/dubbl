@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Wallet, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
+import { useApi } from "@/lib/query/use-api";
 
 interface LoanDetail {
   id: string;
@@ -21,6 +29,13 @@ interface LoanDetail {
   startDate: string;
   monthlyPayment: number;
   status: string;
+  bankAccountId: string | null;
+}
+
+interface BankAccountOption {
+  id: string;
+  accountName: string;
+  currencyCode: string;
 }
 
 interface ScheduleEntry {
@@ -50,32 +65,17 @@ const statusLabels: Record<string, string> = {
 export default function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [ln, setLn] = useState<LoanDetail | null>(null);
-  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ loan?: LoanDetail; schedule?: ScheduleEntry[] }>(`/api/v1/loans/${id}`);
+  const { data: bankData } = useApi<{ bankAccounts?: BankAccountOption[] }>("/api/v1/bank-accounts");
+  const bankAccounts = bankData?.bankAccounts ?? [];
+  const ln = data?.loan ?? null;
+  const schedule = data?.schedule ?? [];
   const [posting, setPosting] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(ln?.name);
-
-  function load() {
-    if (!orgId) return;
-    fetch(`/api/v1/loans/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.loan) setLn(data.loan);
-        if (data.schedule) setSchedule(data.schedule);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, orgId]);
 
   const nextEntry = schedule.find((e) => !e.posted);
 
@@ -83,7 +83,7 @@ export default function LoanDetailPage() {
     if (!orgId || !nextEntry) return;
     await confirm({
       title: "Record this month's payment?",
-      description: `This logs payment #${nextEntry.periodNumber} of ${formatMoney(nextEntry.totalPayment)} — ${formatMoney(nextEntry.principalAmount)} off the loan and ${formatMoney(nextEntry.interestAmount)} in interest.`,
+      description: `This logs payment #${nextEntry.periodNumber} of ${formatMoney(nextEntry.totalPayment)}: ${formatMoney(nextEntry.principalAmount)} off the loan and ${formatMoney(nextEntry.interestAmount)} in interest.`,
       confirmLabel: "Record payment",
       onConfirm: async () => {
         setPosting(true);
@@ -94,7 +94,7 @@ export default function LoanDetailPage() {
           });
           if (res.ok) {
             toast.success("Payment recorded");
-            load();
+            void refetch();
           } else {
             const data = await res.json();
             toast.error(typeof data.error === "string" ? data.error : "Couldn't record the payment");
@@ -104,6 +104,28 @@ export default function LoanDetailPage() {
         }
       },
     });
+  }
+
+  // The bank account repayments come out of. Can be set or changed any time.
+  async function handleBankChange(bankAccountId: string) {
+    if (!orgId) return;
+    setSavingBank(true);
+    try {
+      const res = await fetch(`/api/v1/loans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ bankAccountId }),
+      });
+      if (res.ok) {
+        toast.success("Bank account saved");
+        void refetch();
+      } else {
+        const data = await res.json();
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't save the bank account");
+      }
+    } finally {
+      setSavingBank(false);
+    }
   }
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
@@ -153,6 +175,34 @@ export default function LoanDetailPage() {
         <div className="rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">Monthly payment</p>
           <p className="text-xl font-bold font-mono text-brand-600">{formatMoney(ln.monthlyPayment)}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium">Paid into</p>
+          <p className="text-xs text-muted-foreground">
+            The bank account the loan landed in. Repayments are recorded as coming out of it.
+          </p>
+        </div>
+        <div className="w-full sm:w-72">
+          <Select value={ln.bankAccountId ?? ""} onValueChange={handleBankChange} disabled={savingBank}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a bank account..." />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((acc) => (
+                <SelectItem key={acc.id} value={acc.id}>
+                  {acc.accountName} · {acc.currencyCode}
+                </SelectItem>
+              ))}
+              {bankAccounts.length === 0 && (
+                <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                  No bank or cash accounts yet
+                </div>
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

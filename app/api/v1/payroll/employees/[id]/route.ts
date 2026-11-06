@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { member, payrollEmployee } from "@/lib/db/schema";
+import { compensationBand, member, payrollEmployee } from "@/lib/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,6 +8,7 @@ import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -22,6 +23,9 @@ const updateSchema = z.object({
   memberId: z.string().uuid().nullable().optional(),
   compensationType: z.enum(["salary", "hourly", "milestone", "commission"]).optional(),
   hourlyRate: z.number().int().min(0).nullable().optional(),
+  currency: currencyCodeSchema.optional(),
+  department: z.string().trim().nullable().optional(),
+  compensationBandId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(
@@ -89,11 +93,25 @@ export async function PATCH(
       if (taken) return validationError(`That login is already linked to ${taken.name}`);
     }
 
+    if (parsed.compensationBandId) {
+      const band = await db.query.compensationBand.findFirst({
+        where: and(
+          eq(compensationBand.id, parsed.compensationBandId),
+          eq(compensationBand.organizationId, ctx.organizationId),
+          notDeleted(compensationBand.deletedAt)
+        ),
+        columns: { id: true },
+      });
+      if (!band) return validationError("That pay band wasn't found");
+    }
+
     const [updated] = await db
       .update(payrollEmployee)
       .set({ ...parsed, updatedAt: new Date() })
       .where(eq(payrollEmployee.id, id))
       .returning();
+
+    logAudit({ ctx, action: "update", entityType: "payroll_employee", entityId: id, changes: parsed, request });
 
     return NextResponse.json({ employee: updated });
   } catch (err) {

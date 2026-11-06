@@ -19,7 +19,7 @@ import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBudgetContext } from "../layout";
-import type { BudgetLineData, BudgetPeriodData } from "../layout";
+import type { BudgetLineData } from "../layout";
 import { generatePeriods, distributeAmount } from "@/lib/budget-periods";
 import type { PeriodType } from "@/lib/budget-periods";
 
@@ -75,7 +75,7 @@ function emptyLine(periodType: PeriodType, startDate: string, endDate: string): 
 export default function BudgetSettingsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { budget, accounts, refetch } = useBudgetContext();
+  const { budget, accounts } = useBudgetContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   useDocumentTitle("Accounting \u00B7 Budget Settings");
@@ -84,6 +84,8 @@ export default function BudgetSettingsPage() {
   const [startDate, setStartDate] = useState(budget.startDate);
   const [endDate, setEndDate] = useState(budget.endDate);
   const [periodType, setPeriodType] = useState<PeriodType>(budget.periodType);
+  // Spending alert percent as typed (empty = off)
+  const [alertPct, setAlertPct] = useState(budget.varianceThresholdPct != null ? String(budget.varianceThresholdPct) : "");
   const [lines, setLines] = useState<LineInput[]>(
     budget.lines.map(buildLineFromBudgetLine)
   );
@@ -182,6 +184,11 @@ export default function BudgetSettingsPage() {
       toast.error("Add at least one budget line with an account.");
       return;
     }
+    const pct = alertPct.trim() === "" ? null : Number(alertPct);
+    if (pct !== null && (!Number.isInteger(pct) || pct < 1 || pct > 1000)) {
+      toast.error("Enter a whole percent between 1 and 1000, or leave the alert empty.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -193,6 +200,7 @@ export default function BudgetSettingsPage() {
           startDate,
           endDate,
           periodType,
+          varianceThresholdPct: pct,
           lines: validLines.map((l) => ({
             accountId: l.accountId,
             total: l.total,
@@ -202,8 +210,6 @@ export default function BudgetSettingsPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success("Budget updated");
-      window.dispatchEvent(new Event("budgets-changed"));
-      refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update budget");
     } finally {
@@ -229,8 +235,6 @@ export default function BudgetSettingsPage() {
         });
         if (res.ok) {
           toast.success(willDeactivate ? "Budget deactivated" : "Budget reactivated");
-          window.dispatchEvent(new Event("budgets-changed"));
-          refetch();
         } else {
           toast.error("Failed to update budget");
         }
@@ -251,7 +255,6 @@ export default function BudgetSettingsPage() {
           headers: { "x-organization-id": orgId },
         });
         toast.success("Budget deleted");
-        window.dispatchEvent(new Event("budgets-changed"));
         router.push("/accounting/budgets");
       },
     });
@@ -294,6 +297,35 @@ export default function BudgetSettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Spending alert */}
+        <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+          <div className="shrink-0">
+            <p className="text-sm font-medium">Spending alert</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Get a notification when an account&apos;s spending gets close to or goes over its budget.
+            </p>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="varianceThresholdPct" className="text-xs">Alert at</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="varianceThresholdPct"
+                inputMode="numeric"
+                value={alertPct}
+                onChange={(e) => setAlertPct(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="Off"
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">% of a period&apos;s budget</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Owners and admins are notified once per account and period, the day spending reaches this share of the budgeted amount. At 100% you hear about it when the budget is used up. Leave empty to turn the alert off.
+            </p>
           </div>
         </div>
 

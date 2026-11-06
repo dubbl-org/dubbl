@@ -4,7 +4,6 @@ import {
   bankTransaction,
   bankAccount,
   chartAccount,
-  costCenter,
   taxRate,
   journalEntry,
   journalLine,
@@ -12,6 +11,8 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -22,6 +23,7 @@ import {
   assertBaseRateAvailable,
   ensureControlAccount,
   splitGrossTax,
+  orgIsUsSalesTax,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { z } from "zod";
@@ -116,21 +118,8 @@ export async function POST(
     });
     if (targets.length !== accountIds.length) return notFound("Account");
 
-    // Verify any referenced cost centers belong to this org.
-    const costCenterIds = [
-      ...new Set(parsed.allocations.map((a) => a.costCenterId).filter((v): v is string => !!v)),
-    ];
-    if (costCenterIds.length > 0) {
-      const ccs = await db.query.costCenter.findMany({
-        where: and(
-          eq(costCenter.organizationId, ctx.organizationId),
-          inArray(costCenter.id, costCenterIds),
-          notDeleted(costCenter.deletedAt)
-        ),
-        columns: { id: true },
-      });
-      if (ccs.length !== costCenterIds.length) return notFound("Cost center");
-    }
+    // Verify any referenced cost centers belong to this org and are active.
+    await assertCostCentersActive(ctx.organizationId, parsed.allocations.map((a) => a.costCenterId));
 
     // Load any referenced tax rates (org-scoped) so we can split net/tax per leg.
     const taxRateIds = [
@@ -148,6 +137,7 @@ export async function POST(
     const currencyCode = transaction.currencyCode || account.currencyCode;
 
     // Pre-flight the FX rate so a missing rate fails cleanly (422) before writes.
+    await assertNotLocked(ctx.organizationId, transaction.date, ctx);
     await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
     const moneyIn = transaction.amount > 0;
@@ -225,7 +215,7 @@ export async function POST(
           const net = gross - taxAmt;
           const control = await ensureControlAccount(
             ctx.organizationId,
-            isUsSalesTax ? "salesTaxPayable" : "outputVat",
+            isUsSalesTax || (await orgIsUsSalesTax(ctx.organizationId)) ? "salesTaxPayable" : "outputVat",
             currency,
             tx
           );

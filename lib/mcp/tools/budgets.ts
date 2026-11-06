@@ -115,6 +115,16 @@ export function registerBudgetTools(server: McpServer, ctx: AuthContext) {
         .optional()
         .default(true)
         .describe("Whether the budget is active (default true)"),
+      varianceThresholdPct: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .nullable()
+        .optional()
+        .describe(
+          "Spending alert: a daily check sends a 'Budget exceeded' notification to owners and admins when an account's actual spending in the current period reaches this percent of its budgeted amount (default 100). null turns the alert off."
+        ),
       lines: z
         .array(
           z.object({
@@ -169,6 +179,7 @@ export function registerBudgetTools(server: McpServer, ctx: AuthContext) {
             endDate: params.endDate,
             periodType: params.periodType,
             isActive: params.isActive,
+            ...(params.varianceThresholdPct !== undefined && { varianceThresholdPct: params.varianceThresholdPct }),
           })
           .returning();
 
@@ -216,7 +227,7 @@ export function registerBudgetTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_budget",
-    "Update a budget. Header fields (name, fiscalYearId, startDate, endDate, periodType, isActive) are updated in place. If `lines` is provided it REPLACES all existing lines and their periods: the old lines are deleted (periods cascade) and the supplied lines are recreated using the same rules as create_budget (explicit periods, or `total` distributed across auto-generated periods from the effective periodType/date range). Omit `lines` to leave lines untouched. Amounts are in integer cents. Returns the updated budget (header only).",
+    "Update a budget. Header fields (name, fiscalYearId, startDate, endDate, periodType, isActive, varianceThresholdPct) are updated in place. If `lines` is provided it REPLACES all existing lines and their periods: the old lines are deleted (periods cascade) and the supplied lines are recreated using the same rules as create_budget (explicit periods, or `total` distributed across auto-generated periods from the effective periodType/date range). Omit `lines` to leave lines untouched. Amounts are in integer cents. Returns the updated budget (header only).",
     {
       budgetId: z.string().describe("The UUID of the budget to update"),
       name: z.string().min(1).optional().describe("New budget name"),
@@ -234,6 +245,16 @@ export function registerBudgetTools(server: McpServer, ctx: AuthContext) {
           "New period type used for auto-generating periods when lines are replaced: 'monthly', 'weekly', 'daily', 'quarterly', 'yearly', or 'custom'."
         ),
       isActive: z.boolean().optional().describe("Whether the budget is active"),
+      varianceThresholdPct: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .nullable()
+        .optional()
+        .describe(
+          "Spending alert threshold as a percent of each period's budget (e.g. 90 = alert at 90% spent). null turns the alert off; omit to leave it unchanged."
+        ),
       lines: z
         .array(
           z.object({

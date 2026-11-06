@@ -12,6 +12,8 @@ import {
   User,
   Link2,
   Fingerprint,
+  Smartphone,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +38,21 @@ interface LoginEntry {
   provider: string | null;
   alerted: boolean;
   createdAt: string;
+}
+
+interface AppSessionEntry {
+  id: string;
+  platform: string;
+  deviceName: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+interface McpConnectionEntry {
+  id: string;
+  clientName: string;
+  organizationName: string;
+  authorizedAt: string;
 }
 
 interface AccountDialogProps {
@@ -176,7 +193,7 @@ export function AccountDialog({
   }
 
   async function revokeAll() {
-    if (!confirm("This will sign you out of all devices. You will need to sign in again.")) return;
+    if (!confirm("This will sign you out of all devices and disconnect your AI assistants. You will need to sign in again.")) return;
     setRevoking(true);
     try {
       const res = await fetch("/api/v1/sessions/revoke-all", { method: "POST" });
@@ -479,7 +496,7 @@ function SecurityTab({
             <LogOut className="size-4 shrink-0 text-red-600 dark:text-red-400" />
             <div className="min-w-0">
               <p className="text-[13px] font-medium">Sign out everywhere</p>
-              <p className="text-[11px] text-muted-foreground">Invalidate all active sessions</p>
+              <p className="text-[11px] text-muted-foreground">Signs out every browser, app and connected AI assistant</p>
             </div>
           </div>
           <Button
@@ -493,6 +510,10 @@ function SecurityTab({
           </Button>
         </div>
       </div>
+
+      <SignedInApps />
+
+      <ConnectedAiApps />
 
       {/* Recent sign-ins */}
       <div>
@@ -552,6 +573,138 @@ function SecurityTab({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The iPhone apps signed in to this account, each with its own sign-out. */
+function SignedInApps() {
+  const [sessions, setSessions] = useState<AppSessionEntry[]>([]);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/app-auth/sessions");
+      const data = await res.json();
+      if (data.sessions) setSessions(data.sessions);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function signOut(id: string) {
+    setRemoving(id);
+    try {
+      const res = await fetch(`/api/v1/app-auth/sessions/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to sign the app out");
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      toast.success("App signed out");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to sign the app out");
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  if (sessions.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2.5">Signed-in apps</p>
+      <div className="space-y-1.5">
+        {sessions.map((s) => (
+          <div key={s.id} className="flex items-center gap-3 rounded-lg border px-3.5 py-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Smartphone className="size-3.5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium truncate">{s.deviceName || "iPhone"}</p>
+              <p className="text-[11px] text-muted-foreground">
+                dubbl for iOS · {timeAgo(s.lastUsedAt ?? s.createdAt)}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-red-600"
+              disabled={removing === s.id}
+              onClick={() => signOut(s.id)}
+            >
+              Sign out
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** AI assistants (MCP clients) this user connected, each with its own revoke. */
+function ConnectedAiApps() {
+  const [connections, setConnections] = useState<McpConnectionEntry[]>([]);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/user/mcp-connections");
+      const data = await res.json();
+      if (data.connections) setConnections(data.connections);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function revoke(id: string) {
+    setRemoving(id);
+    try {
+      const res = await fetch(`/api/v1/user/mcp-connections/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to disconnect");
+      setConnections((prev) => prev.filter((c) => c.id !== id));
+      toast.success("AI assistant disconnected");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to disconnect");
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  if (connections.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2.5">Connected AI assistants</p>
+      <div className="space-y-1.5">
+        {connections.map((c) => (
+          <div key={c.id} className="flex items-center gap-3 rounded-lg border px-3.5 py-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Bot className="size-3.5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium truncate">{c.clientName}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {c.organizationName} · {timeAgo(c.authorizedAt)}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-red-600"
+              disabled={removing === c.id}
+              onClick={() => revoke(c.id)}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ))}
       </div>
     </div>
   );

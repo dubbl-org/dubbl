@@ -9,6 +9,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { createCategorizationJournalEntry, assertBaseRateAvailable } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { z } from "zod";
 
 // Code a bank transaction directly to a ledger account ("Categorize"). This is
@@ -78,9 +79,9 @@ export async function POST(
           { status: 400 }
         );
       }
-      // Can't re-code a line dated in a locked or closed period.
-      await assertNotLocked(ctx.organizationId, transaction.date, ctx);
     }
+    // Nothing is posted into (or re-coded in) a locked or closed period.
+    await assertNotLocked(ctx.organizationId, transaction.date, ctx);
 
     // Connect the bank account to its ledger account automatically (older
     // accounts self-heal on first use) so categorizing never hits a dead end.
@@ -97,6 +98,7 @@ export async function POST(
       ),
     });
     if (!target) return notFound("Account");
+    await assertCostCentersActive(ctx.organizationId, [parsed.costCenterId], [transaction.costCenterId]);
 
     const currencyCode = transaction.currencyCode || account.currencyCode;
 

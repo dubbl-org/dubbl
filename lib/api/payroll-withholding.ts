@@ -16,12 +16,12 @@ import {
   payrollEmployee,
   payrollItem,
   payrollRun,
+  payrollSettings,
   taxBracket,
   taxAllowanceConfig,
   employeeTaxConfig,
-  type payrollSettings,
 } from "@/lib/db/schema";
-import { eq, and, lt, gte, inArray } from "drizzle-orm";
+import { eq, and, lt, gte, inArray, isNull } from "drizzle-orm";
 import {
   computePeriodWithholding,
   computeFica,
@@ -58,6 +58,31 @@ export interface EmployeeWithholding {
   breakdown: TaxBreakdownLine[];
   /** Per-line employer tax breakdown, to persist into payrollItemEmployerTax. */
   employerBreakdown: EmployerTaxLine[];
+}
+
+/**
+ * The org's payroll settings row, created with the schema defaults (2026 FICA
+ * rates and wage bases, FUTA, overtime rules) when it doesn't exist yet. Pay
+ * runs used to skip Social Security and Medicare entirely until someone opened
+ * payroll Settings, because that page was the only thing creating the row.
+ */
+export async function resolvePayrollSettings(
+  organizationId: string,
+  exec: DbOrTx = db
+): Promise<PayrollSettingsRow> {
+  const existing = await exec.query.payrollSettings.findFirst({
+    where: eq(payrollSettings.organizationId, organizationId),
+  });
+  if (existing) return existing;
+  await exec
+    .insert(payrollSettings)
+    .values({ organizationId })
+    .onConflictDoNothing({ target: payrollSettings.organizationId });
+  const created = await exec.query.payrollSettings.findFirst({
+    where: eq(payrollSettings.organizationId, organizationId),
+  });
+  if (!created) throw new Error("Could not load payroll settings");
+  return created;
 }
 
 /**
@@ -111,9 +136,42 @@ export async function getEmployeeYtdWage(
 }
 
 /**
- * Load the active marginal bracket schedule for a jurisdiction/filing status/
- * year, ordered by floor. filingStatus rows that are null apply to every status.
- * Falls back to brackets with a null taxYear when no year-specific set exists.
+ * Pick the bracket rows that apply to one employee for a jurisdiction level.
+ * Pure, so the selection rules are unit-testable:
+ *   - filing status: rows with a null filingStatus apply to every status;
+ *   - jurisdiction: rows for the employee's own code (e.g. "CA") win, then rows
+ *     with no jurisdiction (an org-wide schedule). An employee with no code set
+ *     falls back to the only schedule there is when every row names the same
+ *     jurisdiction (a single-state business);
+ *   - year: rows for the requested tax year win over year-agnostic rows.
+ */
+export function selectBracketRows<
+  T extends { jurisdiction: string | null; filingStatus: string | null; taxYear: number | null },
+>(rows: T[], employeeCode: string | null, filingStatus: string, taxYear: number | null): T[] {
+  const byStatus = rows.filter(
+    (r) => r.filingStatus == null || r.filingStatus === filingStatus
+  );
+
+  const code = employeeCode?.trim().toUpperCase() || null;
+  let byPlace: T[] = [];
+  if (code) {
+    byPlace = byStatus.filter((r) => r.jurisdiction?.trim().toUpperCase() === code);
+  }
+  if (byPlace.length === 0) {
+    byPlace = byStatus.filter((r) => r.jurisdiction == null || r.jurisdiction.trim() === "");
+  }
+  if (byPlace.length === 0 && !code) {
+    const codes = new Set(byStatus.map((r) => r.jurisdiction?.trim().toUpperCase()));
+    if (codes.size === 1) byPlace = byStatus;
+  }
+
+  const yearMatch = byPlace.filter((r) => r.taxYear === taxYear);
+  return yearMatch.length > 0 ? yearMatch : byPlace.filter((r) => r.taxYear == null);
+}
+
+/**
+ * Load the active marginal bracket schedule for a jurisdiction level, the
+ * employee's jurisdiction code, filing status and year, ordered by floor.
  */
 async function loadBrackets(
   organizationId: string,
@@ -131,25 +189,25 @@ async function loadBrackets(
       baseAmountCents: taxBracket.baseAmountCents,
       filingStatus: taxBracket.filingStatus,
       taxYear: taxBracket.taxYear,
+      jurisdiction: taxBracket.jurisdiction,
     })
     .from(taxBracket)
     .where(
       and(
         eq(taxBracket.organizationId, organizationId),
         eq(taxBracket.jurisdictionLevel, jurisdictionLevel),
-        eq(taxBracket.isActive, true)
+        eq(taxBracket.isActive, true),
+        isNull(taxBracket.deletedAt)
       )
     );
 
-  // Filter in memory: filing status (null = applies to all statuses), then
-  // prefer the requested tax year, else fall back to year-agnostic rows.
-  void jurisdiction;
-  const byStatus = rows.filter(
-    (r) => r.filingStatus == null || r.filingStatus === filingStatus
+  // Federal schedules are national, so the employee's code doesn't apply.
+  const chosen = selectBracketRows(
+    rows,
+    jurisdictionLevel === "federal" ? null : jurisdiction,
+    filingStatus,
+    taxYear
   );
-
-  const yearMatch = byStatus.filter((r) => r.taxYear === taxYear);
-  const chosen = yearMatch.length > 0 ? yearMatch : byStatus.filter((r) => r.taxYear == null);
 
   return chosen.map((r) => ({
     minIncome: r.minIncome,
@@ -163,6 +221,7 @@ async function loadBrackets(
 async function loadAllowanceConfig(
   organizationId: string,
   jurisdictionLevel: "federal" | "state" | "local",
+  jurisdiction: string | null,
   taxYear: number,
   exec: DbOrTx
 ): Promise<{ allowanceValueCents: number; standardDeductionCents: number }> {
@@ -171,15 +230,20 @@ async function loadAllowanceConfig(
       allowanceValueCents: taxAllowanceConfig.allowanceValueCents,
       standardDeductionCents: taxAllowanceConfig.standardDeductionCents,
       taxYear: taxAllowanceConfig.taxYear,
+      jurisdiction: taxAllowanceConfig.jurisdiction,
     })
     .from(taxAllowanceConfig)
     .where(
       and(
         eq(taxAllowanceConfig.organizationId, organizationId),
-        eq(taxAllowanceConfig.jurisdictionLevel, jurisdictionLevel)
+        eq(taxAllowanceConfig.jurisdictionLevel, jurisdictionLevel),
+        isNull(taxAllowanceConfig.deletedAt)
       )
     );
-  const exact = rows.find((r) => r.taxYear === taxYear) ?? rows[0];
+  const code = jurisdictionLevel === "federal" ? null : jurisdiction?.trim().toUpperCase() || null;
+  const own = code ? rows.filter((r) => r.jurisdiction?.trim().toUpperCase() === code) : [];
+  const pool = own.length > 0 ? own : rows.filter((r) => !r.jurisdiction);
+  const exact = pool.find((r) => r.taxYear === taxYear) ?? pool[0];
   return {
     allowanceValueCents: exact?.allowanceValueCents ?? 0,
     standardDeductionCents: exact?.standardDeductionCents ?? 0,
@@ -192,14 +256,17 @@ async function loadAllowanceConfig(
  * @param taxableIncome period taxable wage in cents (gross less pre-tax deductions)
  * @param ytdWage employee YTD taxable wage BEFORE this period, in cents
  *
- * When no progressive brackets are configured for the org, the income-tax line
- * falls back to the employee's flat taxRate (basis points) so existing orgs keep
- * working until they load a real schedule.
+ * Income tax is worked out per level: federal, then state and local when the
+ * org has loaded a schedule for the employee's state/local code (see
+ * selectBracketRows). When no federal brackets are configured, federal income
+ * tax falls back to the employee's flat taxRate (basis points) so existing orgs
+ * keep working until they load a real schedule. A W-4 "exempt" employee has no
+ * income tax withheld, but still pays Social Security and Medicare.
  */
 export async function computeEmployeeWithholding(
   organizationId: string,
   emp: EmployeeRow,
-  settings: PayrollSettingsRow | undefined,
+  settingsRow: PayrollSettingsRow | undefined,
   taxableIncome: number,
   ytdWage: number,
   periodStart: string,
@@ -207,10 +274,11 @@ export async function computeEmployeeWithholding(
 ): Promise<EmployeeWithholding> {
   const breakdown: TaxBreakdownLine[] = [];
   const employerBreakdown: EmployerTaxLine[] = [];
+  const settings = settingsRow ?? (await resolvePayrollSettings(organizationId, exec));
 
   const periods = payPeriodsPerYear(emp.payFrequency);
   const year =
-    settings?.defaultTaxYear ?? new Date(periodStart).getUTCFullYear();
+    settings.defaultTaxYear ?? new Date(periodStart).getUTCFullYear();
 
   // Per-employee tax election (filing status, allowances, exempt, extra w/h).
   const taxCfg = await exec.query.employeeTaxConfig.findFirst({
@@ -219,94 +287,92 @@ export async function computeEmployeeWithholding(
   const filingStatus = taxCfg?.filingStatus ?? "single";
   const exempt = taxCfg?.exempt ?? false;
 
-  // ── Federal income tax (progressive) ──────────────────────────────
-  let incomeTax = 0;
+  // ── Income tax: federal (progressive), then state and local ────────
   if (!exempt) {
-    const brackets = await loadBrackets(
-      organizationId,
-      "federal",
-      null,
-      filingStatus,
-      year,
-      exec
-    );
+    const levels: {
+      level: "federal" | "state" | "local";
+      code: string | null;
+      allowances: number;
+      additional: number;
+    }[] = [
+      { level: "federal", code: null, allowances: taxCfg?.federalAllowances ?? 0, additional: taxCfg?.additionalWithholding ?? 0 },
+      { level: "state", code: taxCfg?.stateCode ?? null, allowances: taxCfg?.stateAllowances ?? 0, additional: taxCfg?.additionalStateWithholding ?? 0 },
+      { level: "local", code: taxCfg?.localCode ?? null, allowances: 0, additional: 0 },
+    ];
 
-    if (brackets.length > 0) {
-      const allowanceCfg = await loadAllowanceConfig(
-        organizationId,
-        "federal",
-        year,
-        exec
-      );
-      const fed = computePeriodWithholding({
-        annualTaxableWage: taxableIncome * periods,
-        brackets,
-        filingStatus,
-        payPeriodsPerYear: periods,
-        allowances: taxCfg?.federalAllowances ?? 0,
-        allowanceValueCents: allowanceCfg.allowanceValueCents,
-        standardDeductionCents: allowanceCfg.standardDeductionCents,
-        additionalWithholding: taxCfg?.additionalWithholding ?? 0,
-      });
-      incomeTax = fed.periodWithholding;
-    } else {
-      // No bracket schedule loaded yet → keep the legacy flat-rate behavior so
-      // we never silently withhold zero income tax for un-migrated orgs.
-      incomeTax = Math.round((taxableIncome * emp.taxRate) / 10000);
+    for (const l of levels) {
+      const brackets = await loadBrackets(organizationId, l.level, l.code, filingStatus, year, exec);
+      let amount = 0;
+      if (brackets.length > 0) {
+        const allowanceCfg = await loadAllowanceConfig(organizationId, l.level, l.code, year, exec);
+        amount = computePeriodWithholding({
+          annualTaxableWage: taxableIncome * periods,
+          brackets,
+          filingStatus,
+          payPeriodsPerYear: periods,
+          allowances: l.allowances,
+          allowanceValueCents: allowanceCfg.allowanceValueCents,
+          standardDeductionCents: allowanceCfg.standardDeductionCents,
+          additionalWithholding: l.additional,
+        }).periodWithholding;
+      } else if (l.level === "federal") {
+        // No bracket schedule loaded yet → keep the legacy flat-rate behavior so
+        // we never silently withhold zero income tax for un-migrated orgs.
+        amount = Math.round((taxableIncome * emp.taxRate) / 10000) + Math.max(0, l.additional);
+      } else if (l.additional > 0) {
+        amount = l.additional;
+      }
+
+      if (amount > 0) {
+        breakdown.push({
+          jurisdictionLevel: l.level,
+          jurisdiction: l.level === "federal" ? null : l.code?.trim().toUpperCase() || null,
+          taxKind: "income_tax",
+          amount,
+        });
+      }
     }
   }
 
-  if (incomeTax > 0) {
-    breakdown.push({
-      jurisdictionLevel: "federal",
-      jurisdiction: null,
-      taxKind: "income_tax",
-      amount: incomeTax,
-    });
-  }
-
   // ── Employee FICA ─────────────────────────────────────────────────
-  // Only when the org has FICA params (defaults are populated on the settings
-  // row). If there is no settings row at all, skip FICA rather than guessing.
-  if (settings && !exempt) {
-    const fica = computeFica({
-      periodWage: taxableIncome,
-      ytdWage,
-      ssWageBaseCents: settings.ssWageBaseCents,
-      ssRateBp: settings.ssRateBp,
-      medicareRateBp: settings.medicareRateBp,
-      addlMedicareThresholdCents: settings.addlMedicareThresholdCents,
-      addlMedicareRateBp: settings.addlMedicareRateBp,
-    });
-    if (fica.socialSecurity > 0)
-      breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "social_security", amount: fica.socialSecurity });
-    if (fica.medicare > 0)
-      breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "medicare", amount: fica.medicare });
-    if (fica.additionalMedicare > 0)
-      breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "additional_medicare", amount: fica.additionalMedicare });
+  // Applies to exempt employees too: W-4 exemption only covers income tax.
+  const fica = computeFica({
+    periodWage: taxableIncome,
+    ytdWage,
+    ssWageBaseCents: settings.ssWageBaseCents,
+    ssRateBp: settings.ssRateBp,
+    medicareRateBp: settings.medicareRateBp,
+    addlMedicareThresholdCents: settings.addlMedicareThresholdCents,
+    addlMedicareRateBp: settings.addlMedicareRateBp,
+  });
+  if (fica.socialSecurity > 0)
+    breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "social_security", amount: fica.socialSecurity });
+  if (fica.medicare > 0)
+    breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "medicare", amount: fica.medicare });
+  if (fica.additionalMedicare > 0)
+    breakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "additional_medicare", amount: fica.additionalMedicare });
 
-    // ── Employer-side taxes ─────────────────────────────────────────
-    const employer = computeEmployerTaxes({
-      periodWage: taxableIncome,
-      ytdWage,
-      employerFicaEnabled: settings.employerFicaEnabled,
-      ssWageBaseCents: settings.ssWageBaseCents,
-      ssRateBp: settings.ssRateBp,
-      medicareRateBp: settings.medicareRateBp,
-      futaRateBp: settings.futaRateBp,
-      futaWageBaseCents: settings.futaWageBaseCents,
-      sutaRateBp: settings.sutaRateBp,
-      sutaWageBaseCents: settings.sutaWageBaseCents,
-    });
-    if (employer.socialSecurity > 0)
-      employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "employer_social_security", amount: employer.socialSecurity });
-    if (employer.medicare > 0)
-      employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "employer_medicare", amount: employer.medicare });
-    if (employer.futa > 0)
-      employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "futa", amount: employer.futa });
-    if (employer.suta > 0)
-      employerBreakdown.push({ jurisdictionLevel: "state", jurisdiction: null, taxKind: "suta", amount: employer.suta });
-  }
+  // ── Employer-side taxes ─────────────────────────────────────────
+  const employer = computeEmployerTaxes({
+    periodWage: taxableIncome,
+    ytdWage,
+    employerFicaEnabled: settings.employerFicaEnabled,
+    ssWageBaseCents: settings.ssWageBaseCents,
+    ssRateBp: settings.ssRateBp,
+    medicareRateBp: settings.medicareRateBp,
+    futaRateBp: settings.futaRateBp,
+    futaWageBaseCents: settings.futaWageBaseCents,
+    sutaRateBp: settings.sutaRateBp,
+    sutaWageBaseCents: settings.sutaWageBaseCents,
+  });
+  if (employer.socialSecurity > 0)
+    employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "employer_social_security", amount: employer.socialSecurity });
+  if (employer.medicare > 0)
+    employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "employer_medicare", amount: employer.medicare });
+  if (employer.futa > 0)
+    employerBreakdown.push({ jurisdictionLevel: "federal", jurisdiction: null, taxKind: "futa", amount: employer.futa });
+  if (employer.suta > 0)
+    employerBreakdown.push({ jurisdictionLevel: "state", jurisdiction: taxCfg?.stateCode?.trim().toUpperCase() || null, taxKind: "suta", amount: employer.suta });
 
   const totalTax = breakdown.reduce((s, b) => s + b.amount, 0);
 

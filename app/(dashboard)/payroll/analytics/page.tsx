@@ -25,7 +25,10 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { ApiError } from "@/lib/query/api";
 import { cn } from "@/lib/utils";
+import { downloadFile } from "@/components/dashboard/download-link";
 
 /* ---------- types ---------- */
 
@@ -64,7 +67,7 @@ const REPORT_TYPES = [
   { type: "summary", label: "Summary", description: "Overview of payroll totals and averages", icon: BarChart3 },
   { type: "tax-liability", label: "Tax Liability", description: "Tax breakdown by employee", icon: FileText },
   { type: "labor-cost", label: "Labor Cost", description: "Cost breakdown by department", icon: DollarSign },
-  { type: "yoy", label: "Year over Year", description: "Monthly payroll trends", icon: TrendingUp },
+  { type: "yoy", label: "Year over Year", description: "Each month compared with the same month last year", icon: TrendingUp },
 ];
 
 const GHOST_ROWS = Array.from({ length: 6 }, (_, i) => i);
@@ -74,9 +77,15 @@ const GHOST_ROWS = Array.from({ length: 6 }, (_, i) => i);
 export default function AnalyticsPage() {
   const router = useRouter();
 
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [projection, setProjection] = useState<Projection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: summaryRes, loading: summaryLoading, error: summaryError } = useApi<{ summary?: Summary }>("/api/v1/payroll/reports/summary");
+  const { data: projRes, loading: projLoading, error: projError } = useApi<{ data?: Projection[] }>("/api/v1/payroll/forecasting/projection?months=12");
+  const summary = summaryRes?.summary ?? null;
+  const projection = useMemo(() => projRes?.data ?? [], [projRes]);
+  const loading = summaryLoading || projLoading;
+  const loadFailed = [summaryError, projError].some((e) => e && !(e instanceof ApiError));
+  useEffect(() => {
+    if (loadFailed) toast.error("Failed to load analytics data");
+  }, [loadFailed]);
 
   const [whatIf, setWhatIf] = useState<WhatIfResult | null>(null);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
@@ -90,30 +99,12 @@ export default function AnalyticsPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  useEffect(() => {
-    if (!orgId) {
-      setLoading(false);
-      return;
-    }
-
-    const headers = { "x-organization-id": orgId };
-
-    Promise.all([
-      fetch("/api/v1/payroll/reports/summary", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/forecasting/projection?months=12", { headers }).then((r) => r.json()),
-    ])
-      .then(([summaryRes, projRes]) => {
-        if (summaryRes.summary) setSummary(summaryRes.summary);
-        if (projRes.data) setProjection(projRes.data);
-      })
-      .catch(() => toast.error("Failed to load analytics data"))
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
+  // Fetch with the org header (a plain link can't send it) and save the file
   const handleExport = useCallback(() => {
-    if (!orgId) return;
-    window.open(`/api/v1/payroll/reports/export?x-organization-id=${orgId}`, "_blank");
-  }, [orgId]);
+    downloadFile("/api/v1/payroll/reports/export", "payroll-export.csv").catch((err) =>
+      toast.error(err instanceof Error ? err.message : "Couldn't export payroll")
+    );
+  }, []);
 
   async function handleWhatIf() {
     if (!orgId) return;

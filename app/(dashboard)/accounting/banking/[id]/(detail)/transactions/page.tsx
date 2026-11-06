@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { Clock3, LayoutList, Search, Table2, X } from "lucide-react";
+import { Clock3, LayoutList, ListFilter, Search, Table2, X } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,7 @@ export default function BankTransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchAccountId, setBatchAccountId] = useState("");
   const [batchSaving, setBatchSaving] = useState(false);
+  const [applyingRules, setApplyingRules] = useState(false);
 
   const txSearchPending = txSearch !== debouncedTxSearch;
 
@@ -137,11 +138,45 @@ export default function BankTransactionsPage() {
         `Categorized ${ok} transaction${ok === 1 ? "" : "s"}${failed ? ` · ${failed} skipped` : ""}`
       );
       clearSelection();
-      refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't categorize");
     } finally {
       setBatchSaving(false);
+    }
+  }
+
+  // Run the org's bank rules over this account's to-do lines (the same rules
+  // that run on import), for lines imported before a rule existed.
+  async function applyRules() {
+    if (!orgId) return;
+    setApplyingRules(true);
+    try {
+      const res = await fetch(`/api/v1/bank-accounts/${account.id}/apply-rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't apply rules");
+      const { applied = 0, reconciled = 0, skipped = 0 } = data;
+      if (applied === 0) {
+        toast.info("No to-do lines match your bank rules");
+        return;
+      }
+      const suggested = applied - reconciled;
+      const parts = [
+        reconciled ? `${reconciled} categorized` : null,
+        suggested ? `${suggested} given a suggested category` : null,
+      ].filter(Boolean);
+      toast.success(`Rules matched ${applied} transaction${applied === 1 ? "" : "s"}: ${parts.join(", ")}`, {
+        description: skipped
+          ? `${skipped} couldn't be recorded (locked period or missing exchange rate) and are waiting in To do.`
+          : undefined,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't apply rules");
+    } finally {
+      setApplyingRules(false);
     }
   }
 
@@ -161,7 +196,6 @@ export default function BankTransactionsPage() {
       );
       toast.success(`Ignored ${ids.length} transaction${ids.length === 1 ? "" : "s"}`);
       clearSelection();
-      refetch();
     } catch {
       toast.error("Couldn't ignore some transactions");
     } finally {
@@ -194,6 +228,17 @@ export default function BankTransactionsPage() {
             </button>
           ))}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={applyRules}
+          loading={applyingRules}
+          disabled={summary.unreconciled === 0}
+          title="Run your bank rules on the lines still to do"
+        >
+          <ListFilter className="mr-1.5 size-3.5" />
+          Apply rules
+        </Button>
       </div>
 
       {viewMode === "cash-coding" ? (

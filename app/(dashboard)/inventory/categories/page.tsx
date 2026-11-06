@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Tag, Plus, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface Category {
   id: string;
@@ -35,9 +36,9 @@ const COLORS = [
 ];
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [flat, setFlat] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: Category[]; flat?: Category[] }>("/api/v1/inventory/categories");
+  const categories = data?.data || [];
+  const flat = data?.flat || [];
   const [editOpen, setEditOpen] = useState(false);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [saving, setSaving] = useState(false);
@@ -45,29 +46,6 @@ export default function CategoriesPage() {
   useDocumentTitle("Inventory · Categories");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const fetchCategories = useCallback(() => {
-    if (!orgId) return;
-    fetch("/api/v1/inventory/categories", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setCategories(data.data || []);
-        setFlat(data.flat || []);
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  useEffect(() => {
-    function handler() { fetchCategories(); }
-    window.addEventListener("refetch-categories", handler);
-    return () => window.removeEventListener("refetch-categories", handler);
-  }, [fetchCategories]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -99,7 +77,6 @@ export default function CategoriesPage() {
       toast.success(isEdit ? "Category updated" : "Category created");
       setEditOpen(false);
       setEditCategory(null);
-      fetchCategories();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -110,7 +87,7 @@ export default function CategoriesPage() {
   async function handleDelete(cat: Category) {
     const confirmed = await confirm({
       title: `Delete "${cat.name}"?`,
-      description: "This will remove the category. Items using it will keep their text category.",
+      description: "Items in this category become uncategorised, and any sub-categories move to the top level.",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -122,7 +99,6 @@ export default function CategoriesPage() {
         headers: { "x-organization-id": orgId },
       });
       toast.success("Category deleted");
-      fetchCategories();
     } catch {
       toast.error("Failed to delete category");
     }

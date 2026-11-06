@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, CalendarRange, CalendarClock, CalendarCheck, Ban, ArrowUpRight, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { DateCell, DueCell, MoneyCell, MutedCell, StatusPill, daysUntil, formatDay, toDayKey } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerHelpers, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApi } from "@/lib/query/use-api";
 
 interface AccrualEntry {
   id: string;
@@ -81,19 +82,11 @@ function lengthBucket(periods: number) {
 
 /** Chart account names, so schedules can be filtered by the account they touch. */
 function useAccountNames() {
-  const [names, setNames] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        const list = (json?.accounts ?? []) as { id: string; code: string; name: string }[];
-        setNames(Object.fromEntries(list.map((a) => [a.id, a.code ? `${a.code} · ${a.name}` : a.name])));
-      })
-      .catch(() => {});
-  }, []);
-  return names;
+  const { data } = useApi<{ accounts?: { id: string; code: string; name: string }[] }>("/api/v1/accounts");
+  return useMemo<Record<string, string>>(() => {
+    const list = data?.accounts ?? [];
+    return Object.fromEntries(list.map((a) => [a.id, a.code ? `${a.code} · ${a.name}` : a.name]));
+  }, [data]);
 }
 
 async function recordNext(list: AccrualSchedule[], helpers: ExplorerHelpers) {

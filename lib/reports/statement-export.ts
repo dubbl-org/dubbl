@@ -7,8 +7,8 @@
  * shares one rendering path.
  *
  * Monetary amounts on `StatementRow.amount` / `subtotal` / `grandTotal` are
- * ALWAYS integer minor units (cents). We divide by 100 exactly once, at the
- * cell, so XLSX cells stay numeric (sortable / summable) instead of strings.
+ * ALWAYS integer minor units (cents). We scale by the currency's minor units
+ * exactly once, at the cell, so XLSX cells stay numeric (sortable / summable) instead of strings.
  *
  * MULTI-COLUMN statements: a Statement may carry several amount columns (e.g.
  * current vs prior period, or budget vs actual). Set `Statement.columns` to the
@@ -26,6 +26,7 @@ import {
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
+import { getCurrencyMinorUnits } from "@/lib/currency/iso4217";
 
 export interface StatementRow {
   /** Optional account code (e.g. "1000"). */
@@ -130,14 +131,7 @@ function currencyNumberFormat(currency: string): string {
 }
 
 function getMinorUnits(currency: string): number {
-  try {
-    return (
-      new Intl.NumberFormat("en", { style: "currency", currency })
-        .resolvedOptions().maximumFractionDigits ?? 2
-    );
-  } catch {
-    return 2;
-  }
+  return getCurrencyMinorUnits(currency);
 }
 
 /** Scale integer minor units to a real number for a numeric spreadsheet cell. */

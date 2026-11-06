@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download } from "lucide-react";
+import { toast } from "sonner";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { downloadFile } from "@/components/dashboard/download-link";
+import { w2DisplayRows } from "@/lib/tax-forms/w2";
 
 interface TaxFormDetail {
   id: string;
@@ -48,41 +51,20 @@ const statusBadge = (status: string) => {
   }
 };
 
-const w2Labels: Record<string, string> = {
-  box1_wages: "Box 1 - Wages, tips, other compensation",
-  box2_federal_tax: "Box 2 - Federal income tax withheld",
-  box3_ss_wages: "Box 3 - Social security wages",
-  box4_ss_tax: "Box 4 - Social security tax withheld",
-  box5_medicare_wages: "Box 5 - Medicare wages and tips",
-  box6_medicare_tax: "Box 6 - Medicare tax withheld",
+// formData keys rendered as boxes; anything else is shown as extra info
+const BOX_KEYS = new Set(["box12", "box14", "states", "localities"]);
+const INFO_LABELS: Record<string, string> = {
+  employee_email: "Employee email",
+  employee_number: "Employee number",
+  recipient_company: "Company",
+  recipient_email: "Email",
 };
 
 export default function TaxFormDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [form, setForm] = useState<TaxFormDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: formData, loading } = useApi<TaxFormDetail>(`/api/v1/payroll/tax-forms/${id}`);
+  const form = formData?.id ? formData : null;
   useDocumentTitle("Payroll · Tax Form Details");
-
-  const orgId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("activeOrgId") || ""
-      : "";
-
-  const loadForm = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/payroll/tax-forms/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.id) setForm(data);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    loadForm();
-  }, [loadForm]);
 
   if (loading) {
     return (
@@ -110,7 +92,7 @@ export default function TaxFormDetailPage() {
         ? "1099-MISC"
         : "W-2";
 
-  const data = form.formData as Record<string, number | string>;
+  const data = (form.formData ?? {}) as Record<string, unknown>;
 
   return (
     <div className="space-y-6">
@@ -138,7 +120,12 @@ export default function TaxFormDetailPage() {
           variant="outline"
           size="sm"
           onClick={() =>
-            window.open(`/api/v1/payroll/tax-forms/${form.id}/pdf`, "_blank")
+            downloadFile(
+              `/api/v1/payroll/tax-forms/${form.id}/pdf`,
+              `${formTypeLabel}-${form.taxYear}-${form.recipientName}.pdf`
+            ).catch((err) =>
+              toast.error(err instanceof Error ? err.message : "Couldn't download the PDF")
+            )
           }
         >
           <Download className="mr-2 size-3.5" />
@@ -194,16 +181,14 @@ export default function TaxFormDetailPage() {
           )}
 
           {form.formType === "w2" &&
-            Object.entries(w2Labels).map(([key, label]) => (
+            w2DisplayRows(data).map((row, i) => (
               <div
-                key={key}
+                key={`${row.label}-${i}`}
                 className="flex items-center justify-between px-4 py-3"
               >
-                <span className="text-sm text-muted-foreground">{label}</span>
+                <span className="text-sm text-muted-foreground">{row.label}</span>
                 <span className="text-sm font-mono font-bold tabular-nums">
-                  {typeof data[key] === "number"
-                    ? formatMoney(data[key] as number)
-                    : "-"}
+                  {row.amount != null ? formatMoney(row.amount) : row.text || "-"}
                 </span>
               </div>
             ))}
@@ -211,9 +196,12 @@ export default function TaxFormDetailPage() {
           {/* Additional info fields */}
           {Object.entries(data)
             .filter(
-              ([key]) =>
+              ([key, value]) =>
                 !key.startsWith("box") &&
-                !Object.keys(w2Labels).includes(key)
+                !BOX_KEYS.has(key) &&
+                value !== null &&
+                value !== undefined &&
+                typeof value !== "object"
             )
             .map(([key, value]) => (
               <div
@@ -221,7 +209,7 @@ export default function TaxFormDetailPage() {
                 className="flex items-center justify-between px-4 py-3"
               >
                 <span className="text-sm text-muted-foreground">
-                  {key.replace(/_/g, " ")}
+                  {INFO_LABELS[key] ?? key.replace(/_/g, " ")}
                 </span>
                 <span className="text-sm">{String(value) || "-"}</span>
               </div>

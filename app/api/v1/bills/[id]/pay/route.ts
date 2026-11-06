@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { bill, payment, paymentAllocation } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
-import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
-import { getNextNumber } from "@/lib/api/numbering";
+import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { assertNotLocked } from "@/lib/api/period-lock";
+import { requireRole } from "@/lib/api/require-role";
+import { BillPaymentError, recordBillPayment } from "@/lib/api/bill-payment";
 import { z } from "zod";
 
 const paySchema = z.object({
@@ -16,6 +11,9 @@ const paySchema = z.object({
   date: z.string().min(1),
   method: z.enum(["bank_transfer", "cash", "check", "card", "other"]).default("bank_transfer"),
   reference: z.string().nullable().optional(),
+  // The bank account (bank_account row) the money leaves from. Omitted = the
+  // default bank ledger account (1100).
+  bankAccountId: z.string().uuid().nullable().optional(),
 });
 
 export async function POST(
@@ -25,121 +23,23 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:payments");
 
     const body = await request.json();
     const parsed = paySchema.parse(body);
 
-    const found = await db.query.bill.findFirst({
-      where: and(
-        eq(bill.id, id),
-        eq(bill.organizationId, ctx.organizationId),
-        notDeleted(bill.deletedAt)
-      ),
+    // Validates the bill / amount / bank account / period lock, then writes
+    // the payment, allocation, GL entry and bill balance in one transaction.
+    const { bill: updated, payment: created, previousStatus } = await recordBillPayment(ctx, {
+      billId: id,
+      amount: parsed.amount,
+      date: parsed.date,
+      method: parsed.method,
+      reference: parsed.reference,
+      bankAccountId: parsed.bankAccountId,
     });
 
-    if (!found) return notFound("Bill");
-    if (found.status === "draft" || found.status === "void") {
-      return NextResponse.json(
-        { error: "Cannot record payment for this bill status" },
-        { status: 400 }
-      );
-    }
-    // Don't accept more than is outstanding — an overpayment would drive the
-    // balance negative and overstate cash out.
-    if (parsed.amount > found.amountDue) {
-      return NextResponse.json(
-        { error: "Payment is more than the amount still due on this bill." },
-        { status: 400 }
-      );
-    }
-    // The payment posts a GL entry on parsed.date — block locked/closed periods.
-    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
-
-    // Settle against the bill's OUTSTANDING balance (amountDue), not a fresh
-    // total - paid. For reverse-charge bills the payable is the net only (the
-    // self-accounted VAT never leaves the bank), so amountDue < total; deriving
-    // the remainder from total left a phantom balance = the RC VAT and the bill
-    // could never reach "paid".
-    const newAmountPaid = found.amountPaid + parsed.amount;
-    const newAmountDue = found.amountDue - parsed.amount;
-    const newStatus = newAmountDue <= 0 ? "paid" : "partial";
-
-    // Generate payment number
-    const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
-
-    // Atomically write the payment, allocation, GL journal entry, the
-    // payment->journalEntry link, and the bill balance/status update. If
-    // createPaymentJournalEntry throws (e.g. MissingExchangeRateError), the
-    // whole sequence rolls back so we never leave an orphaned payment or a
-    // bill marked paid without a ledger entry.
-    const { created, updated } = await db.transaction(async (tx) => {
-      // Create payment record
-      const [created] = await tx
-        .insert(payment)
-        .values({
-          organizationId: ctx.organizationId,
-          contactId: found.contactId,
-          paymentNumber,
-          type: "made",
-          date: parsed.date,
-          amount: parsed.amount,
-          method: parsed.method,
-          reference: parsed.reference || null,
-          createdBy: ctx.userId,
-        })
-        .returning();
-
-      // Create allocation linking payment to this bill
-      await tx.insert(paymentAllocation).values({
-        paymentId: created.id,
-        documentType: "bill",
-        documentId: id,
-        amount: parsed.amount,
-      });
-
-      // Create payment journal entry
-      const journalEntry = await createPaymentJournalEntry(
-        { organizationId: ctx.organizationId, userId: ctx.userId },
-        {
-          type: "bill",
-          reference: paymentNumber,
-          amount: parsed.amount,
-          date: parsed.date,
-          allocations: [
-            {
-              amount: parsed.amount,
-              currencyCode: found.currencyCode,
-              issueDate: found.issueDate,
-            },
-          ],
-        },
-        tx
-      );
-
-      if (journalEntry) {
-        await tx
-          .update(payment)
-          .set({ journalEntryId: journalEntry.id })
-          .where(eq(payment.id, created.id));
-      }
-
-      // Update bill amounts
-      const [updated] = await tx
-        .update(bill)
-        .set({
-          amountPaid: newAmountPaid,
-          amountDue: Math.max(0, newAmountDue),
-          status: newStatus,
-          paidAt: newStatus === "paid" ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(bill.id, id))
-        .returning();
-
-      return { created, updated };
-    });
-
-    logAudit({ ctx, action: "pay", entityType: "bill", entityId: id, changes: { previousStatus: found.status }, request });
+    logAudit({ ctx, action: "pay", entityType: "bill", entityId: id, changes: { previousStatus }, request });
 
     return NextResponse.json({
       bill: updated,
@@ -147,11 +47,15 @@ export async function POST(
         id: created.id,
         paymentNumber: created.paymentNumber,
         date: created.date,
-        amount: parsed.amount,
+        amount: created.amount,
         method: created.method,
+        bankAccountId: created.bankAccountId,
       },
     });
   } catch (err) {
+    if (err instanceof BillPaymentError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return handleError(err);
   }
 }

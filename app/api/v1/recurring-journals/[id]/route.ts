@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { resumeSchedule } from "@/lib/api/recurring-schedule";
 import { z } from "zod";
 
 const legSchema = z
@@ -89,9 +90,18 @@ export async function PATCH(
 
     const { lines, ...header } = parsed;
 
+    // Resuming a paused schedule skips the dates missed while it was paused.
+    const resumed =
+      existing.status === "paused" && header.status === "active"
+        ? resumeSchedule(
+            { ...existing, frequency: header.frequency ?? existing.frequency, endDate: header.endDate !== undefined ? header.endDate : existing.endDate },
+            new Date().toISOString().split("T")[0]
+          )
+        : {};
+
     const [updated] = await db
       .update(recurringTemplate)
-      .set({ ...header, updatedAt: new Date() })
+      .set({ ...header, ...resumed, updatedAt: new Date() })
       .where(eq(recurringTemplate.id, id))
       .returning();
 

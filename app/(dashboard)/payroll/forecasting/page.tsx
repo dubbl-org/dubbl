@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
-import { toast } from "sonner";
-import { TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +11,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 
 interface Projection {
   month: string;
@@ -35,8 +34,8 @@ const anim = (delay: number) => ({
 });
 
 export default function ForecastingPage() {
-  const [projection, setProjection] = useState<Projection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: projectionData, loading } = useApi<{ data?: Projection[] }>("/api/v1/payroll/forecasting/projection?months=12");
+  const projection = projectionData?.data ?? [];
   const [whatIf, setWhatIf] = useState<WhatIfResult | null>(null);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
 
@@ -48,16 +47,6 @@ export default function ForecastingPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Forecasting");
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch("/api/v1/payroll/forecasting/projection?months=12", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setProjection(data.data); })
-      .finally(() => setLoading(false));
-  }, [orgId]);
 
   async function handleWhatIf() {
     if (!orgId) return;

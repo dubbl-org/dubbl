@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useApi } from "@/lib/query/use-api";
 import { Trash2, Search, RotateCcw, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ const ENTITY_TYPES = [
   { value: "payment", label: "Payment" },
   { value: "recurring_template", label: "Recurring Template" },
   { value: "project", label: "Project" },
+  { value: "deal", label: "Deal" },
   { value: "fixed_asset", label: "Fixed Asset" },
   { value: "budget", label: "Budget" },
   { value: "loan", label: "Loan" },
@@ -82,33 +84,21 @@ function getEntityLabel(entityType: string): string {
 }
 
 export default function TrashPage() {
-  const [items, setItems] = useState<TrashItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [deleteItem, setDeleteItem] = useState<TrashItem | null>(null);
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [acting, setActing] = useState(false);
 
-  const fetchItems = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    const params = new URLSearchParams();
-    if (typeFilter !== "all") params.set("entityType", typeFilter);
-    if (search.trim()) params.set("search", search.trim());
-
-    fetch(`/api/v1/trash?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setItems(data.data || []))
-      .finally(() => setLoading(false));
-  }, [typeFilter, search]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  const params = new URLSearchParams();
+  if (typeFilter !== "all") params.set("entityType", typeFilter);
+  if (search.trim()) params.set("search", search.trim());
+  const { data, loading } = useApi<{ data?: TrashItem[] }>(`/api/v1/trash?${params}`, {
+    keepPrevious: true,
+    // Typed searches aren't part of the page's usual requests.
+    learn: !search.trim(),
+  });
+  const items = useMemo(() => data?.data || [], [data]);
 
   const filteredItems = useMemo(() => {
     return items;
@@ -135,7 +125,6 @@ export default function TrashPage() {
       }
 
       toast.success(`${item.label} restored`);
-      fetchItems();
     } catch {
       toast.error("Failed to restore item");
     }
@@ -165,7 +154,6 @@ export default function TrashPage() {
 
       toast.success(`${deleteItem.label} permanently deleted`);
       setDeleteItem(null);
-      fetchItems();
     } catch {
       toast.error("Failed to delete item");
     } finally {
@@ -192,7 +180,6 @@ export default function TrashPage() {
 
       toast.success("Trash emptied");
       setEmptyOpen(false);
-      fetchItems();
     } catch {
       toast.error("Failed to empty trash");
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   AreaChart,
   Area,
@@ -11,9 +11,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface ForecastWeek {
   weekOf: string;
@@ -75,31 +75,8 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export function CashFlowWidget() {
   const [weeks, setWeeks] = useState(4);
-  const [forecast, setForecast] = useState<ForecastData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const id = localStorage.getItem("activeOrgId");
-    if (!id) return;
-    let active = true;
-    const controller = new AbortController();
-    setLoading(true);
-    (async () => {
-      try {
-        const r = await fetch(`/api/v1/reports/cash-flow-forecast?weeks=${weeks}`, {
-          headers: { "x-organization-id": id },
-          signal: controller.signal,
-        });
-        const data = await r.json();
-        if (active) setForecast(data);
-      } catch {
-        if (active) setForecast(null);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; controller.abort(); };
-  }, [weeks]);
+  const { data, loading } = useApi<ForecastData>(`/api/v1/reports/cash-flow-forecast?weeks=${weeks}`, { keepPrevious: true });
+  const forecast = data ?? null;
 
   const chartData =
     forecast?.weeks?.map((w) => ({

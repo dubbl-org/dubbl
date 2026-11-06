@@ -7,7 +7,7 @@ import { EmailSettingsError, testEmailSettings } from "@/lib/email/email-setting
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:banking");
+    requireRole(ctx, "manage:integrations");
     try {
       const { sentTo } = await testEmailSettings(ctx.organizationId);
       return NextResponse.json({ success: true, message: `Test email sent to ${sentTo}` });

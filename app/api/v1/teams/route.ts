@@ -34,7 +34,16 @@ export async function GET(request: Request) {
       orderBy: desc(team.createdAt),
       limit,
       offset,
-      with: { members: true },
+      with: {
+        members: {
+          with: {
+            member: {
+              columns: { id: true },
+              with: { user: { columns: { name: true, email: true, image: true } } },
+            },
+          },
+        },
+      },
     });
 
     const [countResult] = await db
@@ -43,7 +52,21 @@ export async function GET(request: Request) {
       .where(and(...conditions));
 
     return NextResponse.json(
-      paginatedResponse(teams, Number(countResult?.count || 0), page, limit)
+      paginatedResponse(
+        teams.map((t) => ({
+          ...t,
+          // Flatten each team member row with the person's display fields.
+          members: t.members.map(({ member: m, ...tm }) => ({
+            ...tm,
+            name: m.user?.name || null,
+            email: m.user?.email || "",
+            image: m.user?.image || null,
+          })),
+        })),
+        Number(countResult?.count || 0),
+        page,
+        limit
+      )
     );
   } catch (err) {
     return handleError(err);

@@ -16,21 +16,16 @@ import {
   chartAccount,
 } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, notInArray, isNull, inArray } from "drizzle-orm";
-import { notDeleted } from "@/lib/db/soft-delete";
-import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
-
-/** Billed amount for a cost line = cost grossed up by the markup (basis points). */
-function withMarkup(cost: number, markupBasisPoints: number): number {
-  return Math.round(cost * (1 + markupBasisPoints / 10000));
-}
+import { ProjectError, ProjectNotFoundError, requireProjectAccess } from "@/lib/api/project-access";
+import { syncProjectBilling, withMarkup } from "@/lib/api/project-billing";
 
 export function registerProjectTools(server: McpServer, ctx: AuthContext) {
   // ─── Job-costing profitability ─────────────────────────────────────────
   server.tool(
     "get_project_profitability",
-    "Job-costing profitability per project (estimate vs actual). ACTUAL revenue is the sum of invoice lines tagged with the project; ACTUAL cost is bill lines tagged with the project (materials/subcontractors) + posted expense-account journal lines tagged with the project (excluding bill-sourced entries) + labor (time entries costed at each project member's internal costRate, NOT the client billing rate). Compares actuals to project.budget (total cost budget) and estimatedHours. All amounts in integer cents; hours/minutes in minutes. Pass an optional date range (defaults: Jan 1 of the current year to today) and an optional projectId to scope to one project.",
+    "Job-costing profitability per project (estimate vs actual). ACTUAL revenue is the sum of invoice lines tagged with the project; ACTUAL cost is bill lines tagged with the project (materials/subcontractors) + posted expense-account journal lines tagged with the project (excluding bill-sourced entries) + labor (time entries costed at each project member's internal costRate, NOT the client billing rate). Compares invoiced revenue to project.budget (the fee budget: what the client can be billed; budgetVariance = budget - revenue, positive = budget left to bill) and minutes worked to estimatedHours. All amounts in integer cents; hours/minutes in minutes. Pass an optional date range (defaults: Jan 1 of the current year to today) and an optional projectId to scope to one project.",
     {
       projectId: z
         .string()
@@ -195,8 +190,9 @@ export function registerProjectTools(server: McpServer, ctx: AuthContext) {
             marginPercent: revenue > 0 ? Math.round((profit / revenue) * 10000) / 100 : 0,
             actualMinutes: labor.minutes,
             billableMinutes: labor.billableMinutes,
-            budgetVariance: p.budget - cost,
-            budgetUsedPercent: p.budget > 0 ? Math.round((cost / p.budget) * 10000) / 100 : 0,
+            // budget is the fee budget (what the client can be billed): compared with revenue.
+            budgetVariance: p.budget - revenue,
+            budgetUsedPercent: p.budget > 0 ? Math.round((revenue / p.budget) * 10000) / 100 : 0,
             hoursVariance: p.estimatedHours - labor.minutes,
             hoursUsedPercent:
               p.estimatedHours > 0 ? Math.round((labor.minutes / p.estimatedHours) * 10000) / 100 : 0,
@@ -225,14 +221,9 @@ export function registerProjectTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const proj = await db.query.project.findFirst({
-          where: and(
-            eq(project.id, params.projectId),
-            eq(project.organizationId, ctx.organizationId),
-            notDeleted(project.deletedAt)
-          ),
-        });
-        if (!proj) throw new Error("Project not found");
+        await requireProjectAccess(ctx, params.projectId, "view");
+        // Items on voided/deleted invoices are released back to "registered".
+        await syncProjectBilling(db, ctx.organizationId, [params.projectId]);
 
         const items = await db
           .select()
@@ -333,15 +324,7 @@ export function registerProjectTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:projects");
-        const proj = await db.query.project.findFirst({
-          where: and(
-            eq(project.id, params.projectId),
-            eq(project.organizationId, ctx.organizationId),
-            notDeleted(project.deletedAt)
-          ),
-        });
-        if (!proj) throw new Error("Project not found");
+        await requireProjectAccess(ctx, params.projectId, "manage");
 
         let costAmount = params.costAmount;
         let description = params.description;
@@ -356,11 +339,11 @@ export function registerProjectTools(server: McpServer, ctx: AuthContext) {
                 eq(billLine.id, params.sourceLineId)
               )
             );
-          if (!src) throw new Error("Bill line not found in this organization");
+          if (!src) throw new ProjectError("Bill line not found in this organization", 404);
           costAmount = costAmount ?? src.amount;
           description = description ?? src.description;
         }
-        if (costAmount == null) throw new Error("costAmount is required for this source type");
+        if (costAmount == null) throw new ProjectError("costAmount is required for this source type", 400);
 
         const [row] = await db
           .insert(projectBillableItem)
@@ -391,6 +374,33 @@ export function registerProjectTools(server: McpServer, ctx: AuthContext) {
           id: row.id,
           billableAmount: withMarkup(costAmount, params.markupBasisPoints),
         };
+      })
+  );
+
+  server.tool(
+    "remove_project_billable_item",
+    "Unregister a billable expense from a project so it won't be on-billed. Already-billed items can't be removed (void or delete their invoice first). Needs manager access on the project.",
+    {
+      projectId: z.string().describe("Project UUID"),
+      itemId: z.string().describe("Billable item UUID (from list_project_billable_items)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        await requireProjectAccess(ctx, params.projectId, "manage");
+        await syncProjectBilling(db, ctx.organizationId, [params.projectId]);
+        const existing = await db.query.projectBillableItem.findFirst({
+          where: and(
+            eq(projectBillableItem.id, params.itemId),
+            eq(projectBillableItem.organizationId, ctx.organizationId),
+            eq(projectBillableItem.projectId, params.projectId)
+          ),
+        });
+        if (!existing) throw new ProjectNotFoundError("Billable item");
+        if (existing.billedInvoiceId) {
+          throw new ProjectError("This expense is already billed. Void or delete its invoice first.", 409);
+        }
+        await db.delete(projectBillableItem).where(eq(projectBillableItem.id, params.itemId));
+        return { removed: true, itemId: params.itemId };
       })
   );
 }

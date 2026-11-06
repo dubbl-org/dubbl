@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Check, ChevronsUpDown, Loader2, Plus, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { useApi } from "@/lib/query/use-api";
 
 interface Account {
   id: string;
@@ -55,33 +56,17 @@ export function AccountPicker({
   allowCreate = false,
 }: AccountPickerProps) {
   const [open, setOpen] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ accounts?: Account[] }>("/api/v1/accounts");
   // typeFilter is often an inline array literal (new identity each render); join to a
-  // stable string so the effect doesn't refetch on every parent render, and derive
-  // the allow-list from that same string inside the effect (no ref needed).
+  // stable string so the filter doesn't rerun on every parent render, and derive
+  // the allow-list from that same string.
   const typeKey = typeFilter ? typeFilter.join(",") : "";
 
-  useEffect(() => {
-    let cancelled = false;
+  const accounts = useMemo(() => {
+    const all = data?.accounts ?? [];
     const allow = typeKey ? typeKey.split(",") : null;
-    (async () => {
-      try {
-        const orgId = localStorage.getItem("activeOrgId");
-        if (!orgId) return;
-        const res = await fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } });
-        const data = await res.json();
-        if (!cancelled && data.accounts) {
-          setAccounts(allow ? data.accounts.filter((a: Account) => allow.includes(a.type)) : data.accounts);
-        }
-      } catch {
-        // leave accounts empty on failure
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [typeKey]);
+    return allow ? all.filter((a) => allow.includes(a.type)) : all;
+  }, [data, typeKey]);
 
   // Group accounts by type, in accounting display order, each group sorted by code.
   const groups = useMemo(() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -15,7 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useApi } from "@/lib/query/use-api";
 import { BackToReports, ReportHelp } from "../_components";
+import { DownloadLink } from "@/components/dashboard/download-link";
 
 interface SectionAccount {
   accountId: string;
@@ -34,6 +36,7 @@ interface SectionData {
 
 interface BalanceSheetData {
   asAt: string;
+  fiscalYearStart?: string;
   dates?: string[];
   compareDates?: string[];
   assets: SectionData;
@@ -49,42 +52,19 @@ const SECTION_LABELS: Record<string, string> = {
 
 export default function BalanceSheetPage() {
   const today = new Date().toISOString().slice(0, 10);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [asAt, setAsAt] = useState(today);
   const [compareDate, setCompareDate] = useState<string>("");
   const [showCompare, setShowCompare] = useState(false);
-  const [data, setData] = useState<BalanceSheetData | null>(null);
+  const params = new URLSearchParams({ asAt });
+  if (showCompare && compareDate) params.set("compareDate", compareDate);
+  const { data: report, loading } = useApi<BalanceSheetData>(`/api/v1/reports/balance-sheet?${params}`, { keepPrevious: true });
+  const data = report?.assets ? report : null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ asAt });
-    if (showCompare && compareDate) params.set("compareDate", compareDate);
-
-    fetch(`/api/v1/reports/balance-sheet?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.assets) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [asAt, showCompare, compareDate]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const dates = data?.dates ?? (data ? [data.asAt] : []);
+  // Click-through opens the ledger from the start of the financial year.
+  const ledgerStart = data?.asAt === asAt && data.fiscalYearStart ? data.fiscalYearStart : `${asAt.slice(0, 4)}-01-01`;
   const sections: { label: string; data: SectionData }[] = data
     ? [
         { label: "Assets", data: data.assets },
@@ -108,12 +88,13 @@ export default function BalanceSheetPage() {
         title="What you own and owe"
         description="A snapshot of everything the business owns and owes on a chosen date."
       >
-        <a
+        <DownloadLink
           href={`/api/v1/reports/balance-sheet?${(() => { const p = new URLSearchParams({ asAt, format: "pdf" }); if (showCompare && compareDate) p.set("compareDate", compareDate); return p; })()}`}
+          filename="balance-sheet.pdf"
           className="inline-flex h-8 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
         >
           Download PDF
-        </a>
+        </DownloadLink>
       </PageHeader>
 
       <ReportHelp>
@@ -147,62 +128,58 @@ export default function BalanceSheetPage() {
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          <div className="space-y-6">
-            {sections.map((section) => (
-              <div key={section.label} className="space-y-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {SECTION_LABELS[section.label] || section.label}
-                </h3>
-                <div className="rounded-lg border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-24">Code</TableHead>
-                        <TableHead>Account</TableHead>
-                        {dates.map((d) => (
-                          <TableHead key={d} className="w-36 text-right">As of {d}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {section.data.accounts.map((a) => (
-                        <TableRow key={a.accountId}>
-                          <TableCell className="font-mono text-sm">{a.code}</TableCell>
-                          <TableCell>
-                            <Link
-                              href={`/reports/general-ledger?${new URLSearchParams({ endDate: asAt }).toString()}#${a.accountId}`}
-                              className="hover:text-brand-600 hover:underline"
-                            >
-                              {a.name}
-                            </Link>
-                          </TableCell>
-                          {balancesFor(a).map((bal, i) => (
-                            <TableCell key={i} className="text-right font-mono tabular-nums">
-                              {parseFloat(bal).toFixed(2)}
-                            </TableCell>
-                          ))}
-                        </TableRow>
+      <ContentReveal>
+        <div className="space-y-6">
+          {sections.map((section) => (
+            <div key={section.label} className="space-y-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {SECTION_LABELS[section.label] || section.label}
+              </h3>
+              <div className="rounded-lg border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-24">Code</TableHead>
+                      <TableHead>Account</TableHead>
+                      {dates.map((d) => (
+                        <TableHead key={d} className="w-36 text-right">As of {d}</TableHead>
                       ))}
-                      <TableRow className="bg-muted/30 font-bold">
-                        <TableCell colSpan={2}>Total {(SECTION_LABELS[section.label] || section.label).toLowerCase()}</TableCell>
-                        {totalsFor(section.data).map((t, i) => (
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {section.data.accounts.map((a) => (
+                      <TableRow key={a.accountId}>
+                        <TableCell className="font-mono text-sm">{a.code}</TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/reports/general-ledger?${new URLSearchParams({ startDate: ledgerStart, endDate: asAt }).toString()}#${a.accountId}`}
+                            className="hover:text-brand-600 hover:underline"
+                          >
+                            {a.name}
+                          </Link>
+                        </TableCell>
+                        {balancesFor(a).map((bal, i) => (
                           <TableCell key={i} className="text-right font-mono tabular-nums">
-                            {parseFloat(t).toFixed(2)}
+                            {parseFloat(bal).toFixed(2)}
                           </TableCell>
                         ))}
                       </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                    <TableRow className="bg-muted/30 font-bold">
+                      <TableCell colSpan={2}>Total {(SECTION_LABELS[section.label] || section.label).toLowerCase()}</TableCell>
+                      {totalsFor(section.data).map((t, i) => (
+                        <TableCell key={i} className="text-right font-mono tabular-nums">
+                          {parseFloat(t).toFixed(2)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </div>
-            ))}
-          </div>
-        </ContentReveal>
-      )}
+            </div>
+          ))}
+        </div>
+      </ContentReveal>
     </ContentReveal>
   );
 }

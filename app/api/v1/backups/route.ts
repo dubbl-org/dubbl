@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkManualBackupLimit } from "@/lib/api/check-limit";
 import { db } from "@/lib/db";
 import { dataBackup } from "@/lib/db/schema";
 import { eq, desc, and, count } from "drizzle-orm";
@@ -56,25 +57,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const maxManual = 10;
-
-    const [{ total: manualCount }] = await db
-      .select({ total: count() })
-      .from(dataBackup)
-      .where(
-        and(
-          eq(dataBackup.organizationId, ctx.organizationId),
-          eq(dataBackup.type, "manual"),
-          notDeleted(dataBackup.deletedAt),
-        )
-      );
-
-    if (manualCount >= maxManual) {
-      return NextResponse.json(
-        { error: `Manual backup limit reached (${maxManual})` },
-        { status: 403 },
-      );
-    }
+    await checkManualBackupLimit(ctx.organizationId);
 
     const backup = await createOrgSnapshot(ctx.organizationId, ctx.userId, "manual");
 

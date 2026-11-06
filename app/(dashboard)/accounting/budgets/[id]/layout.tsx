@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useCallback, useMemo } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { ArrowLeft, Target, TrendingUp, TrendingDown, BarChart3, Settings2, Flame, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { cn } from "@/lib/utils";
 import type { PeriodType } from "@/lib/budget-periods";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface Account {
   id: string;
@@ -42,6 +43,8 @@ interface BudgetData {
   endDate: string;
   periodType: PeriodType;
   isActive: boolean;
+  // Spending alert at this % of a period's budget; null = off
+  varianceThresholdPct: number | null;
   createdAt: string;
   lines: BudgetLineData[];
 }
@@ -112,50 +115,47 @@ export default function BudgetDetailLayout({ children }: { children: React.React
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
-  const [budget, setBudget] = useState<BudgetData | null>(null);
-  const [comparisons, setComparisons] = useState<Comparison[]>([]);
-  const [totalBudgeted, setTotalBudgeted] = useState(0);
-  const [totalActual, setTotalActual] = useState(0);
-  const [totalBurnRate, setTotalBurnRate] = useState(0);
-  const [daysElapsed, setDaysElapsed] = useState(0);
-  const [daysRemaining, setDaysRemaining] = useState(0);
-  const [totalDays, setTotalDays] = useState(0);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  const budgetUrl = `/api/v1/budgets/${id}`;
+  const budgetQuery = useApi<{ budget?: BudgetData | null }>(budgetUrl);
+  const accountsQuery = useApi<{ accounts?: Account[] }>("/api/v1/accounts?limit=500");
+  const reportQuery = useApi<{
+    comparisons?: Comparison[];
+    totalBudgeted?: number;
+    totalActual?: number;
+    totalBurnRate?: number;
+    daysElapsed?: number;
+    daysRemaining?: number;
+    totalDays?: number;
+  }>(`/api/v1/reports/budget-vs-actual?budgetId=${id}`);
+  const cache = useApiCache();
+  const budget = budgetQuery.data?.budget ?? null;
+  const report = reportQuery.data;
+  const comparisons = useMemo(() => report?.comparisons || [], [report]);
+  const totalBudgeted = report?.totalBudgeted || 0;
+  const totalActual = report?.totalActual || 0;
+  const totalBurnRate = report?.totalBurnRate || 0;
+  const daysElapsed = report?.daysElapsed || 0;
+  const daysRemaining = report?.daysRemaining || 0;
+  const totalDays = report?.totalDays || 0;
+  const accounts = useMemo(() => accountsQuery.data?.accounts || [], [accountsQuery.data]);
+  const loading = budgetQuery.loading || accountsQuery.loading || reportQuery.loading;
+  const refetchBudget = budgetQuery.refetch;
+  const refetchAccounts = accountsQuery.refetch;
+  const refetchReport = reportQuery.refetch;
 
   useEntityTitle(budget?.name ?? undefined);
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  const setBudget = useCallback(
+    (fn: (prev: BudgetData | null) => BudgetData | null) =>
+      cache.update<{ budget?: BudgetData | null }>(budgetUrl, (d) => ({ ...d, budget: fn(d.budget ?? null) })),
+    [cache, budgetUrl]
+  );
 
   const fetchData = useCallback(() => {
-    if (!orgId) return;
-    setLoading(true);
-
-    Promise.all([
-      fetch(`/api/v1/budgets/${id}`, { headers: { "x-organization-id": orgId } }).then((r) => r.json()),
-      fetch("/api/v1/accounts?limit=500", { headers: { "x-organization-id": orgId } }).then((r) => r.json()),
-      fetch(`/api/v1/reports/budget-vs-actual?budgetId=${id}`, { headers: { "x-organization-id": orgId } }).then((r) => r.json()).catch(() => null),
-    ])
-      .then(([budgetData, accountsData, reportData]) => {
-        if (budgetData.budget) setBudget(budgetData.budget);
-        setAccounts(accountsData.accounts || []);
-        if (reportData) {
-          setComparisons(reportData.comparisons || []);
-          setTotalBudgeted(reportData.totalBudgeted || 0);
-          setTotalActual(reportData.totalActual || 0);
-          setTotalBurnRate(reportData.totalBurnRate || 0);
-          setDaysElapsed(reportData.daysElapsed || 0);
-          setDaysRemaining(reportData.daysRemaining || 0);
-          setTotalDays(reportData.totalDays || 0);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData();
-  }, [fetchData]);
+    void refetchBudget();
+    void refetchAccounts();
+    void refetchReport();
+  }, [refetchBudget, refetchAccounts, refetchReport]);
 
   if (loading) return <BrandLoader />;
 

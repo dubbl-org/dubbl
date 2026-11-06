@@ -1,20 +1,20 @@
 import { db } from "@/lib/db";
 import {
   fixedAsset,
-  depreciationEntry,
   journalEntry,
   journalLine,
   loan,
   loanSchedule,
   bankAccount,
-  revenueSchedule,
-  revenueEntry,
   organization,
 } from "@/lib/db/schema";
 import { eq, and, sql, lte, isNull } from "drizzle-orm";
 import { autoReconcileBankTransactions } from "./bank-auto-reconcile";
 import { checkBudgetVariances } from "./budget-alerts";
 import { checkLowBankBalances } from "./bank-balance-alerts";
+import { processDueRevenueRecognition } from "./revenue-schedules";
+import { assertNotLocked, PeriodLockedError } from "./period-lock";
+import { postAssetDepreciation } from "@/lib/fixed-assets/post-depreciation";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -26,7 +26,6 @@ async function getNextEntryNumber(organizationId: string) {
 
 export async function processDepreciation(): Promise<{ processed: number; skipped: number }> {
   const today = new Date().toISOString().slice(0, 10);
-  const currentMonth = today.slice(0, 7); // "YYYY-MM"
 
   const assets = await db.query.fixedAsset.findMany({
     where: and(
@@ -39,106 +38,25 @@ export async function processDepreciation(): Promise<{ processed: number; skippe
   let skipped = 0;
 
   for (const asset of assets) {
+    // The nightly job only books assets it can post to the ledger.
     if (!asset.depreciationAccountId || !asset.accumulatedDepAccountId) {
       skipped++;
       continue;
     }
 
-    // Idempotency: check if depreciation entry exists for current month
-    const existingEntry = await db.query.depreciationEntry.findFirst({
-      where: and(
-        eq(depreciationEntry.fixedAssetId, asset.id),
-        sql`${depreciationEntry.date} >= ${currentMonth + "-01"}`,
-        sql`${depreciationEntry.date} < ${currentMonth + "-32"}`
-      ),
-    });
-
-    if (existingEntry) {
-      skipped++;
-      continue;
-    }
-
-    // Calculate depreciation amount
-    let amount: number;
-    if (asset.depreciationMethod === "straight_line") {
-      amount = Math.round((asset.purchasePrice - asset.residualValue) / asset.usefulLifeMonths);
-    } else {
-      // declining_balance
-      amount = Math.round(asset.netBookValue * (2 / asset.usefulLifeMonths));
-      // Cap at netBookValue - residualValue
-      amount = Math.min(amount, asset.netBookValue - asset.residualValue);
-    }
-
-    if (amount <= 0) {
-      // Fully depreciated
-      if (asset.netBookValue <= asset.residualValue) {
-        await db
-          .update(fixedAsset)
-          .set({ status: "fully_depreciated", updatedAt: new Date() })
-          .where(eq(fixedAsset.id, asset.id));
+    // Same calculation, once-a-month guard and lock check as the manual run.
+    try {
+      const result = await postAssetDepreciation(asset, { date: today });
+      if (result.status === "posted") processed++;
+      else skipped++;
+    } catch (err) {
+      // A locked period skips the asset; it's picked up once the date is open.
+      if (err instanceof PeriodLockedError) {
+        skipped++;
+        continue;
       }
-      skipped++;
-      continue;
+      throw err;
     }
-
-    const entryNumber = await getNextEntryNumber(asset.organizationId);
-
-    // Create journal entry: DR depreciation expense, CR accumulated depreciation
-    const [je] = await db
-      .insert(journalEntry)
-      .values({
-        organizationId: asset.organizationId,
-        entryNumber,
-        date: today,
-        description: `Monthly depreciation - ${asset.name}`,
-        reference: asset.assetNumber,
-        status: "posted",
-        sourceType: "depreciation",
-        sourceId: asset.id,
-        postedAt: new Date(),
-      })
-      .returning();
-
-    await db.insert(journalLine).values([
-      {
-        journalEntryId: je.id,
-        accountId: asset.depreciationAccountId,
-        description: `Depreciation - ${asset.name}`,
-        debitAmount: amount,
-        creditAmount: 0,
-      },
-      {
-        journalEntryId: je.id,
-        accountId: asset.accumulatedDepAccountId,
-        description: `Accumulated depreciation - ${asset.name}`,
-        debitAmount: 0,
-        creditAmount: amount,
-      },
-    ]);
-
-    // Insert depreciation entry
-    await db.insert(depreciationEntry).values({
-      fixedAssetId: asset.id,
-      date: today,
-      amount,
-      journalEntryId: je.id,
-    });
-
-    // Update asset
-    const newAccum = asset.accumulatedDepreciation + amount;
-    const newNbv = asset.netBookValue - amount;
-
-    await db
-      .update(fixedAsset)
-      .set({
-        accumulatedDepreciation: newAccum,
-        netBookValue: newNbv,
-        status: newNbv <= asset.residualValue ? "fully_depreciated" : "active",
-        updatedAt: new Date(),
-      })
-      .where(eq(fixedAsset.id, asset.id));
-
-    processed++;
   }
 
   return { processed, skipped };
@@ -192,6 +110,17 @@ export async function processLoanPayments(): Promise<{ processed: number; skippe
     }
 
     for (const entry of dueEntries) {
+      // A payment dated in a locked period is left for someone to post by hand.
+      try {
+        await assertNotLocked(l.organizationId, entry.date);
+      } catch (err) {
+        if (err instanceof PeriodLockedError) {
+          skipped++;
+          continue;
+        }
+        throw err;
+      }
+
       const entryNumber = await getNextEntryNumber(l.organizationId);
 
       // Create journal entry: DR Principal + DR Interest, CR Bank
@@ -276,103 +205,14 @@ export async function processLoanPayments(): Promise<{ processed: number; skippe
   return { processed, skipped };
 }
 
+/**
+ * Count every revenue-schedule period whose date has arrived (DR Deferred
+ * Revenue / CR income). Shares the posting code with the "Count next period"
+ * button, so it resolves accounts, honours period locks and skips milestone
+ * schedules the same way.
+ */
 export async function processRevenueRecognition(): Promise<{ processed: number; skipped: number }> {
-  const today = new Date().toISOString().slice(0, 10);
-
-  const schedules = await db.query.revenueSchedule.findMany({
-    where: eq(revenueSchedule.status, "active"),
-  });
-
-  let processed = 0;
-  let skipped = 0;
-
-  for (const schedule of schedules) {
-    if (!schedule.deferredRevenueAccountId || !schedule.revenueAccountId) {
-      skipped++;
-      continue;
-    }
-
-    // Find unrecognized entries due on or before today
-    const dueEntries = await db.query.revenueEntry.findMany({
-      where: and(
-        eq(revenueEntry.scheduleId, schedule.id),
-        eq(revenueEntry.recognized, false),
-        lte(revenueEntry.periodDate, today)
-      ),
-    });
-
-    if (dueEntries.length === 0) {
-      skipped++;
-      continue;
-    }
-
-    for (const entry of dueEntries) {
-      const entryNumber = await getNextEntryNumber(schedule.organizationId);
-
-      // Create journal entry: DR Deferred Revenue (liability), CR Revenue
-      const [je] = await db
-        .insert(journalEntry)
-        .values({
-          organizationId: schedule.organizationId,
-          entryNumber,
-          date: entry.periodDate,
-          description: `Revenue recognition - period ${entry.periodDate}`,
-          status: "posted",
-          sourceType: "revenue_recognition",
-          sourceId: schedule.id,
-          postedAt: new Date(),
-        })
-        .returning();
-
-      await db.insert(journalLine).values([
-        {
-          journalEntryId: je.id,
-          accountId: schedule.deferredRevenueAccountId,
-          description: `Deferred revenue recognition`,
-          debitAmount: entry.amount,
-          creditAmount: 0,
-        },
-        {
-          journalEntryId: je.id,
-          accountId: schedule.revenueAccountId,
-          description: `Revenue recognized`,
-          debitAmount: 0,
-          creditAmount: entry.amount,
-        },
-      ]);
-
-      // Update revenue entry
-      await db
-        .update(revenueEntry)
-        .set({ recognized: true, journalEntryId: je.id })
-        .where(eq(revenueEntry.id, entry.id));
-
-      // Update schedule recognized amount
-      await db
-        .update(revenueSchedule)
-        .set({
-          recognizedAmount: sql`${revenueSchedule.recognizedAmount} + ${entry.amount}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(revenueSchedule.id, schedule.id));
-
-      processed++;
-    }
-
-    // Check if fully recognized
-    const updatedSchedule = await db.query.revenueSchedule.findFirst({
-      where: eq(revenueSchedule.id, schedule.id),
-    });
-
-    if (updatedSchedule && updatedSchedule.recognizedAmount >= updatedSchedule.totalAmount) {
-      await db
-        .update(revenueSchedule)
-        .set({ status: "completed", updatedAt: new Date() })
-        .where(eq(revenueSchedule.id, schedule.id));
-    }
-  }
-
-  return { processed, skipped };
+  return processDueRevenueRecognition();
 }
 
 export async function processBookkeepingMaintenance(): Promise<{

@@ -5,9 +5,18 @@ import { eq, and, isNull, gte, lte, asc, sql, type SQL } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import type { Statement } from "@/lib/reports/statement-export";
-import { aggregateByDateRange, type Dimension } from "@/lib/reports/gl-query";
+import { aggregateAsAt, aggregateByDateRange, type Dimension } from "@/lib/reports/gl-query";
 
 const DEFAULT_ENTRIES_PER_ACCOUNT = 50;
+
+/** The day before an ISO date (YYYY-MM-DD). */
+function dayBefore(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+const BALANCE_SHEET_TYPES = ["asset", "liability", "equity"] as const;
 
 export async function GET(request: Request) {
   try {
@@ -65,6 +74,17 @@ export async function GET(request: Request) {
       dimensionClause
     );
 
+    // Opening balances: balance-sheet accounts carry their balance into the
+    // range (everything posted before startDate), so the running balance ends
+    // on the same figure as the balance sheet. Income and expense accounts
+    // start the range at zero.
+    const openingAggregates = await aggregateAsAt(
+      ctx.organizationId,
+      dayBefore(startDate),
+      { accountTypes: [...BALANCE_SHEET_TYPES], ...(dimension ? { dimension, dimensionValue } : {}) }
+    );
+    const openingByAccount = new Map(openingAggregates.map((a) => [a.accountId, a]));
+
     // Single-account mode: return paginated entries for one account
     if (accountId) {
       const rows = await db
@@ -87,7 +107,7 @@ export async function GET(request: Request) {
 
       // Compute running balances starting from offset
       // If offset > 0, we need the balance up to that point
-      let runningBalance = 0;
+      let runningBalance = openingByAccount.get(accountId)?.balance ?? 0;
       if (offset > 0) {
         const priorRows = await db
           .select({
@@ -142,6 +162,21 @@ export async function GET(request: Request) {
       totalDebit: a.debit,
       totalCredit: a.credit,
     }));
+    // Balance-sheet accounts with a balance but no activity in the range still
+    // belong on the ledger (e.g. drilling into one from the balance sheet).
+    const active = new Set(summaries.map((s) => s.accountId));
+    for (const o of openingAggregates) {
+      if (active.has(o.accountId) || o.balance === 0) continue;
+      summaries.push({
+        accountId: o.accountId,
+        accountName: o.name,
+        accountCode: o.code,
+        accountType: o.type,
+        totalDebit: 0,
+        totalCredit: 0,
+      });
+    }
+    summaries.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
 
     // Then fetch first N entries per account using a single query with row numbers
     const entriesRows = await db
@@ -181,7 +216,8 @@ export async function GET(request: Request) {
     const accounts = summaries.map((s) => {
       const rows = entriesByAccount.get(s.accountId) || [];
       const isDebitNormal = s.accountType === "asset" || s.accountType === "expense";
-      let runningBalance = 0;
+      const openingBalance = openingByAccount.get(s.accountId)?.balance ?? 0;
+      let runningBalance = openingBalance;
       const entries = rows.map((row) => {
         runningBalance += isDebitNormal ? row.debit - row.credit : row.credit - row.debit;
         return {
@@ -208,7 +244,12 @@ export async function GET(request: Request) {
         totalEntries: countByAccount.get(s.accountId) || 0,
         totalDebit: s.totalDebit || 0,
         totalCredit: s.totalCredit || 0,
+        /** Movement in the range (natural sign), integer cents. */
         balance,
+        /** Balance carried in from before startDate (balance-sheet accounts only). */
+        openingBalance,
+        /** openingBalance + balance: the balance at endDate. */
+        closingBalance: openingBalance + balance,
       };
     });
 
@@ -227,12 +268,17 @@ export async function GET(request: Request) {
         currency,
         sections: accounts.map((acct) => ({
           label: `${acct.accountCode} ${acct.accountName}`,
-          rows: acct.entries.map((e) => ({
-            name: `${e.date} ${e.entryNumber}${e.description ? ` - ${e.description}` : ""}`,
-            amount: e.debit - e.credit,
-            depth: 1,
-          })),
-          subtotal: acct.balance,
+          rows: [
+            ...(acct.openingBalance !== 0
+              ? [{ name: `Opening balance at ${startDate}`, amount: acct.openingBalance, depth: 1, bold: true }]
+              : []),
+            ...acct.entries.map((e) => ({
+              name: `${e.date} ${e.entryNumber}${e.description ? ` - ${e.description}` : ""}`,
+              amount: e.debit - e.credit,
+              depth: 1,
+            })),
+          ],
+          subtotal: acct.closingBalance,
         })),
       };
 

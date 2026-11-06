@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -40,6 +40,8 @@ import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { methodName, conventionLabel } from "@/lib/fixed-assets/labels";
 
 interface DepEntry {
   id: string;
@@ -77,6 +79,10 @@ interface AssetDetail {
   residualValue: number;
   usefulLifeMonths: number;
   depreciationMethod: string;
+  convention?: string;
+  depreciationRateBp?: number | null;
+  totalExpectedUnits?: number | null;
+  unitOfMeasure?: string | null;
   accumulatedDepreciation: number;
   netBookValue: number;
   status: string;
@@ -105,16 +111,18 @@ const statusLabels: Record<string, string> = {
   in_progress: "Not in use yet",
 };
 
-const methodLabels: Record<string, string> = {
-  straight_line: "Straight Line",
-  declining_balance: "Declining Balance",
-};
 
 export default function FixedAssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [asset, setAsset] = useState<AssetDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/fixed-assets/${id}`;
+  const { data, loading } = useApi<{ asset?: AssetDetail }>(url);
+  // Construction costs are served by their own endpoint so the history is
+  // reliable regardless of what the asset GET embeds.
+  const { data: cwipData } = useApi<{ costs?: CwipCostEntry[] }>(`/api/v1/fixed-assets/${id}/cwip-cost`);
+  const cache = useApiCache();
+  const asset = data?.asset ?? null;
+  const cwipCosts = cwipData?.costs ?? [];
   const [disposeOpen, setDisposeOpen] = useState(false);
   const [disposeAmount, setDisposeAmount] = useState("");
   const [disposeDate, setDisposeDate] = useState(
@@ -140,7 +148,9 @@ export default function FixedAssetDetailPage() {
   const [costDate, setCostDate] = useState(today);
   const [costDescription, setCostDescription] = useState("");
   const [costSourceAccountId, setCostSourceAccountId] = useState("");
-  const [cwipCosts, setCwipCosts] = useState<CwipCostEntry[]>([]);
+  // Usage reading for units-of-production assets.
+  const [unitsOpen, setUnitsOpen] = useState(false);
+  const [unitsValue, setUnitsValue] = useState("");
   const [busy, setBusy] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -151,53 +161,22 @@ export default function FixedAssetDetailPage() {
 
   useDocumentTitle("Accounting \u00B7 Asset Details");
 
-  useEffect(() => {
+  async function handleDepreciate(unitsThisPeriod?: number) {
     if (!orgId) return;
-    fetch(`/api/v1/fixed-assets/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.asset) setAsset(data.asset);
-      })
-      .finally(() => setLoading(false));
-    // Construction costs are served by their own endpoint so the history is
-    // reliable regardless of what the asset GET embeds.
-    fetch(`/api/v1/fixed-assets/${id}/cwip-cost`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => (r.ok ? r.json() : { costs: [] }))
-      .then((data) => setCwipCosts(data.costs ?? []))
-      .catch(() => setCwipCosts([]));
-  }, [id, orgId]);
-
-  async function reloadAsset() {
-    if (!orgId) return;
-    const data = await fetch(`/api/v1/fixed-assets/${id}`, {
-      headers: { "x-organization-id": orgId },
-    }).then((r) => r.json());
-    if (data.asset) setAsset(data.asset);
-  }
-
-  async function reloadCwipCosts() {
-    if (!orgId) return;
-    const data = await fetch(`/api/v1/fixed-assets/${id}/cwip-cost`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => (r.ok ? r.json() : { costs: [] }))
-      .catch(() => ({ costs: [] }));
-    setCwipCosts(data.costs ?? []);
-  }
-
-  async function handleDepreciate() {
-    if (!orgId) return;
+    // Usage-based items need this period's reading first.
+    if (asset?.depreciationMethod === "units_of_production" && unitsThisPeriod === undefined) {
+      setUnitsValue("");
+      setUnitsOpen(true);
+      return;
+    }
     const res = await fetch(`/api/v1/fixed-assets/${id}/depreciate`, {
       method: "POST",
-      headers: { "x-organization-id": orgId },
+      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+      body: JSON.stringify(unitsThisPeriod !== undefined ? { unitsThisPeriod } : {}),
     });
     if (res.ok) {
-      toast.success("Value drop recorded for this period");
-      await reloadAsset();
+      setUnitsOpen(false);
+      toast.success("Value drop recorded for this month");
     } else {
       const data = await res.json();
       toast.error(typeof data.error === "string" ? data.error : "Couldn't record the value drop");
@@ -221,7 +200,6 @@ export default function FixedAssetDetailPage() {
       );
       if (res.ok) {
         toast.success("Last value drop undone");
-        await reloadAsset();
       } else {
         const data = await res.json();
         toast.error(
@@ -257,7 +235,6 @@ export default function FixedAssetDetailPage() {
         setRevalueAmount("");
         setRevalueNotes("");
         toast.success("New, higher value recorded");
-        await reloadAsset();
       } else {
         const data = await res.json();
         toast.error(
@@ -293,7 +270,6 @@ export default function FixedAssetDetailPage() {
         setImpairAmount("");
         setImpairNotes("");
         toast.success("Lower value recorded");
-        await reloadAsset();
       } else {
         const data = await res.json();
         toast.error(
@@ -322,8 +298,6 @@ export default function FixedAssetDetailPage() {
       if (res.ok) {
         setCapitalizeOpen(false);
         toast.success("Item brought into use");
-        await reloadAsset();
-        await reloadCwipCosts();
       } else {
         const data = await res.json();
         toast.error(
@@ -369,8 +343,6 @@ export default function FixedAssetDetailPage() {
         setCostDescription("");
         setCostSourceAccountId("");
         toast.success("Construction cost added");
-        await reloadAsset();
-        await reloadCwipCosts();
       } else {
         const data = await res.json();
         toast.error(
@@ -399,7 +371,7 @@ export default function FixedAssetDetailPage() {
 
     if (res.ok) {
       const data = await res.json();
-      setAsset((prev) => (prev ? { ...prev, ...data.asset, depreciationEntries: prev.depreciationEntries } : prev));
+      cache.update<{ asset?: AssetDetail }>(url, (prev) => (prev.asset ? { ...prev, asset: { ...prev.asset, ...data.asset, depreciationEntries: prev.asset.depreciationEntries } } : prev));
       setDisposeOpen(false);
       toast.success("Item recorded as sold or written off");
     } else {
@@ -488,9 +460,9 @@ export default function FixedAssetDetailPage() {
           <>
             <Button
               size="sm"
-              onClick={handleDepreciate}
+              onClick={() => handleDepreciate()}
               className="bg-brand-600 hover:bg-brand-700"
-              title="Record this period's drop in value as the item is used (spreads its cost over time)"
+              title="Record this month's drop in value (once a month; spreads its cost over time)"
             >
               <TrendingDown className="mr-2 size-4" />
               Record value drop
@@ -553,6 +525,44 @@ export default function FixedAssetDetailPage() {
       </PageHeader>
 
       {/* Record as sold or written off */}
+      {/* Units used this month (units-of-production) */}
+      <Dialog open={unitsOpen} onOpenChange={setUnitsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>How much was it used this month?</DialogTitle>
+            <DialogDescription>
+              This item loses value by use. Enter this month&apos;s usage
+              {asset.totalExpectedUnits ? ` out of ${asset.totalExpectedUnits.toLocaleString()} ${asset.unitOfMeasure || "units"} over its life` : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Used this month ({asset.unitOfMeasure || "units"})</Label>
+              <Input
+                type="number"
+                min={1}
+                value={unitsValue}
+                onChange={(e) => setUnitsValue(e.target.value)}
+                placeholder="e.g. 1200"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                const units = parseInt(unitsValue, 10);
+                if (!units || units <= 0) {
+                  toast.error("Enter how much it was used");
+                  return;
+                }
+                void handleDepreciate(units);
+              }}
+              className="w-full bg-brand-600 hover:bg-brand-700"
+            >
+              Record value drop
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={disposeOpen} onOpenChange={setDisposeOpen}>
         <DialogContent>
           <DialogHeader>
@@ -786,8 +796,17 @@ export default function FixedAssetDetailPage() {
           {statusLabels[asset.status] || asset.status}
         </Badge>
         <span className="text-xs sm:text-sm text-muted-foreground">
-          {methodLabels[asset.depreciationMethod] || asset.depreciationMethod} ·{" "}
-          value spread over {asset.usefulLifeMonths} months
+          {methodName(asset.depreciationMethod)}
+          {asset.depreciationMethod === "declining_balance" && (
+            <> at {asset.depreciationRateBp ? `${asset.depreciationRateBp / 100}%` : "double the straight-line rate"} a year</>
+          )}{" "}
+          ·{" "}
+          {asset.depreciationMethod === "units_of_production"
+            ? `spread over ${asset.totalExpectedUnits?.toLocaleString() ?? "?"} ${asset.unitOfMeasure || "units"} of use`
+            : `value spread over ${asset.usefulLifeMonths} months`}
+          {asset.convention && asset.depreciationMethod !== "units_of_production" && (
+            <> · {conventionLabel(asset.convention)}</>
+          )}
         </span>
       </div>
 

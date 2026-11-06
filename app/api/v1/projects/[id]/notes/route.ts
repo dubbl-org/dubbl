@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectNote } from "@/lib/db/schema";
+import { projectNote } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { error, handleError, notFound } from "@/lib/api/response";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -21,20 +20,12 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
 
     const notes = await db.query.projectNote.findMany({
       where: eq(projectNote.projectId, id),
       orderBy: desc(projectNote.createdAt),
-      with: { author: true },
+      with: { author: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     return NextResponse.json({ notes });
@@ -50,20 +41,11 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "contribute");
 
     const [created] = await db
       .insert(projectNote)
@@ -78,7 +60,7 @@ export async function POST(
     // Fetch with author
     const note = await db.query.projectNote.findFirst({
       where: eq(projectNote.id, created.id),
-      with: { author: true },
+      with: { author: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     return NextResponse.json({ note }, { status: 201 });
@@ -99,7 +81,6 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
     const noteId = url.searchParams.get("noteId");
@@ -108,21 +89,17 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    const { access } = await requireProjectAccess(ctx, id, "contribute");
 
     const existing = await db.query.projectNote.findFirst({
       where: and(eq(projectNote.id, noteId), eq(projectNote.projectId, id)),
     });
 
     if (!existing) return notFound("Note");
+    // Anyone who contributes can pin; only the author or a manager can edit the text.
+    if (parsed.content !== undefined && existing.authorId !== ctx.userId && access !== "manage") {
+      return error("You can only edit your own notes", 403);
+    }
 
     const [updated] = await db
       .update(projectNote)
@@ -132,7 +109,7 @@ export async function PATCH(
 
     const note = await db.query.projectNote.findFirst({
       where: eq(projectNote.id, updated.id),
-      with: { author: true },
+      with: { author: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     return NextResponse.json({ note });
@@ -148,21 +125,21 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
     const noteId = url.searchParams.get("noteId");
     if (!noteId) return NextResponse.json({ error: "noteId required" }, { status: 400 });
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
+    const { access } = await requireProjectAccess(ctx, id, "contribute");
 
-    if (!proj) return notFound("Project");
+    const existing = await db.query.projectNote.findFirst({
+      where: and(eq(projectNote.id, noteId), eq(projectNote.projectId, id)),
+      columns: { authorId: true },
+    });
+    if (!existing) return notFound("Note");
+    if (existing.authorId !== ctx.userId && access !== "manage") {
+      return error("You can only delete your own notes", 403);
+    }
 
     await db
       .delete(projectNote)

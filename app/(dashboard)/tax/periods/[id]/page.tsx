@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -34,6 +34,7 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface TaxReturnLine {
   id: string;
@@ -56,6 +57,7 @@ interface TaxPeriodDetail {
   filedReference: string | null;
   notes: string | null;
   lines: TaxReturnLine[];
+  dueDate?: string;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -89,7 +91,6 @@ function SettleSheet({
   period,
   open,
   onClose,
-  onSettled,
   orgId,
   defaultIsRefund,
   netAmount,
@@ -97,7 +98,6 @@ function SettleSheet({
   period: TaxPeriodDetail;
   open: boolean;
   onClose: () => void;
-  onSettled: () => void;
   orgId: string | null;
   defaultIsRefund: boolean;
   netAmount: number | null;
@@ -159,7 +159,6 @@ function SettleSheet({
           : "Payment to the tax office recorded"
       );
       onClose();
-      onSettled();
     } catch (err) {
       toast.error(
         err instanceof Error && err.message !== "Failed"
@@ -275,31 +274,15 @@ function SettleSheet({
 
 export default function TaxPeriodDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [period, setPeriod] = useState<TaxPeriodDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ taxPeriod?: TaxPeriodDetail; currency?: string }>(`/api/v1/tax-periods/${id}`);
+  const period = data?.taxPeriod ?? null;
+  const currency = data?.currency ?? "USD";
   const [settleOpen, setSettleOpen] = useState(false);
 
   const orgId =
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(period?.name);
-
-  const fetchPeriod = useCallback(async () => {
-    if (!orgId) return;
-    try {
-      const res = await fetch(`/api/v1/tax-periods/${id}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.taxPeriod) setPeriod(data.taxPeriod);
-    } finally {
-      setLoading(false);
-    }
-  }, [id, orgId]);
-
-  useEffect(() => {
-    fetchPeriod();
-  }, [fetchPeriod]);
 
   if (loading) {
     return (
@@ -330,8 +313,9 @@ export default function TaxPeriodDetailPage() {
   );
   const isFiled = period.status !== "open";
 
-  // Box 5 is the filed net: positive = owed to the authority, negative = refund.
-  const box5 = lines.find((l) => l.boxNumber === "5");
+  // Box 5 (VAT) or NET (BAS) is the filed net: positive = owed to the
+  // authority, negative = refund.
+  const box5 = lines.find((l) => l.boxNumber === "5" || l.boxNumber === "NET");
   const netAmount = box5 ? box5.amount : null;
   const defaultIsRefund = netAmount != null && netAmount < 0;
 
@@ -339,7 +323,7 @@ export default function TaxPeriodDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={period.name}
-        description={`${fmtDate(period.startDate)} – ${fmtDate(period.endDate)}`}
+        description={`${fmtDate(period.startDate)} to ${fmtDate(period.endDate)}${period.dueDate && period.status === "open" ? ` · Due ${fmtDate(period.dueDate)}` : ""}`}
       >
         <Button variant="outline" size="sm" asChild>
           <Link href="/tax/periods">
@@ -385,9 +369,9 @@ export default function TaxPeriodDetailPage() {
               {netAmount == null
                 ? "Record the payment to, or refund from, the tax office."
                 : netAmount < 0
-                  ? `You should receive ${formatMoney(Math.abs(netAmount), "USD")} back from the tax office.`
+                  ? `You should receive ${formatMoney(Math.abs(netAmount), currency)} back from the tax office.`
                   : netAmount > 0
-                    ? `You owe ${formatMoney(netAmount, "USD")} to the tax office.`
+                    ? `You owe ${formatMoney(netAmount, currency)} to the tax office.`
                     : "Nothing to pay or reclaim for this return."}
             </p>
           </div>
@@ -426,7 +410,7 @@ export default function TaxPeriodDetailPage() {
               <tbody>
                 {lines.map((line) => {
                   const isTotal =
-                    line.boxNumber === "3" || line.boxNumber === "5";
+                    line.boxNumber === "3" || line.boxNumber === "5" || line.boxNumber === "NET";
                   return (
                     <tr
                       key={line.id}
@@ -447,7 +431,7 @@ export default function TaxPeriodDetailPage() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                        {formatMoney(line.amount, "USD")}
+                        {formatMoney(line.amount, currency)}
                       </td>
                     </tr>
                   );
@@ -459,8 +443,8 @@ export default function TaxPeriodDetailPage() {
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CheckCircle2 className="size-3.5 text-brand-600" />
               {netAmount < 0
-                ? "Box 5 is negative — this is a refund due to you."
-                : "Box 5 is the net amount payable to the tax office."}
+                ? "The net amount is negative, so this is a refund due to you."
+                : "The net amount is what you pay to the tax office."}
             </p>
           )}
         </div>
@@ -490,7 +474,6 @@ export default function TaxPeriodDetailPage() {
         period={period}
         open={settleOpen}
         onClose={() => setSettleOpen(false)}
-        onSettled={fetchPeriod}
         orgId={orgId}
         defaultIsRefund={defaultIsRefund}
         netAmount={netAmount}

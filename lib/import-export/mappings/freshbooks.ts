@@ -31,6 +31,8 @@ export const freshbooksInvoices: ColumnAlias[] = [
   { targetField: "lineUnitPrice", aliases: ["Rate", "Unit Cost"] },
   { targetField: "lineAmount", aliases: ["Line Total", "Amount"] },
   { targetField: "lineAccountCode", aliases: ["Category", "Account"] },
+  { targetField: "contactEmail", aliases: ["Email", "Client Email"] },
+  { targetField: "currencyCode", aliases: ["Currency"] },
 ];
 
 export const freshbooksBills: ColumnAlias[] = [

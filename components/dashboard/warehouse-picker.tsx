@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown, Loader2, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi } from "@/lib/query/use-api";
 
 interface WarehouseOption {
   id: string;
@@ -35,31 +36,18 @@ interface WarehousePickerProps {
 
 export function WarehousePicker({ value, onChange, placeholder = "Select warehouse..." }: WarehousePickerProps) {
   const [open, setOpen] = useState(false);
-  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  // Warehouses load once the popover has been opened (or a warehouse is already selected, to show its name)
+  const [opened, setOpened] = useState(false);
+  const { data, loading: fetching } = useApi<{ data?: WarehouseOption[] }>(opened || value ? "/api/v1/warehouses" : null);
+  const warehouses = data?.data ?? [];
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
-  const fetchIdRef = useRef(0);
-  const [fetchCount, setFetchCount] = useState(0);
   const isSearching = search !== debouncedSearch;
-  const loading = fetchCount > 0 || isSearching;
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  const loading = fetching || isSearching;
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-    if (nextOpen && orgId) {
-      const id = ++fetchIdRef.current;
-      setFetchCount((c) => c + 1);
-      fetch("/api/v1/warehouses", {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (id === fetchIdRef.current && data.data) setWarehouses(data.data);
-        })
-        .catch(() => {})
-        .finally(() => setFetchCount((c) => c - 1));
-    }
+    if (nextOpen) setOpened(true);
   }
 
   const selected = warehouses.find((w) => w.id === value);

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { portalAccessToken, invoice } from "@/lib/db/schema";
-import { eq, and, isNull, desc, gt } from "drizzle-orm";
+import { eq, and, isNull, desc, gt, notInArray } from "drizzle-orm";
+import { PORTAL_HIDDEN_INVOICE_STATUSES } from "@/lib/api/portal-access";
 
 async function validateToken(token: string) {
   const access = await db.query.portalAccessToken.findFirst({
@@ -33,6 +34,7 @@ export async function GET(
         eq(invoice.organizationId, access.organizationId),
         eq(invoice.contactId, access.contactId),
         gt(invoice.amountPaid, 0),
+        notInArray(invoice.status, [...PORTAL_HIDDEN_INVOICE_STATUSES]),
         isNull(invoice.deletedAt)
       ),
       orderBy: desc(invoice.paidAt),

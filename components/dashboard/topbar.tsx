@@ -165,18 +165,18 @@ const LABELS: Record<string, string> = {
   "report-schedules": "Report Schedules",
   scheduled: "Scheduled",
   // Inventory
-  "stock-takes": "Stock Takes",
-  warehouses: "Warehouses",
-  valuation: "Valuation",
+  "stock-takes": "Stocktakes",
+  warehouses: "Locations",
+  valuation: "Stock value",
   categories: "Categories",
   transfers: "Transfers",
-  alerts: "Alerts",
+  alerts: "Reorder alerts",
   history: "History",
   suppliers: "Suppliers",
-  bom: "Bill of Materials",
-  assembly: "Assembly Orders",
+  bom: "Bills of materials",
+  assembly: "Assembly orders",
   variants: "Variants",
-  "landed-costs": "Landed Costs",
+  "landed-costs": "Landed costs",
   // CRM
   deals: "Deals",
   activities: "Activities",
@@ -238,6 +238,8 @@ const CTA_MAP: Record<string, { label: string; drawer: DrawerType } | null> = {
   "sales/recurring": { label: "New Recurring", drawer: "recurring" },
   "sales/customer-prepayments": { label: "New prepayment", drawer: "customerCredit" },
   "sales/revenue-schedules": { label: "New revenue schedule", drawer: "revenueSchedule" },
+  // Payments are recorded from an invoice ("Record payment"), not created here.
+  "sales/payments": null,
   purchases: { label: "New Bill", drawer: "bill" },
   "purchases/expenses": { label: "New Expense", drawer: "expense" },
   "purchases/orders": { label: "New PO", drawer: "purchaseOrder" },
@@ -350,7 +352,7 @@ function TopbarInner({ customAction }: { customAction: ReactNode }) {
   }, []);
 
   return (
-    <header className="shrink-0 border-b border-border/70">
+    <header data-shell="topbar" className="shrink-0 border-b border-border/70">
       <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-2">
           <Button

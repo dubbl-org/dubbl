@@ -7,6 +7,8 @@ import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
+import { clearOtherDefaults } from "@/lib/documents/templates";
+import { HEX_COLOR_RE } from "@/lib/documents/template-text";
 
 export async function GET(
   request: Request,
@@ -36,7 +38,7 @@ const updateSchema = z.object({
   headerHtml: z.string().nullable().optional(),
   footerHtml: z.string().nullable().optional(),
   logoUrl: z.string().nullable().optional(),
-  accentColor: z.string().optional(),
+  accentColor: z.string().regex(HEX_COLOR_RE, "Accent color must be a hex colour like #10b981").optional(),
   showTaxBreakdown: z.boolean().optional(),
   showPaymentTerms: z.boolean().optional(),
   notes: z.string().nullable().optional(),
@@ -67,17 +69,22 @@ export async function PATCH(
 
     if (!existing) return notFound("Template");
 
-    const [updated] = await db
-      .update(documentTemplate)
-      .set({ ...parsed, updatedAt: new Date() })
-      .where(
-        and(
-          eq(documentTemplate.id, id),
-          eq(documentTemplate.organizationId, ctx.organizationId),
-          notDeleted(documentTemplate.deletedAt)
+    // Turning Default Template on switches off the previous default of this type.
+    const updated = await db.transaction(async (tx) => {
+      await clearOtherDefaults(tx, ctx.organizationId, { id, type: existing.type, isDefault: parsed.isDefault });
+      const [row] = await tx
+        .update(documentTemplate)
+        .set({ ...parsed, updatedAt: new Date() })
+        .where(
+          and(
+            eq(documentTemplate.id, id),
+            eq(documentTemplate.organizationId, ctx.organizationId),
+            notDeleted(documentTemplate.deletedAt)
+          )
         )
-      )
-      .returning();
+        .returning();
+      return row;
+    });
 
     if (!updated) return notFound("Template");
 
@@ -100,7 +107,8 @@ export async function DELETE(
 
     const [deleted] = await db
       .update(documentTemplate)
-      .set(softDelete())
+      // Drop the default flag so restoring it from the trash can't leave two defaults.
+      .set({ ...softDelete(), isDefault: false })
       .where(
         and(
           eq(documentTemplate.id, id),

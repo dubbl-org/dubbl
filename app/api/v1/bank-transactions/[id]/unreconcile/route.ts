@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, payment, paymentAllocation, invoice, bill, journalEntry, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -50,6 +51,12 @@ export async function POST(
       ),
       with: { allocations: true },
     });
+
+    // Undoing voids what the line posted, so its period must still be open.
+    await assertNotLocked(ctx.organizationId, linkedPayment?.date ?? transaction.date, ctx);
+    if (linkedPayment && linkedPayment.date !== transaction.date) {
+      await assertNotLocked(ctx.organizationId, transaction.date, ctx);
+    }
 
     const { updated } = await db.transaction(async (tx) => {
         let linkedPaymentId: string | null = null;

@@ -1,27 +1,43 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { taxForm } from "@/lib/db/schema";
+import { organization } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { handleError, notFound } from "@/lib/api/response";
+import { requireRole } from "@/lib/api/require-role";
+import { handleError } from "@/lib/api/response";
+import { getTaxFormForOrg } from "@/lib/api/tax-form-builder";
+import { renderTaxFormPdf, taxFormTitle } from "@/lib/tax-forms/pdf";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getAuthContext(request);
+    const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:payroll");
     const { id } = await params;
-    const form = await db.query.taxForm.findFirst({ where: eq(taxForm.id, id) });
-    if (!form) return notFound("Tax form");
+    const form = await getTaxFormForOrg(ctx, id);
 
-    return NextResponse.json({
+    const org = await db.query.organization.findFirst({ where: eq(organization.id, ctx.organizationId) });
+    const address = [org?.addressStreet, org?.addressCity, org?.addressState, org?.addressPostalCode]
+      .filter(Boolean)
+      .join(", ");
+
+    const pdf = await renderTaxFormPdf({
       formType: form.formType,
       taxYear: form.taxYear,
       recipientName: form.recipientName,
       recipientTaxId: form.recipientTaxId,
-      formData: form.formData,
-      note: "PDF generation requires pdf-lib package. Form data returned as JSON.",
+      formData: form.formData ?? null,
+      employer: { name: org?.name ?? "", taxId: org?.taxId ?? null, address: address || null },
+    });
+
+    const safeName = form.recipientName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "recipient";
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${taxFormTitle(form.formType)}-${form.taxYear}-${safeName}.pdf"`,
+      },
     });
   } catch (err) {
     return handleError(err);

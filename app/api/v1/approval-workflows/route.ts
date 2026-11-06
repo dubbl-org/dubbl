@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { assertValidWorkflow } from "@/lib/approvals/workflows";
 
 const stepSchema = z.object({
   approverId: z.string().uuid(),
@@ -92,10 +93,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:bills");
+    requireRole(ctx, "manage:approvals");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertValidWorkflow(ctx.organizationId, parsed.entityType, parsed.conditions, parsed.steps);
 
     const [workflow] = await db
       .insert(approvalWorkflow)

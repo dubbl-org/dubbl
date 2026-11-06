@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -26,6 +26,8 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApis } from "@/lib/query/use-api";
+import { BankAccountSelect } from "@/components/dashboard/bank-account-select";
 
 interface BatchItem {
   id: string;
@@ -66,14 +68,14 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
 
 export default function PaymentBatchesPage() {
   const router = useRouter();
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: batchData, loading } = useApi<{ data?: Batch[] }>("/api/v1/payment-batches");
+  const batches = batchData?.data || [];
   const [showDialog, setShowDialog] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Dialog form
   const [batchName, setBatchName] = useState("");
-  const [bills, setBills] = useState<BillOption[]>([]);
+  const [batchBankAccountId, setBatchBankAccountId] = useState("");
   const [selectedBills, setSelectedBills] = useState<
     { billId: string; contactId: string; amount: string; currencyCode: string }[]
   >([]);
@@ -85,33 +87,16 @@ export default function PaymentBatchesPage() {
 
   useDocumentTitle("Accounting \u00B7 Payment Batches");
 
-  const fetchBatches = useCallback(() => {
-    if (!orgId) return;
-    fetch("/api/v1/payment-batches", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setBatches(data.data || []))
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  const fetchBills = useCallback(() => {
-    if (!orgId) return;
-    fetch("/api/v1/bills?status=received&limit=100", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setBills(data.data || []));
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchBatches();
-  }, [fetchBatches]);
+  // Every bill that still has money owing: approved, part paid or overdue.
+  const { data: billData } = useApis<{ data?: BillOption[] }>(
+    showDialog ? ["received", "partial", "overdue"].map((s) => `/api/v1/bills?status=${s}&limit=100`) : []
+  );
+  const bills = billData.flatMap((d) => d?.data ?? []);
 
   function openCreateDialog() {
     setBatchName("");
+    setBatchBankAccountId("");
     setSelectedBills([]);
-    fetchBills();
     setShowDialog(true);
   }
 
@@ -152,6 +137,7 @@ export default function PaymentBatchesPage() {
         },
         body: JSON.stringify({
           name: batchName,
+          bankAccountId: batchBankAccountId || null,
           items: selectedBills.map((b) => ({
             billId: b.billId,
             contactId: b.contactId,
@@ -169,7 +155,6 @@ export default function PaymentBatchesPage() {
 
       toast.success("Payment batch created");
       setShowDialog(false);
-      fetchBatches();
     } catch {
       toast.error("Failed to create batch");
     } finally {
@@ -284,6 +269,13 @@ export default function PaymentBatchesPage() {
                 placeholder="e.g., March Supplier Payments"
               />
             </div>
+
+            <BankAccountSelect
+              value={batchBankAccountId}
+              onChange={setBatchBankAccountId}
+              labelClassName="text-xs"
+              hint="Every payment in the batch leaves this account."
+            />
 
             <div className="space-y-2">
               <Label className="text-xs">

@@ -31,6 +31,10 @@ export const xeroInvoices: ColumnAlias[] = [
   { targetField: "lineUnitPrice", aliases: ["Unit Amount", "UnitAmount", "*UnitAmount"] },
   { targetField: "lineAmount", aliases: ["Line Amount", "LineAmount"] },
   { targetField: "lineAccountCode", aliases: ["Account Code", "AccountCode", "*AccountCode"] },
+  { targetField: "contactEmail", aliases: ["EmailAddress", "Email Address", "Email"] },
+  { targetField: "reference", aliases: ["Reference", "*Reference"] },
+  { targetField: "currencyCode", aliases: ["Currency", "CurrencyCode", "Currency Code"] },
+  { targetField: "lineTaxRate", aliases: ["Tax Type", "TaxType", "*TaxType", "Tax Rate"] },
 ];
 
 export const xeroBills: ColumnAlias[] = [

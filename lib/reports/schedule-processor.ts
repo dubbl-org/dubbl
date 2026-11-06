@@ -1,46 +1,102 @@
 import { db } from "@/lib/db";
-import { reportSchedule, emailConfig } from "@/lib/db/schema";
+import { reportSchedule, emailConfig, organization } from "@/lib/db/schema";
 import { eq, and, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { sendEmail } from "@/lib/email/smtp-client";
+import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { documentsFromAddress } from "@/lib/email/senders";
+import { checkEmailLimit } from "@/lib/api/check-limit";
+import { notifySafely, notifySystemAlert } from "@/lib/notifications/events";
+import { runSavedReportConfig } from "@/lib/reports/saved-report-data";
+import { savedReportFile } from "@/lib/reports/saved-report-file";
+import type { ReportConfig } from "@/lib/db/schema/reports";
+
+import { calculateNextRunAt } from "@/lib/reports/schedule-timing";
+import { getCurrencyMinorUnits } from "@/lib/currency/iso4217";
 
 /**
- * Calculate the next run time based on frequency.
+ * How scheduled report emails go out for an org: through its own mail server
+ * when it's set up and verified, otherwise through dubbl's shared sender (like
+ * invoice emails and payment reminders), with replies going to the
+ * organization's contact email.
  */
-function calculateNextRunAt(
-  frequency: "daily" | "weekly" | "monthly" | "quarterly",
-  from: Date
-): Date {
-  const next = new Date(from);
-  switch (frequency) {
-    case "daily":
-      next.setDate(next.getDate() + 1);
-      break;
-    case "weekly":
-      next.setDate(next.getDate() + 7);
-      break;
-    case "monthly":
-      next.setMonth(next.getMonth() + 1);
-      break;
-    case "quarterly":
-      next.setMonth(next.getMonth() + 3);
-      break;
-  }
-  return next;
+async function reportMailer(orgId: string) {
+  const [config, org] = await Promise.all([
+    db.query.emailConfig.findFirst({ where: eq(emailConfig.organizationId, orgId) }),
+    db.query.organization.findFirst({ where: eq(organization.id, orgId), columns: { contactEmail: true } }),
+  ]);
+  const smtp = config?.isVerified ? config : null;
+  return async (message: {
+    to: string;
+    subject: string;
+    html: string;
+    attachments: { filename: string; content: Buffer }[];
+  }) => {
+    if (smtp) {
+      await sendEmail(smtp, message);
+      return;
+    }
+    await checkEmailLimit(orgId);
+    await sendPlatformEmail({
+      ...message,
+      from: documentsFromAddress(),
+      replyTo: org?.contactEmail || undefined,
+    });
+  };
+}
+
+function escapeHtml(v: string): string {
+  return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**
- * Generate simple CSV content from a saved report config.
+ * Build the scheduled report: run the saved report for real, attach it in the
+ * schedule's format (PDF, CSV or XLSX) and put a short preview of the first
+ * rows in the email body.
  */
-function generateReportCsv(
+async function buildScheduledReport(
+  organizationId: string,
   reportName: string,
-  config: { columns: string[]; dataSource: string }
-): string {
-  const header = config.columns.join(",");
-  const meta = `# Report: ${reportName}`;
-  const source = `# Data source: ${config.dataSource}`;
-  const generated = `# Generated: ${new Date().toISOString()}`;
-  return [meta, source, generated, "", header].join("\n");
+  config: ReportConfig,
+  format: "pdf" | "csv" | "xlsx",
+  intro: string,
+  now: Date
+) {
+  const result = await runSavedReportConfig(organizationId, config);
+  const file = await savedReportFile(reportName, result, format);
+  const preview = result.rows.slice(0, 10);
+  const fmt = (row: (typeof preview)[number], col: string, v: unknown) => {
+    if (v === null || v === undefined) return "";
+    if (result.moneyColumns.includes(col)) {
+      // Money is in minor units of the row's currency (else the org base currency).
+      const n = Number(v);
+      const code = typeof row.currencyCode === "string" && row.currencyCode ? row.currencyCode : result.currency;
+      const digits = getCurrencyMinorUnits(code);
+      return Number.isFinite(n) ? (n / Math.pow(10, digits)).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }) : "";
+    }
+    return String(v instanceof Date ? v.toISOString().slice(0, 10) : v);
+  };
+  const th = result.columns
+    .map((c) => `<th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ddd;">${escapeHtml(c)}</th>`)
+    .join("");
+  const trs = preview
+    .map(
+      (r) =>
+        `<tr>${result.columns
+          .map((c) => `<td style="padding:4px 8px;border-bottom:1px solid #f0f0f0;">${escapeHtml(fmt(r, c, r[c]))}</td>`)
+          .join("")}</tr>`
+    )
+    .join("");
+  const html = [
+    `<h2>${escapeHtml(reportName)}</h2>`,
+    `<p>${escapeHtml(intro)} The full report (${result.rows.length} rows) is attached as ${format.toUpperCase()}.</p>`,
+    preview.length > 0
+      ? `<table style="border-collapse:collapse;font-size:13px;"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`
+      : "<p>The report has no rows for this run.</p>",
+    result.rows.length > preview.length ? `<p style="color:#888;">Showing the first ${preview.length} rows.</p>` : "",
+    `<p style="color:#888;font-size:12px;">Generated at ${now.toISOString()}</p>`,
+  ].join("\n");
+  return { html, attachments: [{ filename: file.filename, content: file.content }] };
 }
 
 /**
@@ -71,35 +127,26 @@ export async function processReportSchedules() {
       }
 
       // Fetch the org's SMTP config
-      const smtp = await db.query.emailConfig.findFirst({
-        where: eq(emailConfig.organizationId, schedule.organizationId),
-      });
+      const send = await reportMailer(schedule.organizationId);
 
-      if (!smtp) {
-        throw new Error(
-          `No email config found for organization ${schedule.organizationId}`
-        );
-      }
-
-      // Generate report content
-      const csvContent = generateReportCsv(
+      // Run the report and attach it in the chosen format
+      const email = await buildScheduledReport(
+        schedule.organizationId,
         schedule.savedReport.name,
-        schedule.savedReport.config
+        schedule.savedReport.config,
+        schedule.format,
+        `Your ${schedule.frequency} report is ready.`,
+        now
       );
 
       // Send to each recipient
       const recipients = schedule.recipients ?? [];
       for (const recipient of recipients) {
-        await sendEmail(smtp, {
+        await send({
           to: recipient,
-          subject: `Scheduled Report: ${schedule.savedReport.name}`,
-          html: [
-            `<h2>Scheduled Report: ${schedule.savedReport.name}</h2>`,
-            `<p>Your scheduled ${schedule.frequency} report is ready.</p>`,
-            `<p>Format: ${schedule.format}</p>`,
-            `<pre>${csvContent}</pre>`,
-            `<p style="color:#888;font-size:12px;">Generated at ${now.toISOString()}</p>`,
-          ].join("\n"),
+          subject: `Scheduled report: ${schedule.savedReport.name}`,
+          html: email.html,
+          attachments: email.attachments,
         });
       }
 
@@ -127,6 +174,13 @@ export async function processReportSchedules() {
           updatedAt: now,
         })
         .where(eq(reportSchedule.id, schedule.id));
+
+      await notifySafely(
+        notifySystemAlert(schedule.organizationId, {
+          title: `Scheduled report "${schedule.savedReport?.name ?? "Report"}" wasn't sent`,
+          body: err instanceof Error ? err.message : undefined,
+        })
+      );
 
       failed++;
     }
@@ -158,31 +212,24 @@ export async function processReportScheduleById(scheduleId: string, organization
     throw new Error("Saved report not found");
   }
 
-  const smtp = await db.query.emailConfig.findFirst({
-    where: eq(emailConfig.organizationId, schedule.organizationId),
-  });
+  const send = await reportMailer(schedule.organizationId);
 
-  if (!smtp) {
-    throw new Error("No email config found for organization");
-  }
-
-  const csvContent = generateReportCsv(
+  const email = await buildScheduledReport(
+    schedule.organizationId,
     schedule.savedReport.name,
-    schedule.savedReport.config
+    schedule.savedReport.config,
+    schedule.format,
+    `Here is your ${schedule.frequency} report, sent now on request.`,
+    now
   );
 
   const recipients = schedule.recipients ?? [];
   for (const recipient of recipients) {
-    await sendEmail(smtp, {
+    await send({
       to: recipient,
-      subject: `Scheduled Report: ${schedule.savedReport.name}`,
-      html: [
-        `<h2>Scheduled Report: ${schedule.savedReport.name}</h2>`,
-        `<p>Your ${schedule.frequency} report has been triggered manually.</p>`,
-        `<p>Format: ${schedule.format}</p>`,
-        `<pre>${csvContent}</pre>`,
-        `<p style="color:#888;font-size:12px;">Generated at ${now.toISOString()}</p>`,
-      ].join("\n"),
+      subject: `Scheduled report: ${schedule.savedReport.name}`,
+      html: email.html,
+      attachments: email.attachments,
     });
   }
 

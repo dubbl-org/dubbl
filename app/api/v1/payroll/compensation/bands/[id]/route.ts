@@ -7,13 +7,16 @@ import { handleError, ok, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
+// Salaries are annual amounts in cents
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   level: z.string().nullable().optional(),
-  minSalary: z.number().int().optional(),
-  midSalary: z.number().int().optional(),
-  maxSalary: z.number().int().optional(),
+  minSalary: z.number().int().min(0).optional(),
+  midSalary: z.number().int().min(0).optional(),
+  maxSalary: z.number().int().min(0).optional(),
+  currency: currencyCodeSchema.optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -58,7 +61,8 @@ export async function PATCH(
       .set(parsed)
       .where(and(
         eq(compensationBand.id, id),
-        eq(compensationBand.organizationId, ctx.organizationId)
+        eq(compensationBand.organizationId, ctx.organizationId),
+        notDeleted(compensationBand.deletedAt)
       ))
       .returning();
 

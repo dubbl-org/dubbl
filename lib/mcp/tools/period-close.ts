@@ -11,7 +11,7 @@ import type { AuthContext } from "@/lib/api/auth-context";
 export function registerPeriodCloseTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "close_fiscal_year",
-    "Close a fiscal year. Creates year-end closing journal entries (DR revenue, CR expense, net to Retained Earnings 3200), sets isClosed=true, and creates a period lock. Validates no draft entries exist first.",
+    "Close a fiscal year. Creates year-end closing journal entries (DR revenue, CR expense, net to the Retained Earnings account), sets isClosed=true, and locks past dates through the year end (an existing later lock date is kept, never moved back). Validates no draft entries exist first.",
     {
       fiscalYearId: z
         .string()
@@ -19,7 +19,7 @@ export function registerPeriodCloseTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:period_lock");
+        requireRole(ctx, "manage:period-lock");
 
         const result = await closeFiscalYear(
           params.fiscalYearId,
@@ -49,7 +49,7 @@ export function registerPeriodCloseTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:period_lock");
+        requireRole(ctx, "manage:period-lock");
 
         const result = await reopenFiscalYear(
           params.fiscalYearId,

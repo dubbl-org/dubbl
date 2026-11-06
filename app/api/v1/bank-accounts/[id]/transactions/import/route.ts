@@ -92,10 +92,10 @@ export async function POST(
       content,
       format: body.format,
       mapping: body.mapping,
-    });
+    }, ctx.userId);
 
     await logAudit({ ctx, action: "import", entityType: "bank_transaction", entityId: ctx.organizationId,
-      changes: { count: result.imported, importId: result.importId, format: result.format, fileName: body.fileName, duplicates: result.duplicateCount }, request });
+      changes: { count: result.imported, importId: result.importId, format: result.format, fileName: body.fileName, duplicates: result.duplicateCount, rules: result.rules }, request });
 
     return NextResponse.json({ import: result }, { status: 201 });
   } catch (err) {

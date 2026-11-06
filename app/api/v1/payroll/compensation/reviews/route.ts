@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { compensationReview } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { compensationReview, compensationReviewEntry } from "@/lib/db/schema";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, created } from "@/lib/api/response";
@@ -10,8 +10,8 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  effectiveDate: z.string().min(1),
-  totalBudget: z.number().int().optional(),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  totalBudget: z.number().int().min(0).optional(), // cents
 });
 
 export async function GET(request: Request) {
@@ -27,7 +27,22 @@ export async function GET(request: Request) {
       orderBy: desc(compensationReview.createdAt),
     });
 
-    return ok({ data: reviews });
+    // Entry counts per review, for the "Total Entries" stat and the list rows
+    const counts = reviews.length
+      ? await db
+          .select({
+            reviewId: compensationReviewEntry.reviewId,
+            count: sql<number>`count(*)`.mapWith(Number),
+          })
+          .from(compensationReviewEntry)
+          .where(inArray(compensationReviewEntry.reviewId, reviews.map((r) => r.id)))
+          .groupBy(compensationReviewEntry.reviewId)
+      : [];
+    const countByReview = new Map(counts.map((c) => [c.reviewId, c.count]));
+
+    return ok({
+      data: reviews.map((r) => ({ ...r, _count: { entries: countByReview.get(r.id) ?? 0 } })),
+    });
   } catch (err) {
     return handleError(err);
   }

@@ -1,14 +1,12 @@
-import { db } from "@/lib/db";
-import { assemblyOrder } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { notDeleted } from "@/lib/db/soft-delete";
-import { ok, notFound, handleError } from "@/lib/api/response";
+import { ok, handleError } from "@/lib/api/response";
+import { cancelAssemblyOrder, startAssemblyOrder, updateAssemblyOrder } from "@/lib/api/assembly";
 import { z } from "zod";
 
+// Building goes through POST /complete, which posts the journal entry.
 const updateSchema = z.object({
-  status: z.enum(["draft", "in_progress", "completed", "cancelled"]).optional(),
+  status: z.enum(["in_progress", "cancelled"]).optional(),
   quantity: z.number().int().min(1).optional(),
   notes: z.string().nullable().optional(),
 });
@@ -21,24 +19,15 @@ export async function PATCH(
     const { id } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:inventory");
+    const { status, ...fields } = updateSchema.parse(await request.json());
 
-    const body = await request.json();
-    const parsed = updateSchema.parse(body);
-
-    const [updated] = await db
-      .update(assemblyOrder)
-      .set({ ...parsed, updatedAt: new Date() })
-      .where(
-        and(
-          eq(assemblyOrder.id, id),
-          eq(assemblyOrder.organizationId, ctx.organizationId),
-          notDeleted(assemblyOrder.deletedAt)
-        )
-      )
-      .returning();
-
-    if (!updated) return notFound("Assembly order");
-    return ok({ order: updated });
+    let order = null;
+    if (fields.quantity !== undefined || fields.notes !== undefined) {
+      order = await updateAssemblyOrder(ctx, id, fields);
+    }
+    if (status === "in_progress") order = await startAssemblyOrder(ctx, id);
+    if (status === "cancelled") order = await cancelAssemblyOrder(ctx, id);
+    return ok({ order });
   } catch (err) {
     return handleError(err);
   }

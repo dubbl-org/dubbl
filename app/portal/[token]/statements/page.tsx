@@ -24,10 +24,10 @@ interface StatementLine {
   status: string;
 }
 
-function formatMoney(cents: number) {
+function formatMoney(cents: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
   }).format(cents / 100);
 }
 
@@ -35,6 +35,7 @@ export default function PortalStatementsPage() {
   const { token } = useParams<{ token: string }>();
   const [lines, setLines] = useState<StatementLine[]>([]);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
+  const [currency, setCurrency] = useState("USD");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function PortalStatementsPage() {
       .then(data => {
         setLines(data.lines || []);
         setTotalOutstanding(data.totalOutstanding || 0);
+        if (data.currencyCode) setCurrency(data.currencyCode);
       })
       .finally(() => setLoading(false));
   }, [token]);
@@ -68,7 +70,7 @@ export default function PortalStatementsPage() {
           </a>
           <div className="text-right">
             <p className="text-sm text-gray-500">Total Outstanding</p>
-            <p className="text-xl font-bold">{formatMoney(totalOutstanding)}</p>
+            <p className="text-xl font-bold">{formatMoney(totalOutstanding, currency)}</p>
           </div>
         </div>
       </div>
@@ -97,9 +99,9 @@ export default function PortalStatementsPage() {
                 <TableRow key={i}>
                   <TableCell className="text-sm">{line.date}</TableCell>
                   <TableCell className="text-sm">{line.description}</TableCell>
-                  <TableCell className="text-sm text-right">{formatMoney(line.amount)}</TableCell>
-                  <TableCell className="text-sm text-right">{formatMoney(line.paid)}</TableCell>
-                  <TableCell className="text-sm text-right font-medium">{formatMoney(line.balance)}</TableCell>
+                  <TableCell className="text-sm text-right">{formatMoney(line.amount, currency)}</TableCell>
+                  <TableCell className="text-sm text-right">{formatMoney(line.paid, currency)}</TableCell>
+                  <TableCell className="text-sm text-right font-medium">{formatMoney(line.balance, currency)}</TableCell>
                   <TableCell>
                     <Badge variant={line.status === "paid" ? "default" : "secondary"} className="text-xs">
                       {line.status}

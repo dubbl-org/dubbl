@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { CalendarDays, Plus, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -21,7 +21,9 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface LeaveRequest {
   id: string;
@@ -34,7 +36,7 @@ interface LeaveRequest {
   policy: { name: string; leaveType: string } | null;
 }
 
-type StatusFilter = "all" | "pending" | "approved" | "rejected";
+type StatusFilter = "all" | "pending" | "approved" | "rejected" | "cancelled";
 
 const statusColors: Record<string, string> = {
   pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
@@ -44,40 +46,25 @@ const statusColors: Record<string, string> = {
 };
 
 export default function LeavePage() {
-  const router = useRouter();
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
-  const [policies, setPolicies] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ employeeId: "", policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
   useDocumentTitle("Payroll · Leave");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchData = useCallback(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    Promise.all([
-      fetch("/api/v1/payroll/leave/requests", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/employees", { headers }).then((r) => r.json()),
-      fetch("/api/v1/payroll/leave/policies", { headers }).then((r) => r.json()),
-    ])
-      .then(([reqData, empData, polData]) => {
-        if (reqData.data) setRequests(reqData.data);
-        if (empData.data) setEmployees(empData.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
-        if (polData.data) setPolicies(polData.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const { data: reqData, loading: reqLoading } = useApi<{ data?: LeaveRequest[] }>("/api/v1/payroll/leave/requests");
+  const { data: empData, loading: empLoading } = useApi<{ data?: { id: string; name: string }[] }>("/api/v1/payroll/employees");
+  const { data: polData, loading: polLoading } = useApi<{ data?: { id: string; name: string }[] }>("/api/v1/payroll/leave/policies");
+  const loading = reqLoading || empLoading || polLoading;
+  const requests = reqData?.data ?? [];
+  const employees = useMemo(() => (empData?.data ?? []).map((e) => ({ id: e.id, name: e.name })), [empData]);
+  const policies = useMemo(() => (polData?.data ?? []).map((p) => ({ id: p.id, name: p.name })), [polData]);
 
   const filtered = requests.filter((r) => {
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
@@ -103,7 +90,10 @@ export default function LeavePage() {
       if (res.ok) {
         toast.success("Leave request created");
         setDialogOpen(false);
-        fetchData();
+        setForm({ employeeId: "", policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to create request");
       }
     } catch {
       toast.error("Failed to create request");
@@ -118,7 +108,11 @@ export default function LeavePage() {
       method: "POST",
       headers: { "x-organization-id": orgId },
     });
-    if (res.ok) { toast.success("Request approved"); fetchData(); }
+    if (res.ok) { toast.success("Request approved"); }
+    else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
+    }
   }
 
   async function handleReject(id: string) {
@@ -128,7 +122,35 @@ export default function LeavePage() {
       headers: { "Content-Type": "application/json", "x-organization-id": orgId },
       body: JSON.stringify({}),
     });
-    if (res.ok) { toast.success("Request rejected"); fetchData(); }
+    if (res.ok) { toast.success("Request rejected"); }
+    else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
+    }
+  }
+
+  async function handleCancel(r: LeaveRequest) {
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Cancel this leave?",
+      description: r.status === "approved"
+        ? `${r.employee?.name || "The employee"} gets the ${r.hours}h back on their leave balance.`
+        : "The request is withdrawn and won't need a decision.",
+      confirmLabel: "Cancel leave",
+      cancelLabel: "Keep it",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/v1/payroll/leave/requests/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    if (res.ok) { toast.success("Leave cancelled"); }
+    else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to cancel");
+    }
   }
 
   if (loading) return <BrandLoader />;
@@ -145,6 +167,7 @@ export default function LeavePage() {
               <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="approved">Approved</TabsTrigger>
               <TabsTrigger value="rejected">Rejected</TabsTrigger>
+              <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button size="sm" className="h-8 text-xs gap-1.5 bg-brand-600 hover:bg-brand-700" onClick={() => setDialogOpen(true)}>
@@ -169,13 +192,13 @@ export default function LeavePage() {
         <div className="rounded-xl border bg-card divide-y">
           {filtered.map((r) => (
             <div key={r.id} className="flex items-center justify-between gap-4 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{r.employee?.name || "Unknown"}</p>
+              <Link href={`/payroll/leave/${r.id}`} className="group min-w-0 flex-1">
+                <p className="text-sm font-medium truncate group-hover:underline underline-offset-2">{r.employee?.name || "Unknown"}</p>
                 <p className="text-xs text-muted-foreground">
                   {r.policy?.name || "-"} · {r.startDate} to {r.endDate} · {r.hours}h
                 </p>
                 {r.reason && <p className="text-xs text-muted-foreground mt-0.5">{r.reason}</p>}
-              </div>
+              </Link>
               <div className="flex items-center gap-2 shrink-0">
                 <Badge variant="outline" className={cn("text-[10px]", statusColors[r.status] || "")}>
                   {r.status}
@@ -185,6 +208,9 @@ export default function LeavePage() {
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(r.id)}>Approve</Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => handleReject(r.id)}>Reject</Button>
                   </>
+                )}
+                {(r.status === "pending" || r.status === "approved") && (
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleCancel(r)}>Cancel</Button>
                 )}
               </div>
             </div>
@@ -235,6 +261,7 @@ export default function LeavePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </ContentReveal>
   );
 }

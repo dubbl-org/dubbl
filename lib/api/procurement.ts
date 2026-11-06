@@ -236,6 +236,106 @@ export function derivePurchaseOrderStatusAfterReceipt(
 }
 
 /**
+ * A purchase order's status from BOTH what has arrived and what has been
+ * billed (quantities x100), so receiving and billing never overwrite each
+ * other's progress:
+ *   • every line fully billed            → "closed" (Fully billed)
+ *   • every line fully received          → "received" (All items in)
+ *   • anything received or billed so far → "partial"
+ *   • nothing yet                        → "sent"
+ */
+export function derivePurchaseOrderStatus(
+  lines: { quantity: number; quantityReceived: number; quantityBilled: number }[]
+): "sent" | "partial" | "received" | "closed" {
+  const open = lines.filter((l) => l.quantity > 0);
+  if (open.length === 0) return "sent";
+  if (open.every((l) => l.quantityBilled >= l.quantity)) return "closed";
+  if (open.every((l) => l.quantityReceived >= l.quantity)) return "received";
+  if (open.some((l) => l.quantityReceived > 0 || l.quantityBilled > 0)) return "partial";
+  return "sent";
+}
+
+/**
+ * Match a bill's lines to a purchase order's lines for billing, without a
+ * stored link: a line tied to a goods receipt goes to that receipt's PO line,
+ * then the same stock item, then the same description. Each PO line takes at
+ * most what's still unbilled. Returns PO line id → quantity (x100) billed now.
+ */
+export function allocateBillToPurchaseOrderLines(
+  billLines: { quantity: number; description: string; inventoryItemId?: string | null; purchaseOrderLineId?: string | null }[],
+  poLines: { id: string; quantity: number; quantityBilled: number; description: string; inventoryItemId?: string | null }[]
+): Map<string, number> {
+  const remaining = new Map(poLines.map((l) => [l.id, Math.max(0, l.quantity - l.quantityBilled)]));
+  const out = new Map<string, number>();
+  const take = (poLineId: string, qty: number) => {
+    const room = remaining.get(poLineId) ?? 0;
+    const q = Math.min(room, qty);
+    if (q <= 0) return qty;
+    remaining.set(poLineId, room - q);
+    out.set(poLineId, (out.get(poLineId) ?? 0) + q);
+    return qty - q;
+  };
+  for (const bl of billLines) {
+    let left = bl.quantity;
+    if (left <= 0) continue;
+    if (bl.purchaseOrderLineId && remaining.has(bl.purchaseOrderLineId)) left = take(bl.purchaseOrderLineId, left);
+    const desc = bl.description.trim().toLowerCase();
+    for (const pl of poLines) {
+      if (left <= 0) break;
+      if (bl.inventoryItemId && pl.inventoryItemId === bl.inventoryItemId) left = take(pl.id, left);
+    }
+    for (const pl of poLines) {
+      if (left <= 0) break;
+      if (pl.description.trim().toLowerCase() === desc) left = take(pl.id, left);
+    }
+  }
+  return out;
+}
+
+/**
+ * Entries a void still has to reverse: each candidate once (a bill's GRNI entry
+ * can be found both by its sourceId and through goods receipt lines), minus
+ * any entry that already has a reversal.
+ */
+export function entriesStillToReverse<T extends { id: string }>(
+  candidates: T[],
+  alreadyReversedIds: (string | null)[]
+): T[] {
+  const reversed = new Set(alreadyReversedIds.filter((v): v is string => !!v));
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const c of candidates) {
+    if (seen.has(c.id) || reversed.has(c.id)) continue;
+    seen.add(c.id);
+    out.push(c);
+  }
+  return out;
+}
+
+/**
+ * Billed quantity left on each PO line after releasing what one bill counted
+ * (all x100). Several records for the same line add up, and a line never drops
+ * below zero. Returns PO line id → new quantityBilled, only for lines touched.
+ */
+export function releaseBilledQuantities(
+  poLines: { id: string; quantityBilled: number }[],
+  counted: { purchaseOrderLineId: string; quantity: number }[]
+): Map<string, number> {
+  const release = new Map<string, number>();
+  for (const c of counted) {
+    if (c.quantity <= 0) continue;
+    release.set(c.purchaseOrderLineId, (release.get(c.purchaseOrderLineId) ?? 0) + c.quantity);
+  }
+  const out = new Map<string, number>();
+  for (const l of poLines) {
+    const r = release.get(l.id);
+    if (r === undefined) continue;
+    out.set(l.id, Math.max(0, l.quantityBilled - r));
+  }
+  return out;
+}
+
+/**
  * One slice of a converted PO line's billed quantity, split by whether it can be
  * MATCHED to a goods receipt (stock already brought on-hand → bill clears GRNI)
  * or is UNMATCHED (not yet received → bill capitalises fresh stock).

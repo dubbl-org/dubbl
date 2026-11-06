@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMilestone } from "@/lib/db/schema";
+import { projectMilestone } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { error, handleError, notFound } from "@/lib/api/response";
+import { syncProjectBilling } from "@/lib/api/project-billing";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -24,20 +24,11 @@ export async function PATCH(
   try {
     const { id, milestoneId } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     const existing = await db.query.projectMilestone.findFirst({
       where: and(
@@ -51,6 +42,8 @@ export async function PATCH(
     const setData: Record<string, unknown> = { ...parsed };
     if (parsed.status === "completed" && existing.status !== "completed") {
       setData.completedAt = new Date();
+    } else if (parsed.status && parsed.status !== "completed") {
+      setData.completedAt = null;
     }
 
     const [updated] = await db
@@ -72,17 +65,17 @@ export async function DELETE(
   try {
     const { id, milestoneId } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
+    await requireProjectAccess(ctx, id, "manage");
+    await syncProjectBilling(db, ctx.organizationId, [id]);
+
+    const existing = await db.query.projectMilestone.findFirst({
+      where: and(eq(projectMilestone.id, milestoneId), eq(projectMilestone.projectId, id)),
     });
-
-    if (!proj) return notFound("Project");
+    if (!existing) return notFound("Milestone");
+    if (existing.invoicedAmountCents > 0) {
+      return error("This milestone is on an invoice. Void or delete the invoice first.", 409);
+    }
 
     await db
       .delete(projectMilestone)

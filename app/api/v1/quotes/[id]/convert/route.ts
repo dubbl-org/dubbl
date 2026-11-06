@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveTermsDays } from "@/lib/payment-terms";
 import { db } from "@/lib/db";
 import { quote, invoice, invoiceLine, contact, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -9,6 +10,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
+import { emitInvoiceCreated } from "@/lib/webhooks/events";
 
 // Progress / milestone billing.
 //
@@ -253,10 +255,10 @@ export async function POST(
         where: eq(organization.id, ctx.organizationId),
         columns: { defaultPaymentTerms: true },
       });
-      termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+      termsDays = resolveTermsDays(null, org?.defaultPaymentTerms);
     }
     const dueDateObj = new Date(today + "T00:00:00Z");
-    dueDateObj.setUTCDate(dueDateObj.getUTCDate() + (termsDays || 30));
+    dueDateObj.setUTCDate(dueDateObj.getUTCDate() + (termsDays ?? 30));
     const dueDate = dueDateObj.toISOString().split("T")[0];
 
     const newBilledTotal = alreadyBilled + invoiceTotal;
@@ -319,6 +321,7 @@ export async function POST(
 
       return { createdInvoice, updatedQuote };
     });
+    emitInvoiceCreated(ctx.organizationId, [result.createdInvoice.id]);
 
     logAudit({
       ctx,

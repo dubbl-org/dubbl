@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -22,6 +23,7 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { checkMultiCurrency } from "@/lib/api/check-limit";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { wrapTool } from "@/lib/mcp/errors";
 import {
   getNextEntryNumber,
@@ -32,9 +34,11 @@ import {
   ensureControlAccount,
   ensureAccountByCode,
   createCogsJournalEntry,
+  routeOutputTax,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { emitInvoicePaid } from "@/lib/webhooks/events";
 
 /**
  * MCP tools for cash sales (sales receipts) and customer credits
@@ -124,6 +128,30 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
   );
 
   server.tool(
+    "get_sales_receipt_pdf",
+    "Get the receipt PDF for a sales receipt (cash sale), styled with the organization's default Receipt document template. Returns the API download URL (add the x-organization-id header) and the receipt number.",
+    {
+      salesReceiptId: z.string().describe("The UUID of the sales receipt"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const found = await db.query.salesReceipt.findFirst({
+          where: and(
+            eq(salesReceipt.id, params.salesReceiptId),
+            eq(salesReceipt.organizationId, ctx.organizationId),
+            notDeleted(salesReceipt.deletedAt)
+          ),
+        });
+        if (!found) throw new Error("Sales receipt not found");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        return {
+          downloadUrl: `${baseUrl}/api/v1/sales-receipts/${params.salesReceiptId}/pdf?format=pdf`,
+          receiptNumber: found.receiptNumber,
+        };
+      })
+  );
+
+  server.tool(
     "create_sales_receipt",
     "Create a draft cash-sale sales receipt with line items. Unit prices and quantities are decimal numbers (e.g. 12.50, 1.5). discountPercent is basis points (1000 = 10%). Lines are tax-EXCLUSIVE — tax is added on top. The system calculates totals and assigns a receipt number. Use post_sales_receipt to post it to the ledger. Provide bankAccountId or depositAccountId for where the cash lands (can also be set at post time).",
     {
@@ -181,6 +209,15 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:invoices");
+        await assertLineStockRefs(ctx.organizationId, params.lines);
+
+        // The customer's defaults: income account and tax rate for lines that
+        // don't set one, and no tax if they're marked "Don't charge tax".
+        params.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+          params.lines,
+          await loadContactDefaults(ctx.organizationId, params.contactId),
+          "sales"
+        ));
         await assertNotLocked(ctx.organizationId, params.date);
 
         const currencyCode = await resolveDocumentCurrency(
@@ -371,22 +408,15 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
               });
             }
           }
-          if (found.taxTotal > 0) {
-            const outputVat = await ensureControlAccount(
-              ctx.organizationId,
-              "outputVat",
-              base,
-              tx
-            );
-            if (outputVat) {
-              lines.push({
-                journalEntryId: entry.id,
-                accountId: outputVat.id,
-                description: `Tax on ${found.receiptNumber}`,
-                debitAmount: 0,
-                creditAmount: found.taxTotal,
-              });
-            }
+          // US sales tax to Sales Tax Payable (2230), VAT / GST to Output VAT (2200).
+          for (const t of await routeOutputTax(ctx.organizationId, found.lines, found.taxTotal, tx)) {
+            lines.push({
+              journalEntryId: entry.id,
+              accountId: t.accountId,
+              description: `Tax on ${found.receiptNumber}`,
+              debitAmount: 0,
+              creditAmount: t.amount,
+            });
           }
           const cashTotal = lines.reduce((s, l) => s + (l.creditAmount ?? 0), 0);
           if (cashTotal > 0) {
@@ -750,7 +780,7 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "apply_customer_credit",
-    "Apply an open customer credit to an invoice. Moves the Customer Deposits 2410 liability onto the invoice: posts DR Customer Deposits 2410 / CR Accounts Receivable 1200, records the allocation, decrements the credit's remaining balance, and updates the invoice's paid/due amounts and status. amount is in integer cents and must not exceed the credit's remaining balance or the invoice's amount due. Credit and invoice currencies must match.",
+    "Apply an open customer credit to an invoice. Moves the Customer Deposits 2410 liability onto the invoice: posts DR Customer Deposits 2410 / CR Accounts Receivable 1200, records the allocation, decrements the credit's remaining balance, and updates the invoice's paid/due amounts and status. amount is in integer cents and must not exceed the credit's remaining balance or the invoice's amount due. The invoice must belong to the same customer as the credit, and the currencies must match.",
     {
       customerCreditId: z.string().describe("The UUID of the customer credit"),
       invoiceId: z.string().describe("The UUID of the invoice to apply it to"),
@@ -786,7 +816,9 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
           ),
         });
         if (!foundInvoice) throw new Error("Invoice not found");
-        if (foundInvoice.status === "draft" || foundInvoice.status === "void")
+        if (foundInvoice.contactId !== found.contactId)
+          throw new Error("The credit and the invoice must belong to the same customer");
+        if (["draft", "void", "pending_approval", "rejected"].includes(foundInvoice.status))
           throw new Error("Cannot apply a credit to this invoice status");
         if (foundInvoice.currencyCode !== found.currencyCode)
           throw new Error("Credit currency must match the invoice currency");
@@ -877,6 +909,8 @@ export function registerSalesReceiptTools(server: McpServer, ctx: AuthContext) {
               createdBy: ctx.userId,
             })
             .returning();
+          // A credit applied, not money received: only invoice.paid can apply
+          emitInvoicePaid(ctx.organizationId, [foundInvoice.id]);
 
           await tx.insert(paymentAllocation).values([
             {

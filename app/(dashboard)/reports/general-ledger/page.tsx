@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { BookOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -11,6 +11,7 @@ import { ExportButton } from "@/components/dashboard/export-button";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { BackToReports, ReportHelp } from "../_components";
 
 interface LedgerEntry {
@@ -32,7 +33,12 @@ interface AccountLedger {
   totalEntries: number;
   totalDebit: number;
   totalCredit: number;
+  /** Movement in the range. */
   balance: number;
+  /** Balance carried in from before the start date (balance-sheet accounts). */
+  openingBalance?: number;
+  /** Balance at the end date. */
+  closingBalance?: number;
 }
 
 const entryColumns: Column<LedgerEntry>[] = [
@@ -70,13 +76,29 @@ function readDrilldown() {
 export default function GeneralLedgerPage() {
   const now = new Date();
   const [drilldown] = useState(readDrilldown);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(drilldown.startDate || `${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(drilldown.endDate || now.toISOString().slice(0, 10));
   const [dimension] = useState<Record<string, string>>(() => drilldown.dimension || {});
-  const [accounts, setAccounts] = useState<AccountLedger[]>([]);
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const url = `/api/v1/reports/general-ledger?${new URLSearchParams({ startDate, endDate, ...dimension })}`;
+  const { data, loading } = useApi<{ accounts?: AccountLedger[] }>(url, { keepPrevious: true });
+  const baseAccounts = data?.accounts;
+  // Entries fetched with "Load more", kept until the report itself changes.
+  const [more, setMore] = useState<{ base: AccountLedger[] | undefined; entries: Record<string, LedgerEntry[]> }>({ base: undefined, entries: {} });
+  const accounts = useMemo(() => {
+    const extra = more.base === baseAccounts ? more.entries : {};
+    return (baseAccounts || []).map((a) => (extra[a.accountId] ? { ...a, entries: [...a.entries, ...extra[a.accountId]] } : a));
+  }, [baseAccounts, more]);
+  // Every account starts open whenever a new report loads.
+  const [expanded, setExpanded] = useState<{ url: string; ids: Set<string> } | null>(null);
+  const expandedAccounts = useMemo(
+    () => (expanded?.url === url ? expanded.ids : new Set(accounts.map((a) => a.accountId))),
+    [expanded, url, accounts]
+  );
+  const setExpandedAccounts = useCallback(
+    (update: Set<string> | ((prev: Set<string>) => Set<string>)) =>
+      setExpanded({ url, ids: typeof update === "function" ? update(expandedAccounts) : update }),
+    [url, expandedAccounts]
+  );
   const [loadingMore, setLoadingMore] = useState<Set<string>>(new Set());
 
   const toggleAccount = useCallback((accountId: string) => {
@@ -86,7 +108,7 @@ export default function GeneralLedgerPage() {
       else next.add(accountId);
       return next;
     });
-  }, []);
+  }, [setExpandedAccounts]);
 
   const loadMoreEntries = useCallback(async (accountId: string) => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -103,11 +125,10 @@ export default function GeneralLedgerPage() {
       });
       const data = await res.json();
       if (data.entries?.length) {
-        setAccounts((prev) => prev.map((a) =>
-          a.accountId === accountId
-            ? { ...a, entries: [...a.entries, ...data.entries] }
-            : a
-        ));
+        setMore((prev) => {
+          const entries = prev.base === baseAccounts ? prev.entries : {};
+          return { base: baseAccounts, entries: { ...entries, [accountId]: [...(entries[accountId] || []), ...data.entries] } };
+        });
       }
     } finally {
       setLoadingMore((prev) => {
@@ -116,43 +137,18 @@ export default function GeneralLedgerPage() {
         return next;
       });
     }
-  }, [accounts, startDate, endDate, dimension]);
+  }, [accounts, baseAccounts, startDate, endDate, dimension]);
 
+  // When arriving from a drill-down link (#accountId), scroll to it once the report shows.
+  const focus = drilldown.focusAccountId;
   useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate, ...dimension });
-    fetch(`/api/v1/reports/general-ledger?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          const accts = data.accounts || [];
-          setAccounts(accts);
-          setExpandedAccounts(new Set(accts.map((a: AccountLedger) => a.accountId)));
-          // When arriving from a drill-down link (#accountId), scroll to it.
-          const focus = drilldown.focusAccountId;
-          if (focus) {
-            requestAnimationFrame(() => {
-              document.getElementById(`gl-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-            });
-          }
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate, dimension, drilldown.focusAccountId]);
+    if (loading || !focus) return;
+    requestAnimationFrame(() => {
+      document.getElementById(`gl-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [loading, focus]);
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -166,6 +162,7 @@ export default function GeneralLedgerPage() {
           <ExportButton
             data={accounts.flatMap((a) => a.entries.map((e) => ({ account: a.accountCode, accountName: a.accountName, ...e })))}
             columns={["account", "accountName", "date", "entryNumber", "description", "reference", "debit", "credit", "runningBalance"]}
+            moneyColumns={["debit", "credit", "runningBalance"]}
             filename="general-ledger"
           />
         )}
@@ -194,9 +191,7 @@ export default function GeneralLedgerPage() {
         </div>
       )}
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : accounts.length === 0 ? (
+      {accounts.length === 0 ? (
         <ContentReveal>
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
             <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
@@ -246,7 +241,10 @@ export default function GeneralLedgerPage() {
                     <div className="flex items-center gap-3 sm:gap-6 font-mono tabular-nums text-xs sm:text-sm shrink-0">
                       <span className="hidden sm:inline text-muted-foreground">In: {formatMoney(acct.totalDebit)}</span>
                       <span className="hidden sm:inline text-muted-foreground">Out: {formatMoney(acct.totalCredit)}</span>
-                      <span className="font-semibold">Balance: {formatMoney(acct.balance)}</span>
+                      {acct.openingBalance ? (
+                        <span className="hidden md:inline text-muted-foreground">Opening: {formatMoney(acct.openingBalance)}</span>
+                      ) : null}
+                      <span className="font-semibold">Balance: {formatMoney(acct.closingBalance ?? acct.balance)}</span>
                       <span className={cn("text-xs px-1.5 py-0.5 rounded-full", acct.totalEntries > 0 ? "bg-muted text-muted-foreground" : "text-muted-foreground/50")}>
                         {acct.totalEntries}
                       </span>
@@ -254,7 +252,13 @@ export default function GeneralLedgerPage() {
                   </button>
                   {isExpanded && (
                     <div>
-                      <DataTable columns={entryColumns} data={acct.entries} emptyMessage="No entries." />
+                      {acct.openingBalance ? (
+                        <div className="flex items-center justify-between border-b bg-muted/10 px-4 py-2 text-sm">
+                          <span className="text-muted-foreground">Opening balance on {new Date(startDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                          <span className="font-mono tabular-nums">{formatMoney(acct.openingBalance)}</span>
+                        </div>
+                      ) : null}
+                      <DataTable columns={entryColumns} data={acct.entries} emptyMessage="No entries in this date range." />
                       {hasMore && (
                         <div className="border-t px-4 py-2 text-center">
                           <Button variant="ghost" size="sm" className="text-xs h-7" disabled={isLoading} onClick={() => loadMoreEntries(acct.accountId)}>

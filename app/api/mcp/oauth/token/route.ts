@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { MemberRole } from "@/lib/plans";
+import { isRevokedForUser } from "@/lib/api/app-auth";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -140,10 +141,16 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     ),
   });
 
-  const role: MemberRole = (mem?.role as MemberRole) ?? "member";
-
   // Delete the used code
   await db.delete(mcpOAuthCode).where(eq(mcpOAuthCode.id, authCode.id));
+
+  if (!mem) {
+    return corsJson(
+      { error: "invalid_grant", error_description: "Not a member of this organization" },
+      { status: 400 }
+    );
+  }
+  const role = mem.role as MemberRole;
 
   // Generate tokens
   const accessTokenRaw = generateToken("mcp_at_");
@@ -240,7 +247,20 @@ async function handleRefreshToken(params: Record<string, string>) {
     ),
   });
 
-  const role: MemberRole = (mem?.role as MemberRole) ?? "member";
+  // A removed member (or one who signed out everywhere) can't refresh
+  if (
+    !mem ||
+    (await isRevokedForUser(oldAccessToken.userId, oldAccessToken.createdAt))
+  ) {
+    await db
+      .delete(mcpAccessToken)
+      .where(eq(mcpAccessToken.id, oldAccessToken.id));
+    return corsJson(
+      { error: "invalid_grant", error_description: "Access has been revoked" },
+      { status: 400 }
+    );
+  }
+  const role = mem.role as MemberRole;
 
   // Generate new tokens
   const newAccessTokenRaw = generateToken("mcp_at_");
@@ -269,6 +289,11 @@ async function handleRefreshToken(params: Record<string, string>) {
     accessTokenId: newAccessToken.id,
     expiresAt: refreshTokenExpiry,
   });
+
+  // The new pair replaces the old one, so a connection stays one row
+  await db
+    .delete(mcpAccessToken)
+    .where(eq(mcpAccessToken.id, oldAccessToken.id));
 
   return corsJson({
     access_token: newAccessTokenRaw,

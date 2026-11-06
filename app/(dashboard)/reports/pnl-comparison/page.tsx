@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowUpDown } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -19,6 +19,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { useApi } from "@/lib/query/use-api";
 
 interface PeriodData {
   label: string;
@@ -34,38 +35,14 @@ interface PeriodData {
 }
 
 export default function PnlComparisonPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [compareType, setCompareType] = useState("monthly");
   const [periodsCount, setPeriodsCount] = useState(6);
-  const [periods, setPeriods] = useState<PeriodData[]>([]);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({
-      compare: compareType,
-      periods: String(periodsCount),
-    });
-    fetch(`/api/v1/reports/pnl-comparison?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setPeriods(data.periods || []);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [compareType, periodsCount]);
+  const params = new URLSearchParams({
+    compare: compareType,
+    periods: String(periodsCount),
+  });
+  const { data, loading } = useApi<{ periods?: PeriodData[] }>(`/api/v1/reports/pnl-comparison?${params}`, { keepPrevious: true });
+  const periods = data?.periods || [];
 
   const chartData = periods.map((p) => ({
     name: p.label,
@@ -74,7 +51,7 @@ export default function PnlComparisonPage() {
     netIncome: p.netIncome / 100,
   }));
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -110,9 +87,7 @@ export default function PnlComparisonPage() {
         </Select>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : periods.length === 0 ? (
+      {periods.length === 0 ? (
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No data available for the selected periods.</p>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bill, contact } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, notInArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, notInArray, inArray, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       .select({
         contactId: bill.contactId,
         contactName: contact.name,
-        totalSpend: sql<number>`COALESCE(SUM(${bill.total}), 0)`,
+        totalSpend: sql<number>`COALESCE(SUM(${bill.total}), 0)`.as("total_spend"),
         billCount: sql<number>`COUNT(*)`,
         avgBillAmount: sql<number>`COALESCE(AVG(${bill.total}), 0)`,
         lastBillDate: sql<string>`MAX(${bill.issueDate})`,
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
             isNull(bill.deletedAt),
             gte(bill.issueDate, startDate),
             lte(bill.issueDate, endDate),
-            sql`${bill.contactId} = ANY(${top5Ids})`
+            inArray(bill.contactId, top5Ids)
           )
         )
         .groupBy(bill.contactId, sql`TO_CHAR(${bill.issueDate}::date, 'YYYY-MM')`)

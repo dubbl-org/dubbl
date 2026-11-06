@@ -6,6 +6,7 @@ import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { SAVED_REPORT_SOURCE_KEYS } from "@/lib/reports/saved-report-data";
 
 export async function GET(
   request: Request,
@@ -34,7 +35,7 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   config: z.object({
-    dataSource: z.enum(["invoices", "expenses", "transactions", "payroll", "inventory", "contacts"]),
+    dataSource: z.enum(SAVED_REPORT_SOURCE_KEYS),
     filters: z.array(z.object({ field: z.string(), operator: z.string(), value: z.string() })),
     groupBy: z.array(z.string()),
     columns: z.array(z.string()),

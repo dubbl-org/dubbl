@@ -373,11 +373,18 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Brand loader - two overlapping circles */
+/* Brand loader - two overlapping circles. It stays invisible for the first 400ms, so
+   quick loads (cached data, a warm route) never flash a spinner. */
 .brand-loader {
   position: relative;
   width: 44px;
   height: 28px;
+  animation: brand-loader-in 200ms ease-out 400ms both;
+}
+
+@keyframes brand-loader-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .brand-loader-circle {
@@ -798,6 +805,59 @@
   --sidebar-ring: #525252;
 }
 
+/* Desktop app (Electron). The preload marks <html data-desktop="mac|windows|linux">.
+   On macOS (vibrancy) and Windows 11 (Mica) the window itself is translucent, so the
+   shell clears its backdrop and the rail and panel sit on the system material while
+   the page sheet stays solid. */
+html:is([data-desktop="mac"], [data-desktop="windows"]):has([data-shell="root"]),
+html:is([data-desktop="mac"], [data-desktop="windows"]) body:has([data-shell="root"]),
+html:is([data-desktop="mac"], [data-desktop="windows"]) [data-shell="root"] {
+  background-color: transparent;
+}
+
+/* The rail and panel read as one sidebar on the material: no tint, no divider. */
+html:is([data-desktop="mac"], [data-desktop="windows"]) [data-shell="rail"] {
+  border-right-color: transparent;
+  background-color: transparent;
+}
+
+/* macOS: the traffic lights share one title row with the org switcher and the page's
+   topbar (main.ts centres them on it). The rail drops its logo, which the dock already
+   shows, and starts level with the panel's nav below that row. Full screen hides the
+   lights, so the shell keeps its normal layout there. */
+html[data-desktop="mac"] [data-shell="rail-logo"] {
+  display: none;
+}
+html[data-desktop="mac"]:not([data-fullscreen]) [data-shell="rail"] {
+  padding-top: 66px;
+}
+html[data-desktop="mac"]:not([data-fullscreen]) [data-shell="rail"] > nav {
+  margin-top: 0;
+}
+html[data-desktop="mac"]:not([data-fullscreen]) [data-shell="panel"] {
+  padding-top: 8px;
+}
+html[data-desktop="mac"]:not([data-fullscreen]) [data-shell="panel-header"] {
+  height: 58px;
+  padding-left: 18px;
+}
+
+/* The chrome around the page drags the window; anything you can click stays clickable.
+   Chromium applies regions in document order, so the topbar inside the (no-drag) sheet
+   drags again and its buttons, and portalled menus, cut themselves back out. */
+html[data-desktop] :is([data-shell="rail"], [data-shell="panel-header"], [data-shell="main-col"], [data-shell="topbar"]) {
+  -webkit-app-region: drag;
+}
+html[data-desktop] :is(
+    [data-shell="main"],
+    [data-shell] :is(a, button, input, select, textarea, [role="button"], [role="combobox"]),
+    [data-radix-popper-content-wrapper],
+    [role="dialog"],
+    [role="menu"],
+    [data-sonner-toaster]
+  ) {
+  -webkit-app-region: no-drag;
+}
 /* Fix Fumadocs TOC bleeding on mobile */
 @media (max-width: 1279.98px) {
   div#nd-toc {

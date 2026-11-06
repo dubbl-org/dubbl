@@ -17,14 +17,17 @@ import {
 } from "@/components/ui/select";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { useAccountContext } from "../layout";
 
 export default function AccountSettingsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const { account, setAccount, refetch } = useAccountContext();
+  const { account, setAccount } = useAccountContext();
   const [saving, setSaving] = useState(false);
+  const { data: taxRatesData } = useApi<{ taxRates?: { id: string; name: string; rate: number }[] }>("/api/v1/tax-rates");
+  const taxRates = taxRatesData?.taxRates ?? [];
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -40,6 +43,8 @@ export default function AccountSettingsPage() {
     if (!orgId) return;
     setSaving(true);
     const fd = new FormData(e.currentTarget);
+    const taxRateValue = fd.get("defaultTaxRateId");
+    const defaultTaxRateId = taxRateValue && taxRateValue !== "none" ? taxRateValue : null;
     // Built-in categories have their name/code locked (the inputs are disabled,
     // so they aren't in the form data) — only send the editable usage fields.
     const payload = isSystem
@@ -47,6 +52,7 @@ export default function AccountSettingsPage() {
           subType: fd.get("subType") || null,
           description: fd.get("description") || null,
           isActive: fd.get("isActive") === "true",
+          defaultTaxRateId,
         }
       : {
           code: fd.get("code"),
@@ -54,6 +60,7 @@ export default function AccountSettingsPage() {
           subType: fd.get("subType") || null,
           description: fd.get("description") || null,
           isActive: fd.get("isActive") === "true",
+          defaultTaxRateId,
         };
     try {
       const res = await fetch(`/api/v1/accounts/${id}`, {
@@ -65,8 +72,6 @@ export default function AccountSettingsPage() {
       const data = await res.json();
       setAccount(() => data.account ? { ...account, ...data.account } : account);
       toast.success("Account updated");
-      window.dispatchEvent(new CustomEvent("accounts-changed"));
-      refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     } finally {
@@ -92,8 +97,6 @@ export default function AccountSettingsPage() {
         });
         if (res.ok) {
           toast.success(willDeactivate ? "Account deactivated" : "Account reactivated");
-          window.dispatchEvent(new CustomEvent("accounts-changed"));
-          refetch();
         } else {
           toast.error("Failed to update account");
         }
@@ -115,7 +118,6 @@ export default function AccountSettingsPage() {
         });
         if (res.ok) {
           toast.success("Account deleted");
-          window.dispatchEvent(new CustomEvent("accounts-changed"));
           router.push("/accounting/accounts");
         } else {
           const data = await res.json();
@@ -134,7 +136,7 @@ export default function AccountSettingsPage() {
             <p className="text-[12px] leading-relaxed text-muted-foreground">
               This is a <span className="font-medium text-foreground">built-in category</span>. It&apos;s kept up to date for you,
               so its name and code can&apos;t be changed and it can&apos;t be deleted. You can still hide it (mark it inactive) or
-              set its tax defaults. Need something different? <span className="font-medium text-foreground">Create your own category</span> instead.
+              set its default tax rate. Need something different? <span className="font-medium text-foreground">Create your own category</span> instead.
             </p>
           </div>
         )}
@@ -186,6 +188,33 @@ export default function AccountSettingsPage() {
               <SelectContent>
                 <SelectItem value="true">Active</SelectItem>
                 <SelectItem value="false">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Tax default */}
+        <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+          <div className="shrink-0">
+            <p className="text-sm font-medium">Default tax rate</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">Filled in for you when you categorize a bank transaction to this account.</p>
+          </div>
+          <div className="min-w-0 max-w-xs">
+            <Select
+              name="defaultTaxRateId"
+              defaultValue={account.defaultTaxRateId || "none"}
+              key={`${account.defaultTaxRateId ?? "none"}-${taxRates.length}`}
+            >
+              <SelectTrigger><SelectValue placeholder="Select tax rate" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {taxRates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} ({(t.rate / 100).toFixed(1)}%)
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

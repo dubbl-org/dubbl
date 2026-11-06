@@ -7,6 +7,8 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { clearOtherDefaults } from "@/lib/documents/templates";
+import { HEX_COLOR_RE } from "@/lib/documents/template-text";
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +19,8 @@ export async function GET(request: Request) {
         eq(documentTemplate.organizationId, ctx.organizationId),
         notDeleted(documentTemplate.deletedAt)
       ),
-      orderBy: documentTemplate.createdAt,
+      // Grouped by type (invoice first, in the enum's order), then oldest first.
+      orderBy: [documentTemplate.type, documentTemplate.createdAt],
     });
 
     return ok({ templates });
@@ -32,7 +35,7 @@ const createSchema = z.object({
   headerHtml: z.string().nullable().optional(),
   footerHtml: z.string().nullable().optional(),
   logoUrl: z.string().nullable().optional(),
-  accentColor: z.string().optional(),
+  accentColor: z.string().regex(HEX_COLOR_RE, "Accent color must be a hex colour like #10b981").optional(),
   showTaxBreakdown: z.boolean().optional(),
   showPaymentTerms: z.boolean().optional(),
   notes: z.string().nullable().optional(),
@@ -49,31 +52,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    // If this is set as default, unset other defaults of same type
-    if (parsed.isDefault) {
-      const existing = await db.query.documentTemplate.findMany({
-        where: and(
-          eq(documentTemplate.organizationId, ctx.organizationId),
-          eq(documentTemplate.type, parsed.type),
-          eq(documentTemplate.isDefault, true),
-          notDeleted(documentTemplate.deletedAt)
-        ),
-      });
-      for (const t of existing) {
-        await db
-          .update(documentTemplate)
-          .set({ isDefault: false })
-          .where(eq(documentTemplate.id, t.id));
-      }
-    }
-
-    const [template] = await db
-      .insert(documentTemplate)
-      .values({
-        organizationId: ctx.organizationId,
-        ...parsed,
-      })
-      .returning();
+    // Exactly one default per type: a new default takes over from the old one.
+    const template = await db.transaction(async (tx) => {
+      await clearOtherDefaults(tx, ctx.organizationId, parsed);
+      const [row] = await tx
+        .insert(documentTemplate)
+        .values({
+          organizationId: ctx.organizationId,
+          ...parsed,
+        })
+        .returning();
+      return row;
+    });
 
     logAudit({ ctx, action: "create", entityType: "document_template", entityId: template.id, request });
 

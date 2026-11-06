@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, Wallet } from "lucide-react";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { formatMoney, minorUnitsToDecimal, decimalToMinorUnits } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import Link from "next/link";
 
 interface CustomerCreditDetail {
@@ -69,55 +70,41 @@ interface InvoiceOption {
   amountDue: number;
   status: string;
   currencyCode: string;
+  contactId: string;
   contact: { name: string } | null;
 }
 
 export default function CustomerPrepaymentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [cc, setCc] = useState<CustomerCreditDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/customer-credits/${id}`;
+  const { data, loading } = useApi<{ customerCredit?: CustomerCreditDetail }>(url);
+  const cc = data?.customerCredit ?? null;
+  const cache = useApiCache();
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyInvoiceId, setApplyInvoiceId] = useState("");
   const [applyAmount, setApplyAmount] = useState("");
-  const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(cc?.contact?.name);
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/customer-credits/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.customerCredit) setCc(data.customerCredit);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
   // Fetch outstanding invoices (same customer + currency) for the apply dialog.
-  useEffect(() => {
-    if (!orgId || !applyOpen || !cc) return;
-    fetch(`/api/v1/invoices?limit=100`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setInvoices(
-            (data.data as InvoiceOption[]).filter(
-              (inv) =>
-                ["sent", "partial", "overdue"].includes(inv.status) &&
-                inv.amountDue > 0 &&
-                inv.currencyCode === cc.currencyCode
-            )
-          );
-        }
-      });
-  }, [orgId, applyOpen, cc]);
+  const { data: invoiceData } = useApi<{ data?: InvoiceOption[] }>(
+    applyOpen && cc?.contactId ? `/api/v1/invoices?contactId=${cc.contactId}&limit=100` : null
+  );
+  const currencyCode = cc?.currencyCode;
+  const invoices = useMemo(
+    () =>
+      (invoiceData?.data ?? []).filter(
+        (inv) =>
+          ["sent", "partial", "overdue"].includes(inv.status) &&
+          inv.contactId === cc?.contactId &&
+          inv.amountDue > 0 &&
+          inv.currencyCode === currencyCode
+      ),
+    [invoiceData, currencyCode, cc?.contactId]
+  );
 
   async function handleApply() {
     if (!orgId || !applyInvoiceId || !cc) return;
@@ -138,7 +125,7 @@ export default function CustomerPrepaymentDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setCc((prev) => prev ? { ...prev, ...data.customerCredit } : prev);
+        cache.update<{ customerCredit?: CustomerCreditDetail }>(url, (d) => d.customerCredit ? { ...d, customerCredit: { ...d.customerCredit, ...data.customerCredit } } : d);
         setApplyOpen(false);
         setApplyInvoiceId("");
         setApplyAmount("");
@@ -189,7 +176,7 @@ export default function CustomerPrepaymentDetailPage() {
                       ))}
                       {invoices.length === 0 && (
                         <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                          No outstanding invoices in {cc.currencyCode}
+                          No outstanding invoices for {cc.contact?.name || "this customer"} in {cc.currencyCode}
                         </div>
                       )}
                     </SelectContent>

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { parseCsvObjects } from "@/lib/import-export/csv-parse";
 import {
   Sheet,
   SheetContent,
@@ -100,18 +101,10 @@ export function BulkImportWizard({
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-      if (lines.length < 2) return;
-
-      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+      // Real CSV parsing: quoted fields may hold commas, quotes and line breaks.
+      const { headers, rows } = parseCsvObjects(text);
+      if (headers.length === 0 || rows.length === 0) return;
       setCsvHeaders(headers);
-
-      const rows = lines.slice(1).map(line => {
-        const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
-        const row: Record<string, string> = {};
-        headers.forEach((h, i) => { row[h] = values[i] || ""; });
-        return row;
-      });
       setCsvData(rows);
 
       const autoMappings: ColumnMapping[] = headers.map(h => {
@@ -196,6 +189,11 @@ export function BulkImportWizard({
         body: JSON.stringify({ fileName, rows: mappedRows, source }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setResult({ processedRows: 0, errorRows: mappedRows.length, errorDetails: [{ row: 0, error: data.error || "Import failed" }] });
+        setStep("results");
+        return;
+      }
       setResult({
         processedRows: data.job?.processedRows || 0,
         errorRows: data.job?.errorRows || 0,
@@ -412,7 +410,7 @@ export function BulkImportWizard({
                 <div className="max-h-40 overflow-y-auto rounded-lg border p-3 space-y-1">
                   {result.errorDetails.map((e, i) => (
                     <p key={i} className="text-[11px] text-destructive">
-                      Row {e.row}: {e.error}
+                      {e.row > 0 ? `Row ${e.row}: ` : ""}{e.error}
                     </p>
                   ))}
                 </div>

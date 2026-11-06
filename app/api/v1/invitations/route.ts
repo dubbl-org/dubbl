@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
+import { memberCapacity } from "@/lib/api/check-limit";
 import { db } from "@/lib/db";
 import { invitation, member, users, organization } from "@/lib/db/schema";
-import { subscription } from "@/lib/db/schema/billing";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { getEffectiveLimits } from "@/lib/plans";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { render } from "@react-email/render";
@@ -57,65 +56,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = inviteSchema.parse(body);
 
-    // Check billing status
-    const sub = await db.query.subscription.findFirst({
-      where: eq(subscription.organizationId, ctx.organizationId),
-    });
-    const billingStatus = sub?.status ?? "active";
-    if (billingStatus === "past_due" || billingStatus === "incomplete") {
-      return NextResponse.json(
-        { error: "Your billing is past due. Update your payment method to invite members." },
-        { status: 402 }
-      );
-    }
-
-    // Enforce member limit (count current members + pending invitations)
-    const [memberCountResult] = await db
-      .select({ count: count() })
-      .from(member)
-      .where(eq(member.organizationId, ctx.organizationId));
-
-    const [pendingCount] = await db
-      .select({ count: count() })
-      .from(invitation)
-      .where(
-        and(
-          eq(invitation.organizationId, ctx.organizationId),
-          eq(invitation.status, "pending")
-        )
-      );
-
-    const totalUsed = memberCountResult.count + pendingCount.count;
-    const limits = getEffectiveLimits(sub ?? null);
-    const plan = sub?.plan ?? "free";
-    const seatCount = sub?.seatCount ?? 1;
-
-    let memberMax: number;
-    if (sub?.overrideMembers != null) {
-      memberMax = sub.overrideMembers;
-    } else if (plan === "pro") {
-      memberMax = seatCount;
-    } else {
-      memberMax = limits.members;
-    }
-
-    if (totalUsed >= memberMax) {
-      if (plan === "free") {
-        return NextResponse.json(
-          { error: "Free plan is limited to 1 member. Upgrade to Pro to invite your team." },
-          { status: 403 }
-        );
-      }
-      if (plan === "pro") {
-        return NextResponse.json(
-          { error: `You've used all ${seatCount} seats. Add more seats in billing settings.` },
-          { status: 403 }
-        );
-      }
-      return NextResponse.json(
-        { error: `You've reached your limit of ${memberMax} members.` },
-        { status: 403 }
-      );
+    // Enforce billing status and member limit (members + pending invitations)
+    const capacity = await memberCapacity(ctx.organizationId, { includePending: true });
+    if (!capacity.canAdd) {
+      return NextResponse.json({ error: capacity.reason }, { status: capacity.billingOk ? 403 : 402 });
     }
 
     // Check if already a member

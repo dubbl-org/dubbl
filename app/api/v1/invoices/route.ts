@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
+import { resolveTermsDays } from "@/lib/payment-terms";
 import { db } from "@/lib/db";
 import { invoice, invoiceLine, contact, organization, customerCredit, inventoryItem, member } from "@/lib/db/schema";
 import { eq, and, desc, asc, gte, lte, ne, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -21,6 +25,7 @@ import {
   checkApprovalRequired,
   createApprovalRequest,
 } from "@/lib/approvals/engine";
+import { emitInvoiceCreated } from "@/lib/webhooks/events";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -135,6 +140,15 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertLineStockRefs(ctx.organizationId, parsed.lines);
+    await assertCostCentersActive(ctx.organizationId, parsed.lines.map((l) => l.costCenterId));
+    // The contact's defaults (Contacts > Bookkeeping): account and tax rate for
+    // lines that don't set one, and no tax for a contact marked "Don't charge tax".
+    parsed.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+      parsed.lines,
+      await loadContactDefaults(ctx.organizationId, parsed.contactId),
+      "sales"
+    ));
 
     await assertNotLocked(ctx.organizationId, parsed.issueDate);
     await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
@@ -160,10 +174,10 @@ export async function POST(request: Request) {
           where: eq(organization.id, ctx.organizationId),
           columns: { defaultPaymentTerms: true },
         });
-        termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+        termsDays = resolveTermsDays(null, org?.defaultPaymentTerms);
       }
       const d = new Date(parsed.issueDate + "T00:00:00Z");
-      d.setUTCDate(d.getUTCDate() + (termsDays || 30));
+      d.setUTCDate(d.getUTCDate() + (termsDays ?? 30));
       dueDate = d.toISOString().split("T")[0];
     }
 
@@ -352,6 +366,7 @@ export async function POST(request: Request) {
     );
 
     logAudit({ ctx, action: "create", entityType: "invoice", entityId: created.id, request });
+    emitInvoiceCreated(ctx.organizationId, [created.id]);
 
     // Submit-for-approval on create: mirror the dedicated submit route. Resolve
     // the creating user's member record, find a matching active workflow, create

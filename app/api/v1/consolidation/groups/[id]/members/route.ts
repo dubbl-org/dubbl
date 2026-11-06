@@ -5,14 +5,15 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, ok, created, error, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { checkConsolidation } from "@/lib/api/check-limit";
 
 const addSchema = z.object({
-  orgId: z.string().uuid("Invalid organization ID"),
+  orgId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "Invalid organization ID"),
   label: z.string().optional(),
 });
 
 const removeSchema = z.object({
-  orgId: z.string().uuid("Invalid organization ID"),
+  orgId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "Invalid organization ID"),
 });
 
 export async function POST(
@@ -36,6 +37,7 @@ export async function POST(
 
     const body = await request.json();
     const parsed = addSchema.parse(body);
+    await checkConsolidation(ctx.organizationId, group.id);
 
     // Verify the requesting user has access to the target org
     const membership = await db.query.member.findFirst({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { X, BarChart3, Loader2, Download, Send } from "lucide-react";
@@ -16,23 +16,28 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useApi } from "@/lib/query/use-api";
+import { ApiError } from "@/lib/query/api";
 import { useContactContext, getOrgId } from "../layout";
 
 export default function ContactStatementPage() {
   const { id } = useParams<{ id: string }>();
   const { contact } = useContactContext();
 
-  const [statementData, setStatementData] = useState<{
+  const [statementStartDate, setStatementStartDate] = useState("");
+  const [statementEndDate, setStatementEndDate] = useState("");
+  const statementParams = new URLSearchParams();
+  if (statementStartDate) statementParams.set("startDate", statementStartDate);
+  if (statementEndDate) statementParams.set("endDate", statementEndDate);
+  const { data, error, loading: statementLoading } = useApi<{
     contact: { id: string; name: string; email: string | null; type: string };
     startDate: string;
     endDate: string;
     openingBalance: number;
     transactions: { date: string; type: string; documentNumber: string; description: string; debit: number; credit: number; balance: number }[];
     closingBalance: number;
-  } | null>(null);
-  const [statementLoading, setStatementLoading] = useState(false);
-  const [statementStartDate, setStatementStartDate] = useState("");
-  const [statementEndDate, setStatementEndDate] = useState("");
+  }>(`/api/v1/contacts/${id}/statement?${statementParams}`, { keepPrevious: true });
+  const statementData = data?.contact ? data : null;
   const [sendingStatement, setSendingStatement] = useState(false);
 
   const statementTypeLabels: Record<string, string> = {
@@ -43,33 +48,9 @@ export default function ContactStatementPage() {
     debit_note: "Debit note (extra charge)",
   };
 
-  const fetchStatement = useCallback(async () => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    setStatementLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (statementStartDate) params.set("startDate", statementStartDate);
-      if (statementEndDate) params.set("endDate", statementEndDate);
-
-      const res = await fetch(`/api/v1/contacts/${id}/statement?${params}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.contact) {
-        setStatementData(data);
-      }
-    } catch {
-      toast.error("Failed to load statement");
-    } finally {
-      setStatementLoading(false);
-    }
-  }, [id, statementStartDate, statementEndDate]);
-
   useEffect(() => {
-    fetchStatement();
-  }, [fetchStatement]);
+    if (error && !data && !(error instanceof ApiError)) toast.error("Failed to load statement");
+  }, [error, data]);
 
   function applyStatementPreset(preset: string) {
     const now = new Date();

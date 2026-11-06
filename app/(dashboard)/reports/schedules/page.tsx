@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Mail, Clock, X, CalendarClock, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Plus, Mail, Clock, X, CalendarClock, Loader2, Pause, Play, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -34,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface SavedReport {
   id: string;
@@ -94,14 +97,16 @@ function describeTiming(s: ReportSchedule): string {
 }
 
 export default function ReportSchedulesPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
-  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { data: schedRes, loading: schedulesLoading } = useApi<{ data?: ReportSchedule[] }>("/api/v1/report-schedules?limit=200");
+  const { data: savedRes, loading: savedLoading } = useApi<{ reports?: SavedReport[] }>("/api/v1/reports/saved");
+  const loading = schedulesLoading || savedLoading;
+  const schedules = schedRes?.data || [];
+  const savedReports = savedRes?.reports || [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
 
   // Create form state.
@@ -115,36 +120,6 @@ export default function ReportSchedulesPage() {
 
   const orgId =
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    setLoading(true);
-
-    Promise.all([
-      fetch("/api/v1/report-schedules?limit=200", {
-        headers: { "x-organization-id": orgId },
-      }).then((r) => r.json()),
-      fetch("/api/v1/reports/saved", {
-        headers: { "x-organization-id": orgId },
-      }).then((r) => r.json()),
-    ])
-      .then(([schedRes, savedRes]) => {
-        if (cancelled) return;
-        setSchedules(schedRes.data || []);
-        setSavedReports(savedRes.reports || []);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, refreshKey]);
 
   const resetForm = useCallback(() => {
     setSavedReportId("");
@@ -203,7 +178,6 @@ export default function ReportSchedulesPage() {
       }
       setDialogOpen(false);
       resetForm();
-      setRefreshKey((k) => k + 1);
     } finally {
       setSubmitting(false);
     }
@@ -219,12 +193,55 @@ export default function ReportSchedulesPage() {
     resetForm,
   ]);
 
-  if (initialLoad) return <BrandLoader />;
+  async function toggleActive(s: ReportSchedule) {
+    if (!orgId) return;
+    setBusyId(s.id);
+    try {
+      const res = await fetch(`/api/v1/report-schedules/${s.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ isActive: !s.isActive }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Couldn't update this schedule");
+        return;
+      }
+      toast.success(s.isActive ? "Schedule paused" : "Schedule turned back on");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function handleDelete(s: ReportSchedule) {
+    if (!orgId) return;
+    confirm({
+      title: `Stop sending "${s.savedReport?.name || "this report"}"?`,
+      description: "The schedule is deleted and no more emails are sent. The saved report itself stays.",
+      confirmLabel: "Delete schedule",
+      destructive: true,
+      onConfirm: async () => {
+        const res = await fetch(`/api/v1/report-schedules/${s.id}`, {
+          method: "DELETE",
+          headers: { "x-organization-id": orgId },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err.error || "Couldn't delete this schedule");
+          return;
+        }
+        toast.success("Schedule deleted");
+      },
+    });
+  }
+
+  if (loading) return <BrandLoader />;
 
   const hasSavedReports = savedReports.length > 0;
 
   return (
     <ContentReveal className="space-y-6">
+      {confirmDialog}
       <BackToReports />
 
       <PageHeader
@@ -251,9 +268,7 @@ export default function ReportSchedulesPage() {
         choose, as a PDF or spreadsheet, so nobody has to remember to run it.
       </ReportHelp>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !hasSavedReports ? (
+      {!hasSavedReports ? (
         <div className="rounded-lg border bg-muted/20 p-8 text-center">
           <CalendarClock className="mx-auto size-8 text-muted-foreground/60" />
           <p className="mt-3 text-sm font-medium">No saved reports yet</p>
@@ -299,6 +314,9 @@ export default function ReportSchedulesPage() {
                   <TableHead>Sent to</TableHead>
                   <TableHead className="w-44">Next send</TableHead>
                   <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-20 text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -325,7 +343,7 @@ export default function ReportSchedulesPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {s.nextRunAt
                         ? new Date(s.nextRunAt).toLocaleString()
-                        : "—"}
+                        : s.isActive ? "-" : "Paused"}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -338,6 +356,31 @@ export default function ReportSchedulesPage() {
                       >
                         {s.isActive ? "On" : "Paused"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={busyId === s.id}
+                          title={s.isActive ? "Pause" : "Turn back on"}
+                          aria-label={s.isActive ? "Pause schedule" : "Turn schedule back on"}
+                          onClick={() => toggleActive(s)}
+                        >
+                          {s.isActive ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-destructive"
+                          title="Delete"
+                          aria-label="Delete schedule"
+                          onClick={() => handleDelete(s)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

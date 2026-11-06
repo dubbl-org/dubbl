@@ -8,6 +8,7 @@ import { wrapTool } from "@/lib/mcp/errors";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { processRecurringJournals } from "@/lib/api/recurring-generate";
+import { resumeSchedule } from "@/lib/api/recurring-schedule";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 const FREQUENCIES = [
@@ -197,7 +198,7 @@ export function registerRecurringJournalTools(server: McpServer, ctx: AuthContex
 
   server.tool(
     "set_recurring_journal_status",
-    "Pause, resume (activate), or complete a recurring journal template. Paused templates are skipped by the scheduler; resuming does not back-fill missed occurrences.",
+    "Pause, resume (activate), or complete a recurring journal template. Paused templates are skipped by the scheduler; resuming does not back-fill missed occurrences: the next run date moves forward to the first scheduled date on or after today. Returns the updated template.",
     {
       templateId: z.string().describe("The UUID of the recurring journal template"),
       status: z
@@ -217,9 +218,15 @@ export function registerRecurringJournalTools(server: McpServer, ctx: AuthContex
         });
         if (!existing) throw new Error("Recurring journal not found");
 
+        // Resuming skips the dates missed while paused (no back-fill).
+        const changes =
+          existing.status === "paused" && params.status === "active"
+            ? resumeSchedule(existing, new Date().toISOString().split("T")[0])
+            : { status: params.status };
+
         const [updated] = await db
           .update(recurringTemplate)
-          .set({ status: params.status, updatedAt: new Date() })
+          .set({ ...changes, updatedAt: new Date() })
           .where(eq(recurringTemplate.id, params.templateId))
           .returning();
 
@@ -228,7 +235,7 @@ export function registerRecurringJournalTools(server: McpServer, ctx: AuthContex
           action: "update",
           entityType: "recurring_journal",
           entityId: params.templateId,
-          changes: { status: params.status },
+          changes,
         });
         return { template: updated };
       })

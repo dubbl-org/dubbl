@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { team } from "@/lib/db/schema";
+import { team, projectTeamAssignment } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
+import { releaseTeamAssignmentMembers } from "@/lib/api/project-team-members";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -95,7 +96,15 @@ export async function DELETE(
 
     if (!existing) return notFound("Team");
 
-    await db.delete(team).where(eq(team.id, id));
+    // Deleting the team removes its project assignments and the access they gave.
+    await db.transaction(async (tx) => {
+      const assignments = await tx
+        .select({ id: projectTeamAssignment.id })
+        .from(projectTeamAssignment)
+        .where(eq(projectTeamAssignment.teamId, id));
+      await tx.delete(team).where(eq(team.id, id));
+      await releaseTeamAssignmentMembers(tx, assignments.map((a) => a.id));
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

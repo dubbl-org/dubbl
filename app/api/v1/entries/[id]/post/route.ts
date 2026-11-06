@@ -6,8 +6,10 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { emitJournalPosted } from "@/lib/webhooks/events";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { centsToDecimal } from "@/lib/money";
+import { assertApprovedIfRequired } from "@/lib/approvals/entities";
 
 export async function POST(
   request: Request,
@@ -38,6 +40,9 @@ export async function POST(
     // draft-now / finalize-later — so posting must re-check, or a draft can be
     // finalized straight into a period that has since been locked or closed.
     await assertNotLocked(ctx.organizationId, entry.date, ctx);
+    // When an active approval workflow matches this entry, it can only be
+    // posted after its approval request is fully approved (409 otherwise).
+    await assertApprovedIfRequired(ctx, "journal_entry", id);
 
     await db
       .update(journalEntry)
@@ -59,6 +64,7 @@ export async function POST(
     });
 
     logAudit({ ctx, action: "post", entityType: "journal_entry", entityId: id, changes: { previousStatus: entry.status }, request });
+    emitJournalPosted(ctx.organizationId, { id });
 
     return NextResponse.json({
       entry: {

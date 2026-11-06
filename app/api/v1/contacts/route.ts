@@ -11,6 +11,7 @@ import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { emitContactCreated } from "@/lib/webhooks/events";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -22,6 +23,10 @@ const createSchema = z.object({
   addresses: z.any().optional(),
   notes: z.string().nullable().optional(),
   currencyCode: currencyCodeSchema.default("USD"),
+  is1099Vendor: z.boolean().optional(),
+  w9TaxClassification: z.enum(["individual", "c_corp", "s_corp", "partnership", "trust_estate", "llc"]).nullable().optional(),
+  taxIdentifier: z.string().max(32).nullable().optional(),
+  backupWithholding: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -169,6 +174,7 @@ export async function POST(request: Request) {
       .returning();
 
     logAudit({ ctx, action: "create", entityType: "contact", entityId: created.id, request });
+    emitContactCreated(ctx.organizationId, [created.id]);
 
     return NextResponse.json({ contact: created }, { status: 201 });
   } catch (err) {

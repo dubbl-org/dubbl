@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useApi } from "@/lib/query/use-api";
 import { useContactContext, getOrgId } from "../layout";
 import type { ContactFile } from "../layout";
 
@@ -35,32 +36,15 @@ export default function ContactFilesPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm } = useContactContext();
 
-  const [files, setFiles] = useState<ContactFile[]>([]);
-  const [filesLoading, setFilesLoading] = useState(false);
+  const { data, error, loading: filesLoading } = useApi<{ data?: ContactFile[] }>(`/api/v1/contacts/${id}/files`);
+  const files = data?.data ?? [];
   const [uploading, setUploading] = useState(false);
   const [fileVisibility, setFileVisibility] = useState<"organization" | "private">("organization");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchFiles = useCallback(async () => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-    setFilesLoading(true);
-    try {
-      const res = await fetch(`/api/v1/contacts/${id}/files`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      setFiles(data.data ?? []);
-    } catch {
-      toast.error("Failed to load files");
-    } finally {
-      setFilesLoading(false);
-    }
-  }, [id]);
-
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    if (error && !data) toast.error("Failed to load files");
+  }, [error, data]);
 
   async function handleFileUpload(file: File) {
     const orgId = getOrgId();
@@ -91,7 +75,6 @@ export default function ContactFilesPage() {
         body: file,
       });
       toast.success("File uploaded");
-      fetchFiles();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to upload file");
     } finally {
@@ -112,7 +95,6 @@ export default function ContactFilesPage() {
       });
       if (!res.ok) throw new Error();
       toast.success("File deleted");
-      fetchFiles();
     } catch {
       toast.error("Failed to delete file");
     }

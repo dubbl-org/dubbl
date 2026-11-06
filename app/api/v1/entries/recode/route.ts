@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
 import { requireRole } from "@/lib/api/require-role";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
@@ -135,6 +136,11 @@ export async function POST(request: Request) {
 
     if (toChange.length === 0) {
       return NextResponse.json({ recoded: 0, entriesAffected: 0, lines: [] });
+    }
+
+    // A cost center being newly set on any line must be active.
+    if (patch.costCenterId && toChange.some((r) => r.costCenterId !== patch.costCenterId)) {
+      await assertCostCentersActive(ctx.organizationId, [patch.costCenterId]);
     }
 
     await db.transaction(async (tx) => {

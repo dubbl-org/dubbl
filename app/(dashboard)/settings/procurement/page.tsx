@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PackageCheck, ShieldAlert, Percent, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { toast } from "sonner";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface ProcurementSettings {
   priceTolerancePercent: number; // basis points (500 = 5%)
@@ -34,31 +35,38 @@ function percentToBps(percent: string): number {
   return Math.round(n * 100);
 }
 
+interface ProcurementForm {
+  settings: ProcurementSettings;
+  priceInput: string;
+  qtyInput: string;
+}
+
+function toForm(s: ProcurementSettings | undefined): ProcurementForm {
+  const settings = s ?? DEFAULT_SETTINGS;
+  return {
+    settings,
+    priceInput: bpsToPercent(settings.priceTolerancePercent),
+    qtyInput: bpsToPercent(settings.qtyTolerancePercent),
+  };
+}
+
+const SETTINGS_URL = "/api/v1/procurement-settings";
+
 export default function ProcurementSettingsPage() {
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ procurementSettings?: ProcurementSettings }>(SETTINGS_URL);
+  const cache = useApiCache();
   const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState<ProcurementSettings>(DEFAULT_SETTINGS);
-  const [priceInput, setPriceInput] = useState("0");
-  const [qtyInput, setQtyInput] = useState("0");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/procurement-settings", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.procurementSettings) {
-          const s = data.procurementSettings as ProcurementSettings;
-          setSettings(s);
-          setPriceInput(bpsToPercent(s.priceTolerancePercent));
-          setQtyInput(bpsToPercent(s.qtyTolerancePercent));
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const [draft, setDraft] = useState<ProcurementForm | null>(null);
+  const form = draft ?? toForm(data?.procurementSettings);
+  const { settings, priceInput, qtyInput } = form;
+  const updateForm = (patch: Partial<ProcurementForm>) => setDraft((d) => ({ ...(d ?? form), ...patch }));
+  const setSettings = (fn: (s: ProcurementSettings) => ProcurementSettings) =>
+    setDraft((d) => {
+      const base = d ?? form;
+      return { ...base, settings: fn(base.settings) };
+    });
+  const setPriceInput = (priceInput: string) => updateForm({ priceInput });
+  const setQtyInput = (qtyInput: string) => updateForm({ qtyInput });
 
   const handleSave = async () => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -83,12 +91,8 @@ export default function ProcurementSettingsPage() {
       if (!res.ok) throw new Error("Failed to save");
 
       const data = await res.json();
-      if (data.procurementSettings) {
-        const s = data.procurementSettings as ProcurementSettings;
-        setSettings(s);
-        setPriceInput(bpsToPercent(s.priceTolerancePercent));
-        setQtyInput(bpsToPercent(s.qtyTolerancePercent));
-      }
+      if (data.procurementSettings) cache.set(SETTINGS_URL, { procurementSettings: data.procurementSettings as ProcurementSettings });
+      setDraft(null);
       toast.success("Bill matching settings saved");
     } catch {
       toast.error("Failed to save settings");

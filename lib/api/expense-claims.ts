@@ -1,10 +1,13 @@
-import { journalEntry, journalLine } from "@/lib/db/schema";
+import { journalEntry, journalLine, taxRate } from "@/lib/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   getNextEntryNumber,
   ensureAccountByCode,
+  ensureControlAccount,
   resolveBaseRate,
   toBaseLines,
 } from "@/lib/api/journal-automation";
+import { splitExpenseClaimTax, type ExpenseTaxRate } from "@/lib/api/expense-claim-tax";
 import { db } from "@/lib/db";
 
 /** A transaction handle, derived from db.transaction's callback parameter. */
@@ -25,6 +28,7 @@ interface ExpenseClaimForPosting {
     accountId?: string | null;
     amount: number;
     description?: string | null;
+    taxRateId?: string | null;
   }[];
 }
 
@@ -56,7 +60,14 @@ const MISC_EXPENSE = {
  *
  * DR each expense line to its expense account (falling back to Miscellaneous
  * Expense 5990 per line when the item has no account assigned)
+ * DR Input VAT / GST Receivable for the reclaimable tax on taxed items
+ * CR Output VAT for self-accounted reverse-charge tax (if any)
  * CR Employee Reimbursements Payable (2110) for the claim total
+ *
+ * Item amounts are tax-inclusive (what the employee paid). An item with a tax
+ * rate is split into net and tax by splitExpenseClaimTax, the same way a
+ * categorized bank payment is: the expense account gets the net (plus any
+ * irrecoverable tax) and the recoverable tax goes to Input VAT (1500).
  *
  * Recognizing the obligation at approval makes the reimbursable visible in AP /
  * aged-payables between approval and payment, and keeps period-end accruals
@@ -112,11 +123,35 @@ export async function createExpenseClaimApprovalJournalEntry(
     })
     .returning();
 
-  const lines: (typeof journalLine.$inferInsert)[] = [];
-  let debitTotal = 0;
+  // Load the tax rates used on the claim's items (org-scoped).
+  const taxRateIds = Array.from(
+    new Set(claim.items.map((i) => i.taxRateId).filter((v): v is string => !!v))
+  );
+  const rates = new Map<string, ExpenseTaxRate>();
+  if (taxRateIds.length > 0) {
+    const rows = await tx.query.taxRate.findMany({
+      where: and(
+        eq(taxRate.organizationId, ctx.organizationId),
+        inArray(taxRate.id, taxRateIds)
+      ),
+      columns: { id: true, rate: true, kind: true, recoverablePercent: true },
+    });
+    for (const r of rows) rates.set(r.id, r);
+  }
 
-  for (const item of claim.items) {
-    if (item.amount <= 0) continue;
+  const split = splitExpenseClaimTax(
+    claim.items.map((item) => ({
+      amount: item.amount,
+      tax: item.taxRateId ? rates.get(item.taxRateId) ?? null : null,
+    }))
+  );
+
+  const lines: (typeof journalLine.$inferInsert)[] = [];
+
+  for (let i = 0; i < claim.items.length; i++) {
+    const item = claim.items[i];
+    const s = split.items[i];
+    if (!s) continue;
     const account = item.accountId
       ? ({ id: item.accountId } as AccountRef)
       : await ensureMisc();
@@ -124,20 +159,44 @@ export async function createExpenseClaimApprovalJournalEntry(
       journalEntryId: entry.id,
       accountId: account.id,
       description: item.description ?? claim.title,
-      debitAmount: item.amount,
+      debitAmount: s.expenseDebit,
       creditAmount: 0,
     });
-    debitTotal += item.amount;
   }
 
-  // CR the payable for the same total as the debits so the entry balances even
-  // if line amounts don't sum to the stored totalAmount.
+  // DR the reclaimable tax to Input VAT, and CR self-accounted reverse-charge
+  // tax to Output VAT, using the same control accounts as bills.
+  if (split.inputTax > 0) {
+    const inputVat = await ensureControlAccount(ctx.organizationId, "inputVat", base, tx);
+    if (!inputVat) throw new Error("Could not resolve the Input VAT / GST Receivable account");
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: inputVat.id,
+      description: `Tax on expense claim: ${claim.title}`,
+      debitAmount: split.inputTax,
+      creditAmount: 0,
+    });
+  }
+  if (split.outputTax > 0) {
+    const outputVat = await ensureControlAccount(ctx.organizationId, "outputVat", base, tx);
+    if (!outputVat) throw new Error("Could not resolve the Output VAT / GST Payable account");
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: outputVat.id,
+      description: `Reverse charge tax on expense claim: ${claim.title}`,
+      debitAmount: 0,
+      creditAmount: split.outputTax,
+    });
+  }
+
+  // CR the payable for the gross the employee paid (sum of item amounts), so
+  // the entry balances even if they don't sum to the stored totalAmount.
   lines.push({
     journalEntryId: entry.id,
     accountId: payable.id,
     description: `Reimbursement owed: ${claim.title}`,
     debitAmount: 0,
-    creditAmount: debitTotal,
+    creditAmount: split.payable,
   });
 
   const baseLines = toBaseLines(lines, currency, rate);

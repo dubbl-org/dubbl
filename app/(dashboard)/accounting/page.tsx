@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, ArrowLeftRight, BookOpen, BarChart3, Check, Undo2, Pencil, Trash2, ArrowUpRight } from "lucide-react";
@@ -27,6 +27,7 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { DateCell, MutedCell, NumberCell, StatusPill, daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerHelpers, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApi } from "@/lib/query/use-api";
 
 interface Entry {
   id: string;
@@ -387,26 +388,8 @@ function LinkedEntry({ href, label }: { href: string; label: string }) {
 
 /** The debit and credit lines of one entry, loaded when the preview opens. */
 function EntryLines({ id }: { id: string }) {
-  const [state, setState] = useState<{ id: string; lines: EntryLine[] } | null>(null);
-  const loading = state?.id !== id;
-
-  useEffect(() => {
-    let cancelled = false;
-    const orgId = localStorage.getItem("activeOrgId");
-    fetch(`/api/v1/entries/${id}`, { headers: orgId ? { "x-organization-id": orgId } : {} })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled) setState({ id, lines: (json?.entry?.lines as EntryLine[] | undefined) ?? [] });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ id, lines: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  const lines = !loading && state ? state.lines : [];
+  const { data, loading } = useApi<{ entry?: { lines?: EntryLine[] } }>(`/api/v1/entries/${id}`);
+  const lines = (!loading && data?.entry?.lines) || [];
   const debit = lines.reduce((s, l) => s + toCents(l.debitAmount), 0);
   const credit = lines.reduce((s, l) => s + toCents(l.creditAmount), 0);
   const money = (cents: number, currency?: string) => (cents ? formatMoney(cents, currency || "USD") : "");

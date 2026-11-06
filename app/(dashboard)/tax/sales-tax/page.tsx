@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MapPin, Receipt, FileText, Printer, ArrowUpRight } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -9,8 +9,8 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
-import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import Link from "next/link";
 
 interface TaxBreakdown {
@@ -25,36 +25,23 @@ export default function SalesTaxPage() {
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [breakdown, setBreakdown] = useState<TaxBreakdown[]>([]);
-  const [exemptAmount, setExemptAmount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{
+    breakdown?: TaxBreakdown[];
+    exemptAmount?: number;
+    exemptCustomerAmount?: number;
+    invoiceCount?: number;
+    currency?: string;
+  }>(`/api/v1/reports/sales-tax?${new URLSearchParams({ startDate, endDate })}`, { keepPrevious: true });
+  const breakdown = data?.breakdown || [];
+  const exemptAmount = data?.exemptAmount || 0;
+  const exemptCustomerAmount = data?.exemptCustomerAmount || 0;
+  const currency = data?.currency || "USD";
+  const money = (cents: number) => formatMoney(cents, currency);
   useDocumentTitle("Tax · Sales Tax");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/sales-tax?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setBreakdown(data.breakdown || []);
-        setExemptAmount(data.exemptAmount || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
 
   const totalTaxable = breakdown.reduce((sum, b) => sum + b.taxableAmount, 0);
   const totalCollected = breakdown.reduce((sum, b) => sum + b.taxCollected, 0);
-  const totalInvoices = breakdown.reduce((sum, b) => sum + b.invoiceCount, 0);
+  const totalInvoices = data?.invoiceCount || 0;
   const maxTaxable = Math.max(totalTaxable, exemptAmount, 1);
 
   return (
@@ -68,14 +55,20 @@ export default function SalesTaxPage() {
           Print
         </Button>
         <ExportButton
-          data={breakdown.map((b) => ({
-            taxRate: b.taxRateName || "Exempt",
-            ratePercent: b.taxRatePercent != null ? (b.taxRatePercent / 100).toFixed(2) : "",
-            taxableAmount: b.taxableAmount,
-            taxCollected: b.taxCollected,
-            invoiceCount: b.invoiceCount,
-          }))}
+          data={[
+            ...breakdown.map((b) => ({
+              taxRate: b.taxRateName,
+              ratePercent: b.taxRatePercent != null ? (b.taxRatePercent / 100).toFixed(2) : "",
+              taxableAmount: b.taxableAmount,
+              taxCollected: b.taxCollected,
+              invoiceCount: b.invoiceCount,
+            })),
+            ...(exemptAmount !== 0
+              ? [{ taxRate: "Exempt sales", ratePercent: "", taxableAmount: exemptAmount, taxCollected: 0, invoiceCount: "" }]
+              : []),
+          ]}
           columns={["taxRate", "ratePercent", "taxableAmount", "taxCollected", "invoiceCount"]}
+          moneyColumns={["taxableAmount", "taxCollected"]}
           filename="sales-tax"
         />
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
@@ -104,10 +97,10 @@ export default function SalesTaxPage() {
                 <Receipt className="size-4 text-blue-500/50" />
               </div>
               <p className="mt-1 text-xl font-bold font-mono tabular-nums text-blue-700 dark:text-blue-300">
-                {formatMoney(totalCollected)}
+                {money(totalCollected)}
               </p>
               <p className="text-[11px] text-blue-600/60 dark:text-blue-400/60 mt-0.5">
-                {totalInvoices} invoice{totalInvoices !== 1 ? "s" : ""}
+                From {totalInvoices} document{totalInvoices !== 1 ? "s" : ""}
               </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
@@ -116,7 +109,7 @@ export default function SalesTaxPage() {
                 <FileText className="size-4 text-muted-foreground/50" />
               </div>
               <p className="mt-1 text-xl font-bold font-mono tabular-nums">
-                {formatMoney(totalTaxable)}
+                {money(totalTaxable)}
               </p>
               <div className="mt-2 h-1.5 rounded-full bg-muted">
                 <div
@@ -131,8 +124,13 @@ export default function SalesTaxPage() {
                 <MapPin className="size-4 text-muted-foreground/50" />
               </div>
               <p className="mt-1 text-xl font-bold font-mono tabular-nums">
-                {formatMoney(exemptAmount)}
+                {money(exemptAmount)}
               </p>
+              {exemptCustomerAmount > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {money(exemptCustomerAmount)} to customers you don&apos;t charge tax
+                </p>
+              )}
               <div className="mt-2 h-1.5 rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-gray-400 transition-all"
@@ -158,19 +156,19 @@ export default function SalesTaxPage() {
                           <Receipt className="size-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{b.taxRateName || "No tax rate"}</p>
+                          <p className="text-sm font-medium">{b.taxRateName}</p>
                           <p className="text-xs text-muted-foreground">
                             {b.taxRatePercent != null ? `${(b.taxRatePercent / 100).toFixed(2)}%` : "N/A"}
-                            {" · "}{b.invoiceCount} invoice{b.invoiceCount !== 1 ? "s" : ""}
+                            {" · "}{b.invoiceCount} document{b.invoiceCount !== 1 ? "s" : ""}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold font-mono tabular-nums text-blue-600 dark:text-blue-400">
-                          {formatMoney(b.taxCollected)}
+                          {money(b.taxCollected)}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono tabular-nums">
-                          on {formatMoney(b.taxableAmount)}
+                          on {money(b.taxableAmount)}
                         </p>
                       </div>
                     </div>
@@ -190,7 +188,7 @@ export default function SalesTaxPage() {
           <div className="rounded-lg border-2 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 px-5 py-3.5">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold">Total Tax Collected</span>
-              <span className="font-mono text-base tabular-nums font-bold text-blue-600 dark:text-blue-400">{formatMoney(totalCollected)}</span>
+              <span className="font-mono text-base tabular-nums font-bold text-blue-600 dark:text-blue-400">{money(totalCollected)}</span>
             </div>
           </div>
         </ContentReveal>

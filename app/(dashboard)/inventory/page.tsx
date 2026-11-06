@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Upload, ArrowUpDown, Trash2, Power, PowerOff, Tag, AlertTriangle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -16,6 +16,7 @@ import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
@@ -84,7 +85,8 @@ function stockStatus(i: InventoryItem) {
   return "in_stock";
 }
 
-const stockValue = (i: InventoryItem) => i.quantityOnHand * i.purchasePrice;
+/** Book value: what the stock on hand cost, after write-downs and landed costs. */
+const stockValue = (i: InventoryItem) => i.totalValue;
 const salesValue = (i: InventoryItem) => i.quantityOnHand * i.salePrice;
 /** Same formula as the old summary: how much more you sell for than you pay. */
 const markup = (i: InventoryItem) => (i.purchasePrice > 0 ? ((i.salePrice - i.purchasePrice) / i.purchasePrice) * 100 : null);
@@ -120,20 +122,8 @@ function StockCell({ item }: { item: InventoryItem }) {
 }
 
 function RecentMovements({ itemId }: { itemId: string }) {
-  const [state, setState] = useState<{ id: string; rows: Movement[] } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const orgId = localStorage.getItem("activeOrgId");
-    fetch(`/api/v1/inventory/${itemId}/movements?limit=8`, { headers: orgId ? { "x-organization-id": orgId } : {} })
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((json) => !cancelled && setState({ id: itemId, rows: json.data ?? [] }))
-      .catch(() => !cancelled && setState({ id: itemId, rows: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [itemId]);
-
-  const rows = state?.id === itemId ? state.rows : null;
+  const { data, error } = useApi<{ data?: Movement[] }>(`/api/v1/inventory/${itemId}/movements?limit=8`);
+  const rows = data ? (data.data ?? []) : error ? [] : null;
   return (
     <div className="mt-6">
       <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">Recent stock changes</p>
@@ -178,12 +168,10 @@ export default function InventoryPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Inventory · Products");
-  const [version, setVersion] = useState(0);
 
   // Bulk sheets: the rows they act on and the explorer to refresh afterwards
   const [target, setTarget] = useState<{ mode: "category" | "adjust"; ids: string[]; helpers: ExplorerHelpers } | null>(null);
   const [bulkCategory, setBulkCategory] = useState("");
-  const [categories, setCategories] = useState<string[]>([]);
   const [bulkAdjustment, setBulkAdjustment] = useState("");
   const [bulkAdjustReason, setBulkAdjustReason] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -195,34 +183,14 @@ export default function InventoryPage() {
   const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
 
   // Movement chart
-  const [chartData, setChartData] = useState<{ date: string; in: number; out: number; net: number }[]>([]);
   const [chartPeriod, setChartPeriod] = useState("30d");
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch(`/api/v1/inventory/movements/chart?period=${chartPeriod}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) setChartData(data.data || []);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [chartPeriod, version]);
+  const { data: chartJson } = useApi<{ data?: { date: string; in: number; out: number; net: number }[] }>(`/api/v1/inventory/movements/chart?period=${chartPeriod}`, { keepPrevious: true });
+  const chartData = chartJson?.data || [];
 
   // Category suggestions for the bulk category sheet
-  useEffect(() => {
-    if (target?.mode !== "category") return;
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/inventory?limit=1", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => setCategories(data.categories || []))
-      .catch(() => {});
-  }, [target?.mode]);
+  const { data: categoriesJson } = useApi<{ categories?: string[] }>(target?.mode === "category" ? "/api/v1/inventory?limit=1" : null);
+  const categories = categoriesJson?.categories || [];
 
   async function submitSheet(action: "set_category" | "adjust_stock", extra: Record<string, unknown>) {
     if (!target) return;
@@ -257,7 +225,6 @@ export default function InventoryPage() {
       if (!res.ok) throw new Error(data.error || "Import failed");
       setImportResult(data);
       toast.success(`Imported: ${data.created} created, ${data.updated} updated`);
-      setVersion((v) => v + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -312,7 +279,7 @@ export default function InventoryPage() {
             return m == null ? <span className="text-muted-foreground/50">—</span> : <span className={cn("tabular-nums", m < 0 && "text-red-600 dark:text-red-400")}>{m.toFixed(1)}%</span>;
           },
         },
-        { key: "value", label: "Stock value", align: "right", className: "w-32", money: true, hint: "On hand times cost", value: stockValue, render: (i) => <MoneyCell cents={stockValue(i)} className="font-medium" /> },
+        { key: "value", label: "Stock value", align: "right", className: "w-32", money: true, hint: "What the stock on hand cost you, in your books", value: stockValue, render: (i) => <MoneyCell cents={stockValue(i)} className="font-medium" /> },
         { key: "salesValue", label: "Could sell for", align: "right", className: "w-32", money: true, hidden: true, hint: "On hand times sale price", value: salesValue },
         { key: "bookValue", label: "Book value", align: "right", className: "w-32", money: true, hidden: true, hint: "What your books say the stock is worth, using its real purchase history", value: (i) => i.totalValue },
         { key: "avgCost", label: "Average cost", align: "right", className: "w-28", hidden: true, value: (i) => i.averageCost, csv: (i) => dollars(i.averageCost), render: (i) => <MoneyCell cents={i.averageCost} /> },
@@ -336,7 +303,7 @@ export default function InventoryPage() {
         for (const i of rows) byCategory.set(i.category || "No category", (byCategory.get(i.category || "No category") ?? 0) + stockValue(i));
         const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
         return [
-          { key: "value", label: "Stock value", color: "#14B8A6", value: formatMoney(value), note: `${plural(units, "unit")} on hand`, hint: "What everything on your shelves cost you: units on hand times cost." },
+          { key: "value", label: "Stock value", color: "#14B8A6", value: formatMoney(value), note: `${plural(units, "unit")} on hand`, hint: "What everything on your shelves cost you, as your books show it (after write-downs and landed costs)." },
           { key: "retail", label: "Could sell for", color: "#8B5CF6", value: formatMoney(retail), note: retail > value ? `${formatMoney(retail - value)} profit if it all sells` : "At today's prices", hint: "What you'd take in if you sold everything on hand at its sale price." },
           { key: "low", label: "Running low", color: "#F59E0B", status: "low", value: low.length.toString(), note: low.length ? "at or below the reorder level" : "Nothing is running low", hint: "Items at or below their reorder level. Order more before they run out." },
           { key: "out", label: "Out of stock", color: "#EF4444", status: "out", value: out.length.toString(), note: out.length || low.length ? `~${formatMoney(refill)} to restock` : "Everything is available", hint: "Items with none left. The restock figure is roughly what it costs to bring low and empty items back to twice their reorder level." },
@@ -446,7 +413,7 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <Explorer key={version} config={config} />
+      <Explorer config={config} />
 
       {/* Movement chart */}
       {chartData.length > 0 && (

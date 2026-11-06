@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and, lte, isNull, sql } from "drizzle-orm";
+import { getNextEntryNumber } from "@/lib/api/journal-automation";
 
 /**
  * Auto-reversing journals (accruals / prepayments).
@@ -20,13 +21,7 @@ async function nextEntryNumber(
   exec: Parameters<Parameters<(typeof db)["transaction"]>[0]>[0],
   organizationId: string
 ): Promise<number> {
-  const [m] = await exec
-    .select({
-      max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
-    })
-    .from(journalEntry)
-    .where(eq(journalEntry.organizationId, organizationId));
-  return (m?.max || 0) + 1;
+  return getNextEntryNumber(organizationId, exec);
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown, Loader2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,80 +18,61 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi } from "@/lib/query/use-api";
 
-interface InventoryItemOption {
+export interface InventoryItemOption {
   id: string;
   name: string;
   code: string;
   sku: string | null;
   quantityOnHand: number;
+  /** Cents per unit. */
+  purchasePrice: number;
+  /** Cents per unit. */
+  salePrice: number;
+  /** Default sales account for invoice lines. */
+  revenueAccountId?: string | null;
 }
 
 interface InventoryItemPickerProps {
   value: string;
-  onChange: (itemId: string) => void;
+  /** Called with "" when the selected item is picked again (cleared). */
+  onChange: (itemId: string, item?: InventoryItemOption) => void;
   placeholder?: string;
+  /** Smaller trigger, for use inside line editors. */
+  compact?: boolean;
 }
 
-export function InventoryItemPicker({ value, onChange, placeholder = "Select item..." }: InventoryItemPickerProps) {
+export function InventoryItemPicker({ value, onChange, placeholder = "Select item...", compact }: InventoryItemPickerProps) {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<InventoryItemOption[]>([]);
-  const [selected, setSelected] = useState<InventoryItemOption | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Items load once the popover has been opened
+  const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
-  const fetchIdRef = useRef(0);
+  const isSearching = search !== debouncedSearch;
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  // Fetch items for the debounced search (after the first open). No keepPrevious: an
+  // uncached search shows the spinner, as before, instead of the previous term's results.
+  const params = new URLSearchParams({ limit: "50" });
+  if (debouncedSearch) params.set("search", debouncedSearch);
+  const { data, loading: fetching } = useApi<{ data?: InventoryItemOption[] }>(opened ? `/api/v1/inventory?${params}` : null, { learn: false });
+  const items = data?.data ?? [];
+  const loading = fetching || isSearching;
 
-  // Fetch items when debounced search changes (while open)
-  useEffect(() => {
-    if (!open || !orgId) return;
-    const id = ++fetchIdRef.current;
-    const params = new URLSearchParams({ limit: "50" });
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    // Only show loading for search changes, not the initial open (handled by onOpenChange)
-    fetch(`/api/v1/inventory?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (id === fetchIdRef.current && data.data) {
-          setItems(data.data);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (id === fetchIdRef.current) setLoading(false);
-      });
-  }, [open, debouncedSearch, orgId]);
+  // The item last picked from the list, so its label stays while a new search loads
+  const [picked, setPicked] = useState<InventoryItemOption | null>(null);
 
-  // Resolve the selected item label if we have a value but no match yet
-  const resolvedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!value || !orgId) return;
-    if (items.find((i) => i.id === value)) return;
-    if (resolvedRef.current === value) return;
-    let cancelled = false;
-    resolvedRef.current = value;
-    fetch(`/api/v1/inventory/${value}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled && data.inventoryItem) setSelected(data.inventoryItem);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [value, items, orgId]);
+  // Resolve the selected item label if we have a value but no match in the list
+  const inItems = !!value && items.some((i) => i.id === value);
+  const { data: resolved } = useApi<{ inventoryItem?: InventoryItemOption }>(value && !inItems && picked?.id !== value ? `/api/v1/inventory/${value}` : null);
 
-  // Derive selected from items list or keep the fetched resolution
-  const selectedItem = !value ? null : items.find((i) => i.id === value) || selected;
+  // Derive selected from items list or fall back to the picked item / fetched resolution
+  const selectedItem = !value ? null : items.find((i) => i.id === value) || (picked?.id === value ? picked : null) || resolved?.inventoryItem || null;
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (nextOpen) {
-      setLoading(true);
+      setOpened(true);
     } else {
       setSearch("");
     }
@@ -104,7 +85,7 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between font-normal h-9"
+          className={cn("w-full justify-between font-normal", compact ? "h-8 text-sm" : "h-9")}
         >
           {selectedItem ? (
             <span className="truncate">
@@ -121,7 +102,7 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
           <CommandInput
             placeholder="Search items..."
             value={search}
-            onValueChange={(v) => { setSearch(v); setLoading(true); }}
+            onValueChange={setSearch}
           />
           <CommandList>
             {loading ? (
@@ -144,7 +125,9 @@ export function InventoryItemPicker({ value, onChange, placeholder = "Select ite
                     key={item.id}
                     value={item.id}
                     onSelect={() => {
-                      onChange(item.id === value ? "" : item.id);
+                      setPicked(item);
+                      if (item.id === value) onChange("");
+                      else onChange(item.id, item);
                       setOpen(false);
                       setSearch("");
                     }}

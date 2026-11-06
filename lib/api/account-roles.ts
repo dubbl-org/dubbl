@@ -31,6 +31,8 @@ export const CANONICAL_CODES: ReadonlySet<string> = new Set([
   ...UNIVERSAL_ACCOUNTS.map((a) => a.code),
   "1660", // construction in progress / CWIP
   "3900", // currency translation reserve (consolidation CTA)
+  "4940", // bank reconciliation adjustments (income), see lib/banking/reconciliation-adjustment.ts
+  "5950", // bank reconciliation adjustments (expense)
 ]);
 
 export function isCanonicalCode(code: string): boolean {
@@ -187,10 +189,9 @@ export async function ensureAccountForCode(
 }
 
 /**
- * The canonical code revenue recognition defers into. Legacy charts have
- * always used 2300; role-mapped charts use the proper income-in-advance role
- * (2400 → e.g. 810 Income in Advance), since 2300 there means accruals.
+ * The canonical code revenue recognition defers into: the income-in-advance
+ * role 2400 (Unearned Revenue on the generic chart, e.g. 810 Income in
+ * Advance on Xero-style charts). 2300 is Accrued Expenses on every chart, a
+ * liability for costs owed, not income received in advance.
  */
-export async function deferredRevenueCode(organizationId: string, exec: DbOrTx = db): Promise<string> {
-  return (await getOrgChartTemplate(organizationId, exec)) ? "2400" : "2300";
-}
+export const DEFERRED_REVENUE_CODE = "2400";

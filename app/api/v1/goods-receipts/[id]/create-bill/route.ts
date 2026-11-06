@@ -11,6 +11,7 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
 import { linkBillToPurchaseOrders } from "@/app/api/v1/bills/_procurement";
 import { logAudit } from "@/lib/api/audit";
+import { emitBillCreated } from "@/lib/webhooks/events";
 
 /**
  * Create a draft bill from a goods receipt (GRN).
@@ -137,6 +138,7 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      emitBillCreated(ctx.organizationId, [createdBill.id]);
 
       await tx.insert(billLine).values(
         processedLines.map((l) => ({ billId: createdBill.id, ...l }))

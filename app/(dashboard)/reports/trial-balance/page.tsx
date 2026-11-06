@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState } from "react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface SplitBalance {
   debitBalance: string;
@@ -34,49 +35,27 @@ interface AccountBalance extends SplitBalance {
 
 interface TrialBalanceData {
   asAt: string;
+  fiscalYearStart?: string;
   dates?: string[];
   accounts: AccountBalance[];
 }
 
 export default function TrialBalancePage() {
   const today = new Date().toISOString().slice(0, 10);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [asAt, setAsAt] = useState(today);
   const [compareDate, setCompareDate] = useState("");
   const [showCompare, setShowCompare] = useState(false);
-  const [data, setData] = useState<TrialBalanceData | null>(null);
+  const params = new URLSearchParams({ asAt });
+  if (showCompare && compareDate) params.set("compareDate", compareDate);
+  const { data: report, loading } = useApi<TrialBalanceData>(`/api/v1/reports/trial-balance?${params}`, { keepPrevious: true });
+  const data = report?.accounts ? report : null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ asAt });
-    if (showCompare && compareDate) params.set("compareDate", compareDate);
-
-    fetch(`/api/v1/reports/trial-balance?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.accounts) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [asAt, showCompare, compareDate]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const accounts = data?.accounts ?? [];
   const dates = data?.dates ?? (data ? [data.asAt] : []);
+  // Click-through opens the ledger from the start of the financial year.
+  const ledgerStart = data?.asAt === asAt && data.fiscalYearStart ? data.fiscalYearStart : `${asAt.slice(0, 4)}-01-01`;
 
   function splitsFor(a: AccountBalance): SplitBalance[] {
     return a.balances ?? [a];
@@ -141,74 +120,70 @@ export default function TrialBalancePage() {
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          <div className="rounded-lg border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-24">Code</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead className="w-24">Type</TableHead>
-                  {dates.map((d) => (
-                    <TableHead key={d} colSpan={2} className="text-center">As of {d}</TableHead>
-                  ))}
-                </TableRow>
-                <TableRow className="bg-muted/30">
-                  <TableHead colSpan={3} />
-                  {dates.map((d) => (
-                    <Fragment key={d}>
-                      <TableHead className="w-28 text-right text-xs">Money in side</TableHead>
-                      <TableHead className="w-28 text-right text-xs">Money out side</TableHead>
-                    </Fragment>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accounts.map((a) => (
-                  <TableRow key={a.accountId}>
-                    <TableCell className="font-mono text-sm">{a.code}</TableCell>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/reports/general-ledger?${new URLSearchParams({ endDate: asAt }).toString()}#${a.accountId}`}
-                        className="hover:text-brand-600 hover:underline"
-                      >
-                        {a.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground capitalize">{a.type}</TableCell>
-                    {splitsFor(a).map((s, i) => (
-                      <Fragment key={i}>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {parseFloat(s.debitBalance) > 0 ? parseFloat(s.debitBalance).toFixed(2) : ""}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {parseFloat(s.creditBalance) > 0 ? parseFloat(s.creditBalance).toFixed(2) : ""}
-                        </TableCell>
-                      </Fragment>
-                    ))}
-                  </TableRow>
+      <ContentReveal>
+        <div className="rounded-lg border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-24">Code</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead className="w-24">Type</TableHead>
+                {dates.map((d) => (
+                  <TableHead key={d} colSpan={2} className="text-center">As of {d}</TableHead>
                 ))}
-                <TableRow className="bg-muted/30 font-bold">
-                  <TableCell colSpan={3}>Total</TableCell>
-                  {totals.map((t, i) => (
+              </TableRow>
+              <TableRow className="bg-muted/30">
+                <TableHead colSpan={3} />
+                {dates.map((d) => (
+                  <Fragment key={d}>
+                    <TableHead className="w-28 text-right text-xs">Money in side</TableHead>
+                    <TableHead className="w-28 text-right text-xs">Money out side</TableHead>
+                  </Fragment>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {accounts.map((a) => (
+                <TableRow key={a.accountId}>
+                  <TableCell className="font-mono text-sm">{a.code}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/reports/general-ledger?${new URLSearchParams({ startDate: ledgerStart, endDate: asAt }).toString()}#${a.accountId}`}
+                      className="hover:text-brand-600 hover:underline"
+                    >
+                      {a.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground capitalize">{a.type}</TableCell>
+                  {splitsFor(a).map((s, i) => (
                     <Fragment key={i}>
                       <TableCell className="text-right font-mono tabular-nums">
-                        {t.debit.toFixed(2)}
+                        {parseFloat(s.debitBalance) > 0 ? parseFloat(s.debitBalance).toFixed(2) : ""}
                       </TableCell>
                       <TableCell className="text-right font-mono tabular-nums">
-                        {t.credit.toFixed(2)}
+                        {parseFloat(s.creditBalance) > 0 ? parseFloat(s.creditBalance).toFixed(2) : ""}
                       </TableCell>
                     </Fragment>
                   ))}
                 </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </ContentReveal>
-      )}
+              ))}
+              <TableRow className="bg-muted/30 font-bold">
+                <TableCell colSpan={3}>Total</TableCell>
+                {totals.map((t, i) => (
+                  <Fragment key={i}>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {t.debit.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {t.credit.toFixed(2)}
+                    </TableCell>
+                  </Fragment>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </ContentReveal>
     </ContentReveal>
   );
 }

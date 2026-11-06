@@ -20,6 +20,7 @@ import {
   document,
   documentTemplate,
   dataBackup,
+  deal,
 } from "@/lib/db/schema";
 import type { PgTable } from "drizzle-orm/pg-core";
 
@@ -47,6 +48,7 @@ export const TRASHABLE_ENTITIES: TrashableEntity[] = [
   { type: "payment", label: "Payment", table: payment, nameCol: "paymentNumber", permission: "manage:payments" },
   { type: "recurring_template", label: "Recurring Template", table: recurringTemplate, nameCol: "name", permission: "manage:recurring" },
   { type: "project", label: "Project", table: project, nameCol: "name", permission: "manage:projects" },
+  { type: "deal", label: "Deal", table: deal, nameCol: "title", permission: "manage:contacts" },
   { type: "fixed_asset", label: "Fixed Asset", table: fixedAsset, nameCol: "name", permission: "manage:assets" },
   { type: "budget", label: "Budget", table: budget, nameCol: "name", permission: "manage:budgets" },
   { type: "loan", label: "Loan", table: loan, nameCol: "name", permission: "manage:banking" },

@@ -8,7 +8,6 @@ import {
   invoice,
   contact,
   organization,
-  emailConfig,
   reminderLog,
   auditLog,
 } from "@/lib/db/schema";
@@ -18,11 +17,14 @@ import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { createCategorizationJournalEntry, resolveBaseRate } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { MissingExchangeRateError } from "@/lib/currency/converter";
-import { sendEmail } from "@/lib/email/smtp-client";
+import { reminderMailer } from "@/lib/email/reminder-processor";
 import { renderTemplate } from "@/lib/email/template-engine";
 import { formatMoney } from "@/lib/money";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { markInvoicesPaid } from "@/lib/api/invoice-payment";
+import { postDraftInvoices } from "@/lib/api/invoice-send";
 
 /**
  * MCP tools for high-value BULK operations — the batch equivalents of
@@ -55,7 +57,7 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
   // -------------------------------------------------------------------------
   server.tool(
     "bulk_categorize_bank_transactions",
-    "Bulk-categorize many bank transactions in one call, where EACH transaction codes to its OWN chart-of-accounts account (and optional contact, tax rate, cost center, project, memo). This is the per-item batch of the single Categorize action; use bulk_cash_code instead when every line goes to the SAME account. Each item is posted in its own DB transaction (DR bank / CR account for money in; DR account / CR bank for money out), marked reconciled, and audited. Every transaction must belong to a bank account in THIS org and be unreconciled. Per-item failures (not found, not this org's, already reconciled, missing FX rate, target account not in org) are isolated and reported; the rest still commit. Amounts are integer cents.",
+    "Bulk-categorize many bank transactions in one call, where EACH transaction codes to its OWN chart-of-accounts account (and optional contact, tax rate, cost center, project, memo). This is the per-item batch of the single Categorize action; use bulk_cash_code instead when every line goes to the SAME account. Each item is posted in its own DB transaction (DR bank / CR account for money in; DR account / CR bank for money out), marked reconciled, and audited. Every transaction must belong to a bank account in THIS org and be unreconciled. Per-item failures (not found, not this org's, already reconciled, missing FX rate, target account not in org) are isolated and reported; the rest still commit. An inactive or unknown cost center rejects the whole batch before anything posts. Amounts are integer cents.",
     {
       items: z
         .array(
@@ -101,6 +103,25 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
         requireRole(ctx, "manage:banking");
 
         const items = params.items;
+
+        // Every cost center being newly set must be active. Checked up front so
+        // one bad pick rejects the batch before anything posts; a cost center
+        // already saved on a transaction stays allowed.
+        const ccItems = items.filter((i) => i.costCenterId);
+        if (ccItems.length > 0) {
+          const saved = await db.query.bankTransaction.findMany({
+            where: inArray(
+              bankTransaction.id,
+              ccItems.map((i) => i.transactionId).filter((id) => z.string().uuid().safeParse(id).success)
+            ),
+            columns: { id: true, costCenterId: true },
+          });
+          const savedById = new Map(saved.map((t) => [t.id, t.costCenterId]));
+          await assertCostCentersActive(
+            ctx.organizationId,
+            ccItems.filter((i) => i.costCenterId !== savedById.get(i.transactionId)).map((i) => i.costCenterId)
+          );
+        }
 
         type ItemResult = {
           transactionId: string;
@@ -275,51 +296,45 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
   // -------------------------------------------------------------------------
   server.tool(
     "bulk_mark_invoices_paid",
-    "Mark many invoices as fully PAID in one call (sets status=paid, amountPaid=total, amountDue=0, paidAt=now). Use this to clear off invoices that have been settled outside the system. Void invoices in the list are skipped. Every id is org-scoped — only invoices in THIS org are touched. NOTE: this is a status/balance flip only; it does NOT record a payment or post a payment journal entry (use pay_invoice for a single invoice with a real payment + GL posting). Returns the number updated.",
+    "Mark many invoices as paid in full in one call. Each open invoice (sent, partial or overdue) gets a real payment for its whole amountDue: a payment record, its allocation and the journal entry (DR the bank account's ledger account / CR Accounts Receivable), exactly like pay_invoice. Drafts, void, already-paid and other-organization invoices are skipped and reported. Each invoice is done on its own, so one failure (for example a locked period) doesn't stop the rest. Returns the number paid and a result per id (success, paymentId or error).",
     {
       ids: z
         .array(z.string().uuid())
         .min(1)
         .max(100)
         .describe("UUIDs of the invoices to mark as paid (max 100)"),
+      date: z
+        .string()
+        .optional()
+        .describe("Payment date (YYYY-MM-DD); defaults to today. The journal entries post on this date"),
+      bankAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("UUID of the bank account (from list_bank_accounts) the money went into. Omit for the default bank account (ledger account 1100)"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:invoices");
+        requireRole(ctx, "manage:payments");
 
-        const ids = params.ids;
-
-        const invoices = await db.query.invoice.findMany({
-          where: and(inArray(invoice.id, ids), eq(invoice.organizationId, ctx.organizationId)),
+        const results = await markInvoicesPaid(ctx, params.ids, {
+          date: params.date,
+          bankAccountId: params.bankAccountId,
         });
+        const paidIds = results.filter((r) => r.success).map((r) => r.id);
 
-        let count = 0;
-        for (const inv of invoices) {
-          if (inv.status === "void") continue;
-          await db
-            .update(invoice)
-            .set({
-              status: "paid",
-              amountPaid: inv.total,
-              amountDue: 0,
-              paidAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .where(eq(invoice.id, inv.id));
-          count++;
-        }
-
-        const paidIds = invoices.filter((inv) => inv.status !== "void").map((inv) => inv.id);
+        // Each payment sends payment.received and invoice.paid itself.
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
           userId: ctx.userId,
           action: "pay",
           entityType: "invoice",
           entityId: ctx.organizationId,
-          changes: { count, ids: paidIds, bulk: true },
+          changes: { count: paidIds.length, ids: paidIds, bulk: true },
         });
 
-        return { updated: count };
+        return { updated: paidIds.length, results };
       })
   );
 
@@ -331,7 +346,7 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
   // -------------------------------------------------------------------------
   server.tool(
     "bulk_mark_invoices_sent",
-    "Mark many DRAFT invoices as SENT in one call (sets status=sent, sentAt=now). Only invoices in THIS org that are currently in draft are updated; non-draft and other-org ids are ignored. NOTE: this is a status flip only — it does NOT email the customer and does NOT post a recognition/COGS journal entry. Returns the count and the ids actually updated.",
+    "Mark many DRAFT invoices as SENT in one call, without emailing the customer. Each invoice is posted to the ledger exactly like send_invoice: DR Accounts Receivable / CR income and output tax on its issue date, plus cost of goods sold for stock lines. Invoices that aren't drafts, belong to another organization, fall in a locked period or lack an exchange rate are skipped and reported. Returns the count, the ids sent and a result per id (success or error).",
     {
       ids: z
         .array(z.string().uuid())
@@ -341,21 +356,10 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:invoices");
+        requireRole(ctx, "approve:invoices");
 
-        const ids = params.ids;
-
-        const updated = await db
-          .update(invoice)
-          .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
-          .where(
-            and(
-              inArray(invoice.id, ids),
-              eq(invoice.organizationId, ctx.organizationId),
-              eq(invoice.status, "draft")
-            )
-          )
-          .returning({ id: invoice.id });
+        const results = await postDraftInvoices(ctx, params.ids);
+        const sentIds = results.filter((r) => r.success).map((r) => r.id);
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
@@ -363,10 +367,10 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
           action: "send",
           entityType: "invoice",
           entityId: ctx.organizationId,
-          changes: { count: updated.length, ids: updated.map((r) => r.id), bulk: true },
+          changes: { count: sentIds.length, ids: sentIds, bulk: true },
         });
 
-        return { updated: updated.length, ids: updated.map((r) => r.id) };
+        return { updated: sentIds.length, ids: sentIds, results };
       })
   );
 
@@ -386,7 +390,7 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "bulk_send_invoice_reminders",
-    "Email a payment reminder for each of the given invoices in one call. Requires verified org email (SMTP) to be set up. Only invoices that are owed money are reminded — draft, void, and paid invoices are skipped, as are invoices whose customer has no email. One email per invoice; a single failure never aborts the batch (each result is reported as sent/skipped/failed). Each successful reminder is logged and bumps that invoice's overdue (dunning) stage by one. All ids are org-scoped to THIS org. Returns per-invoice results plus a summary.",
+    "Email a payment reminder for each of the given invoices in one call. Sent through the org's own mail server when one is set up and verified, otherwise through dubbl's shared sender with replies going to the org's contact email. Only invoices that are owed money are reminded — draft, void, and paid invoices are skipped, as are invoices whose customer has no email. One email per invoice; a single failure never aborts the batch (each result is reported as sent/skipped/failed). Each successful reminder is logged and bumps that invoice's overdue (dunning) stage by one. All ids are org-scoped to THIS org. Returns per-invoice results plus a summary.",
     {
       invoiceIds: z
         .array(z.string().min(1))
@@ -403,17 +407,11 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
         // De-dupe ids while preserving order.
         const ids = [...new Set(params.invoiceIds)];
 
-        // SMTP must be configured + verified or nothing can go out.
-        const config = await db.query.emailConfig.findFirst({
-          where: eq(emailConfig.organizationId, ctx.organizationId),
-        });
-        if (!config || !config.isVerified) {
-          throw new Error("Email is not set up yet. Connect and verify your email to send reminders.");
-        }
-
         const org = await db.query.organization.findFirst({
           where: eq(organization.id, ctx.organizationId),
         });
+        // The org's own mail server if verified, otherwise dubbl's shared sender
+        const send = await reminderMailer(ctx.organizationId, org?.contactEmail);
 
         // Org-scoped load of just the requested invoices, with the contact for
         // the recipient email + name.
@@ -462,7 +460,7 @@ export function registerBulkTools(server: McpServer, ctx: AuthContext) {
           const html = renderTemplate(DEFAULT_BODY, vars);
 
           try {
-            await sendEmail(config, { to: recipient, subject, html });
+            await send({ to: recipient, subject, html });
             await db.insert(reminderLog).values({
               organizationId: ctx.organizationId,
               reminderRuleId: null,

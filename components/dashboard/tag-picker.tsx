@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { X, Plus, Tags } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +11,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import type { TaggableEntityType } from "@/lib/api/tags";
 
 interface Tag {
   id: string;
@@ -17,107 +20,132 @@ interface Tag {
   color: string;
 }
 
+const TAGS_URL = "/api/v1/tags";
+
+/** URL of the tags attached to one record (GET /api/v1/tags/record). */
+export function recordTagsUrl(entityType: TaggableEntityType, entityId: string) {
+  return `/api/v1/tags/record?${new URLSearchParams({ entityType, entityId })}`;
+}
+
+/** A small read-only chip for one tag, as shown on records and in lists. */
+export function TagChip({
+  tag,
+  onRemove,
+}: {
+  tag: Tag;
+  onRemove?: () => void;
+}) {
+  return (
+    <span className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border bg-muted/50 px-2 py-0.5 text-[11px] font-medium">
+      <span
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: tag.color }}
+      />
+      <span className="truncate">{tag.name}</span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label={`Remove tag ${tag.name}`}
+        >
+          <X className="size-2.5" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 interface TagPickerProps {
-  entityType: string;
+  entityType: TaggableEntityType;
   entityId: string;
   className?: string;
 }
 
+/**
+ * The tags on one record, with an "Add tags" popover to attach existing tags
+ * or create a new one, and an x on each chip to remove it.
+ */
 export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [attachedTagIds, setAttachedTagIds] = useState<Set<string>>(new Set());
+  const { data } = useApi<{ tags?: Tag[] }>(TAGS_URL);
+  const allTags = data?.tags ?? [];
+  const recordUrl = recordTagsUrl(entityType, entityId);
+  const { data: recordData } = useApi<{ tags?: Tag[] }>(recordUrl);
+  const attachedTags = recordData?.tags ?? [];
+  const cache = useApiCache();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
 
   const getOrgId = () => localStorage.getItem("activeOrgId") || "";
 
-  const fetchTags = useCallback(() => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-    fetch("/api/v1/tags", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setAllTags(data.tags || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
-
-  const attachTag = async (tagId: string) => {
-    const orgId = getOrgId();
-    const res = await fetch("/api/v1/tags/attach", {
+  const post = (url: string, body: unknown) =>
+    fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({ tagId, entityType, entityId }),
+      headers: { "Content-Type": "application/json", "x-organization-id": getOrgId() },
+      body: JSON.stringify(body),
     });
-    if (res.ok) {
-      setAttachedTagIds((prev) => new Set([...prev, tagId]));
+
+  const attachTag = async (tag: Tag) => {
+    await cache.cancel(recordUrl);
+    cache.update<{ tags?: Tag[] }>(recordUrl, (d) => ({
+      ...d,
+      tags: [...(d.tags ?? []).filter((t) => t.id !== tag.id), tag].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      ),
+    }));
+    const res = await post("/api/v1/tags/attach", { tagId: tag.id, entityType, entityId });
+    if (!res.ok) {
+      toast.error("Couldn't add the tag");
+      cache.invalidate(recordUrl);
     }
   };
 
-  const detachTag = async (tagId: string) => {
-    const orgId = getOrgId();
-    await fetch("/api/v1/tags/detach", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({ tagId, entityType, entityId }),
-    });
-    setAttachedTagIds((prev) => {
-      const next = new Set(prev);
-      next.delete(tagId);
-      return next;
-    });
+  const detachTag = async (tag: Tag) => {
+    await cache.cancel(recordUrl);
+    cache.update<{ tags?: Tag[] }>(recordUrl, (d) => ({
+      ...d,
+      tags: (d.tags ?? []).filter((t) => t.id !== tag.id),
+    }));
+    const res = await post("/api/v1/tags/detach", { tagId: tag.id, entityType, entityId });
+    if (!res.ok) {
+      toast.error("Couldn't remove the tag");
+      cache.invalidate(recordUrl);
+    }
   };
 
   const createAndAttach = async () => {
     if (!search.trim()) return;
-    const orgId = getOrgId();
     setCreating(true);
     try {
-      const res = await fetch("/api/v1/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ name: search.trim() }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAllTags((prev) => [...prev, data.tag]);
-        await attachTag(data.tag.id);
-        setSearch("");
+      const res = await post(TAGS_URL, { name: search.trim() });
+      if (!res.ok) {
+        toast.error("Couldn't create the tag");
+        return;
       }
+      const created = await res.json();
+      cache.update<{ tags?: Tag[] }>(TAGS_URL, (d) => ({ ...d, tags: [...(d.tags ?? []), created.tag] }));
+      await attachTag(created.tag);
+      setSearch("");
     } finally {
       setCreating(false);
     }
   };
 
-  const attachedTags = allTags.filter((t) => attachedTagIds.has(t.id));
+  const attachedIds = new Set(attachedTags.map((t) => t.id));
   const filtered = allTags.filter(
     (t) =>
-      !attachedTagIds.has(t.id) &&
+      !attachedIds.has(t.id) &&
       t.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const exactMatch = allTags.some(
+    (t) => t.name.toLowerCase() === search.trim().toLowerCase()
   );
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {attachedTags.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-white"
-          style={{ backgroundColor: tag.color }}
-        >
-          {tag.name}
-          <button
-            type="button"
-            onClick={() => detachTag(tag.id)}
-            className="hover:opacity-70"
-          >
-            <X className="size-2.5" />
-          </button>
-        </span>
+        <TagChip key={tag.id} tag={tag} onRemove={() => detachTag(tag)} />
       ))}
 
       <Popover open={open} onOpenChange={setOpen}>
@@ -129,7 +157,7 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
             className="h-6 px-1.5 text-[11px] text-muted-foreground gap-1"
           >
             <Tags className="size-3" />
-            {attachedTags.length === 0 ? "Add tags" : "+"}
+            {attachedTags.length === 0 ? "Add tags" : "Add"}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-56 p-2" align="start">
@@ -145,7 +173,7 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
                 key={tag.id}
                 type="button"
                 className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted"
-                onClick={() => attachTag(tag.id)}
+                onClick={() => attachTag(tag)}
               >
                 <div
                   className="size-2.5 rounded-full shrink-0"
@@ -154,7 +182,7 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
                 {tag.name}
               </button>
             ))}
-            {filtered.length === 0 && search.trim() && (
+            {search.trim() && !exactMatch && (
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted text-muted-foreground"

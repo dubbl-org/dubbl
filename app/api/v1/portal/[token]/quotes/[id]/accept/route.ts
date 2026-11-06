@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { portalAccessToken, quote } from "@/lib/db/schema";
+import { portalAccessToken, quote, portalActivityLog } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
 export async function POST(
@@ -26,6 +26,7 @@ export async function POST(
         eq(quote.organizationId, access.organizationId),
         eq(quote.contactId, access.contactId),
         eq(quote.status, "sent"),
+        isNull(quote.deletedAt),
       ),
     });
 
@@ -44,7 +45,15 @@ export async function POST(
       .where(eq(quote.id, id))
       .returning();
 
-    return NextResponse.json(updated);
+    await db.insert(portalActivityLog).values({
+      tokenId: access.id,
+      action: "approve_quote",
+      entityType: "quote",
+      entityId: id,
+      ipAddress: request.headers.get("x-forwarded-for") || null,
+    });
+
+    return NextResponse.json({ id: updated.id, status: updated.status });
   } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

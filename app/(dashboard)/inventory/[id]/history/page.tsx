@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Clock, ArrowUpDown } from "lucide-react";
+import { Clock } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useInventoryItem } from "../layout";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 const movementTypeColors: Record<string, string> = {
   adjustment: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
@@ -24,21 +22,9 @@ const movementTypeColors: Record<string, string> = {
 export default function InventoryItemHistoryPage() {
   const { id } = useParams<{ id: string }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [movements, setMovements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: any[] }>(`/api/v1/inventory/${id}/movements?limit=50`);
+  const movements = data?.data ?? [];
   useDocumentTitle("Inventory · Stock History");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch(`/api/v1/inventory/${id}/movements?limit=50`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setMovements(data.data); })
-      .finally(() => setLoading(false));
-  }, [id]);
 
   if (loading) return <BrandLoader />;
 

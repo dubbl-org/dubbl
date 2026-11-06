@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { preProcessAccounts } from "@/lib/import-export/pre-process";
 import type { SourceSystem } from "@/lib/import-export/types";
+import { validateImportRows } from "@/lib/import-export/validate-rows";
 import { z } from "zod";
 
 const importSchema = z.object({
@@ -32,23 +33,25 @@ export async function POST(request: Request) {
     const rawParsed = importSchema.parse(body);
     const source = (rawParsed.source || "custom") as SourceSystem;
     const transformedRows = preProcessAccounts(rawParsed.rows, source);
+    // Validate row by row: bad rows are reported, the rest still import.
+    const checked = validateImportRows(transformedRows, rowSchema);
     const parsed = {
       fileName: rawParsed.fileName,
-      rows: transformedRows.map(r => rowSchema.parse(r)),
+      rows: checked.rows,
     };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
       type: "accounts",
       fileName: parsed.fileName,
-      totalRows: parsed.rows.length,
+      totalRows: transformedRows.length,
       status: "processing",
       createdBy: ctx.userId,
     }).returning();
 
     let processedRows = 0;
-    let errorRows = 0;
-    const errorDetails: Array<{ row: number; error: string }> = [];
+    let errorRows = checked.invalid.length;
+    const errorDetails: Array<{ row: number; error: string }> = [...checked.invalid];
 
     for (let i = 0; i < parsed.rows.length; i++) {
       try {
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
         processedRows++;
       } catch (err) {
         errorRows++;
-        errorDetails.push({ row: i + 1, error: err instanceof Error ? err.message : "Unknown error" });
+        errorDetails.push({ row: checked.rowNumbers[i], error: err instanceof Error ? err.message : "Unknown error" });
       }
     }
 
@@ -71,7 +74,7 @@ export async function POST(request: Request) {
       processedRows,
       errorRows,
       errorDetails: errorDetails.length > 0 ? errorDetails : null,
-      status: errorRows === parsed.rows.length ? "failed" : "completed",
+      status: processedRows === 0 ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id));
 

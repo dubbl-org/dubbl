@@ -55,6 +55,7 @@ export async function POST(
     const { entryId, grniEntryId, warnings } = await postBillReceipt(
       { organizationId: ctx.organizationId, userId: ctx.userId },
       {
+        id: found.id,
         billNumber: found.billNumber,
         issueDate: found.issueDate,
         currencyCode: found.currencyCode,

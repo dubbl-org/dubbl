@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Ban, CalendarClock, Check } from "lucide-react";
@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
+import { useApi } from "@/lib/query/use-api";
 
 interface AccrualEntry {
   id: string;
@@ -48,36 +49,13 @@ const statusLabels: Record<string, string> = {
 export default function AccrualDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [acc, setAcc] = useState<AccrualScheduleDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ schedule?: AccrualScheduleDetail }>(`/api/v1/accrual-schedules/${id}`);
+  const acc = data?.schedule ?? null;
   const [posting, setPosting] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(acc?.description);
-
-  const refetch = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/accrual-schedules/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.schedule) setAcc(data.schedule);
-      });
-  }, [id, orgId]);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/accrual-schedules/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.schedule) setAcc(data.schedule);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
 
   async function handlePostNext() {
     if (!orgId) return;
@@ -89,7 +67,6 @@ export default function AccrualDetailPage() {
       });
       if (res.ok) {
         toast.success("This month's share has been recorded");
-        refetch();
       } else {
         const data = await res.json();
         toast.error(typeof data.error === "string" ? data.error : "Couldn't record this month");
@@ -113,7 +90,6 @@ export default function AccrualDetailPage() {
         });
         if (res.ok) {
           toast.success("Accrual cancelled");
-          refetch();
         } else {
           const data = await res.json();
           toast.error(typeof data.error === "string" ? data.error : "Couldn't cancel this accrual");

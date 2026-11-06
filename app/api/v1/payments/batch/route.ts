@@ -8,7 +8,11 @@ import { handleError } from "@/lib/api/response";
 import { getNextNumber } from "@/lib/api/numbering";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { decimalToCents } from "@/lib/money";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { checkPaymentBankAccount } from "@/lib/api/payment-bank-account";
 import { z } from "zod";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
 
 const batchSchema = z.object({
   type: z.enum(["received", "made"]),
@@ -31,6 +35,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = batchSchema.parse(body);
+
+    // The payment posts a GL entry on parsed.date — block locked/closed periods.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
 
     // A "received" batch settles invoices (AR); a "made" batch settles bills
     // (AP). Reject inconsistent allocations so the journal posts to the correct
@@ -137,6 +144,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // A chosen bank account must exist and be able to carry this currency;
+    // otherwise the cash leg would silently fall back to the default account.
+    if (parsed.bankAccountId) {
+      const bankError = await checkPaymentBankAccount(
+        ctx.organizationId,
+        parsed.bankAccountId,
+        [...batchCurrencies],
+        expectedDocType
+      );
+      if (bankError) {
+        return NextResponse.json({ error: bankError }, { status: 400 });
+      }
+    }
+
     // Atomic write sequence: the payment row, its allocations, the document
     // balance/status updates, the GL journal entry, and the payment ->
     // journalEntry link must all COMMIT TOGETHER or ROLL BACK TOGETHER. A
@@ -160,6 +181,7 @@ export async function POST(request: Request) {
           createdBy: ctx.userId,
         })
         .returning();
+      emitPaymentReceived(ctx.organizationId, [created.id]);
 
       // Create allocation records
       await tx.insert(paymentAllocation).values(
@@ -227,6 +249,8 @@ export async function POST(request: Request) {
 
       return { created };
     });
+
+    await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
 
     // Return payment with allocations
     const result = await db.query.payment.findFirst({

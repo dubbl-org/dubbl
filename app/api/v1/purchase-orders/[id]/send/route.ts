@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/api/audit";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import { renderDocumentEmailHtml } from "@/lib/email/render-document-email";
 import { z } from "zod";
+import { assertApprovedIfRequired } from "@/lib/approvals/entities";
 
 const templatePropsSchema = z.object({
   organizationName: z.string(),
@@ -56,6 +57,10 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // When an active approval workflow matches this order, it can only be sent
+    // after its approval request is fully approved (409 otherwise).
+    await assertApprovedIfRequired(ctx, "purchase_order", id);
 
     const rawBody = await request.json().catch(() => ({}));
     const emailParsed = sendBodySchema.safeParse(rawBody);

@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
 import { cn, safeCallbackUrl } from "@/lib/utils";
+import { rememberPlanIntent } from "@/lib/plan-intent";
+import { INVITE_COOKIE, inviteTokenFromCallback } from "@/lib/invite-token";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -58,11 +60,18 @@ export default function SignUpPage() {
   );
 }
 
+/** Keep the invite link through an OAuth round trip (read when the account is created). */
+function rememberInvite(token: string | null) {
+  if (token) document.cookie = `${INVITE_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=1800; samesite=lax`;
+}
+
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Set when sign-up starts from a flow that should resume afterwards (e.g. an invite link)
   const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"), "");
+  // An invite link lets this person register even when sign-up is invite only
+  const inviteToken = inviteTokenFromCallback(callbackUrl);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,6 +91,11 @@ function SignUpContent() {
       .catch(() => setProviders({ google: false, apple: false, registrationMode: "open", allowedDomains: "" }));
   }, [router]);
 
+  // A paid plan picked on the pricing page opens checkout after onboarding
+  useEffect(() => {
+    rememberPlanIntent(searchParams.get("plan"), searchParams.get("interval"));
+  }, [searchParams]);
+
   const hasOAuth = providers?.google || providers?.apple;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -93,7 +107,7 @@ function SignUpContent() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, inviteToken: inviteToken ?? undefined }),
       });
 
       if (!res.ok) {
@@ -135,14 +149,14 @@ function SignUpContent() {
       </motion.div>
 
       {/* Registration mode notices */}
-      {providers?.registrationMode === "invite_only" && (
+      {providers?.registrationMode === "invite_only" && !inviteToken && (
         <motion.div
           className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.03 }}
         >
-          Registration is by invitation only. You need an invite to create an account.
+          Registration is by invitation only. Sign up with the email address your invitation was sent to.
         </motion.div>
       )}
       {providers?.allowedDomains && (
@@ -170,7 +184,10 @@ function SignUpContent() {
                 type="button"
                 variant="outline"
                 className="h-11 rounded-lg text-sm font-medium"
-                onClick={() => signIn("google", { callbackUrl: callbackUrl || "/dashboard" })}
+                onClick={() => {
+                  rememberInvite(inviteToken);
+                  signIn("google", { callbackUrl: callbackUrl || "/dashboard" });
+                }}
               >
                 <GoogleIcon className="size-4" />
                 Google
@@ -181,7 +198,10 @@ function SignUpContent() {
                 type="button"
                 variant="outline"
                 className="h-11 rounded-lg text-sm font-medium"
-                onClick={() => signIn("apple", { callbackUrl: callbackUrl || "/dashboard" })}
+                onClick={() => {
+                  rememberInvite(inviteToken);
+                  signIn("apple", { callbackUrl: callbackUrl || "/dashboard" });
+                }}
               >
                 <AppleIcon className="size-4" />
                 Apple

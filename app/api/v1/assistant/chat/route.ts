@@ -12,7 +12,7 @@ import {
   type FileBlock,
   type StoredBlock,
   type StoredMessage,
-} from "@/lib/assistant/anthropic";
+} from "@/lib/assistant/model";
 import {
   BOOKING_TOOLS,
   CORE_TOOLS,
@@ -20,7 +20,7 @@ import {
   FIND_TOOLS,
   collectTools,
   findTools,
-  toAnthropicTool,
+  toModelTool,
   type AssistantTool,
 } from "@/lib/assistant/tools";
 import { systemPrompt } from "@/lib/assistant/prompt";
@@ -122,7 +122,7 @@ function loadedToolNames(messages: StoredMessage[]) {
 export async function GET(request: Request) {
   try {
     await getAuthContext(request);
-    return Response.json({ configured: Boolean(process.env.ANTHROPIC_API_KEY) });
+    return Response.json({ configured: Boolean(process.env.OPENROUTER_API_KEY) });
   } catch (err) {
     return handleError(err);
   }
@@ -137,10 +137,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       return Response.json(
-        { error: "not_configured", message: "Tilly needs an ANTHROPIC_API_KEY in the server environment." },
+        { error: "not_configured", message: "Tilly needs an OPENROUTER_API_KEY in the server environment." },
         { status: 503 }
       );
     }
@@ -321,7 +321,7 @@ export async function POST(request: Request) {
               apiKey,
               system,
               messages: api,
-              tools: [FIND_TOOLS, ...[...loaded].flatMap((n) => (tools.has(n) ? [toAnthropicTool(tools.get(n)!)] : []))],
+              tools: [FIND_TOOLS, ...[...loaded].flatMap((n) => (tools.has(n) ? [toModelTool(tools.get(n)!)] : []))],
               onText: (t) => emit({ type: "text_delta", text: t }),
               signal: request.signal,
             });

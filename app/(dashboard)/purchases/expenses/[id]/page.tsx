@@ -26,6 +26,13 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -42,11 +49,15 @@ import {
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { TagPicker } from "@/components/dashboard/tag-picker";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApprovalPanel } from "@/components/dashboard/approval-panel";
 import { formatMoney, minorUnitsToDecimal, decimalToCents } from "@/lib/money";
+import { splitExpenseItemTax } from "@/lib/api/expense-claim-tax";
 import Link from "next/link";
 
 interface ExpenseDetail {
@@ -70,10 +81,29 @@ interface ExpenseDetail {
     description: string;
     amount: number;
     category: string | null;
+    accountId: string | null;
+    taxRateId: string | null;
+    isMileage: boolean;
+    distanceMiles: number | null;
+    mileageRate: number | null;
     receiptFileKey: string | null;
     receiptFileName: string | null;
     account: { code: string; name: string } | null;
   }[];
+}
+
+// Row shape from GET /api/v1/tax-rates. `rate` is in basis points (2000 = 20%).
+interface TaxRateOption {
+  id: string;
+  name: string;
+  rate: number;
+  type?: string;
+  kind: string;
+  recoverablePercent: number;
+}
+
+function formatRate(rate: number) {
+  return `${(rate / 100).toFixed(rate % 100 === 0 ? 0 : 2)}%`;
 }
 
 interface EditItem {
@@ -82,8 +112,13 @@ interface EditItem {
   amount: string;
   category: string;
   accountId: string;
+  taxRateId: string;
   receiptFileKey: string;
   receiptFileName: string;
+  // Mileage fields aren't editable here; carried through so a save keeps them.
+  isMileage: boolean;
+  distanceMiles: number | null;
+  mileageRate: number | null;
 }
 
 const statusConfig: Record<string, { class: string; dot: string }> = {
@@ -238,12 +273,12 @@ function EditExpenseDrawer({
   open,
   onClose,
   claim,
-  onSaved,
+  taxRates,
 }: {
   open: boolean;
   onClose: () => void;
   claim: ExpenseDetail;
-  onSaved: () => void;
+  taxRates: TaxRateOption[];
 }) {
   const [saving, setSaving] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -261,9 +296,13 @@ function EditExpenseDrawer({
           description: item.description,
           amount: minorUnitsToDecimal(item.amount, claim.currencyCode),
           category: item.category || "",
-          accountId: "",
+          accountId: item.accountId || "",
+          taxRateId: item.taxRateId || "",
           receiptFileKey: item.receiptFileKey || "",
           receiptFileName: item.receiptFileName || "",
+          isMileage: item.isMileage,
+          distanceMiles: item.distanceMiles,
+          mileageRate: item.mileageRate,
         }))
       );
     }
@@ -276,7 +315,7 @@ function EditExpenseDrawer({
   function addEditItem() {
     setEditItems((prev) => [
       ...prev,
-      { date: new Date().toISOString().split("T")[0], description: "", amount: "", category: "", accountId: "", receiptFileKey: "", receiptFileName: "" },
+      { date: new Date().toISOString().split("T")[0], description: "", amount: "", category: "", accountId: "", taxRateId: "", receiptFileKey: "", receiptFileName: "", isMileage: false, distanceMiles: null, mileageRate: null },
     ]);
   }
 
@@ -314,8 +353,12 @@ function EditExpenseDrawer({
             amount: parseFloat(item.amount) || 0,
             category: item.category || null,
             accountId: item.accountId || null,
+            taxRateId: item.taxRateId || null,
             receiptFileKey: item.receiptFileKey || null,
             receiptFileName: item.receiptFileName || null,
+            isMileage: item.isMileage,
+            distanceMiles: item.distanceMiles,
+            mileageRate: item.mileageRate,
           })),
         }),
       });
@@ -327,7 +370,6 @@ function EditExpenseDrawer({
 
       toast.success("Expense claim updated");
       onClose();
-      onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     } finally {
@@ -399,10 +441,29 @@ function EditExpenseDrawer({
                         <Input value={item.category} onChange={(e) => updateEditItem(index, { category: e.target.value })} />
                       </div>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       <div className="space-y-2">
                         <Label className="text-xs">Account</Label>
                         <AccountPicker value={item.accountId} onChange={(val) => updateEditItem(index, { accountId: val })} typeFilter={["expense"]} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Tax</Label>
+                        <Select
+                          value={item.taxRateId || "none"}
+                          onValueChange={(val) => updateEditItem(index, { taxRateId: val === "none" ? "" : val })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="No tax" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No tax</SelectItem>
+                            {taxRates
+                              .filter((t) => t.type !== "sales" || t.id === item.taxRateId)
+                              .map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.name} ({formatRate(t.rate)})
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Receipt</Label>
@@ -444,8 +505,15 @@ export default function ExpenseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [claim, setClaim] = useState<ExpenseDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/expenses/${id}`;
+  const cache = useApiCache();
+  const { data, loading } = useApi<{ expenseClaim?: ExpenseDetail }>(url);
+  const claim = data?.expenseClaim ?? null;
+  const { data: taxData } = useApi<{ taxRates?: TaxRateOption[] }>("/api/v1/tax-rates");
+  const taxRates = taxData?.taxRates ?? [];
+  const taxRateById = new Map(taxRates.map((t) => [t.id, t]));
+  const setClaim = (fn: (prev: ExpenseDetail) => ExpenseDetail) =>
+    cache.update<{ expenseClaim?: ExpenseDetail }>(url, (d) => (d.expenseClaim ? { ...d, expenseClaim: fn(d.expenseClaim) } : d));
   const [editOpen, setEditOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -457,22 +525,6 @@ export default function ExpenseDetailPage() {
   useDocumentTitle("Purchases · Expense Details");
   useEntityTitle(claim?.title);
 
-  const loadClaim = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/expenses/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.expenseClaim) setClaim(data.expenseClaim);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    loadClaim();
-  }, [loadClaim]);
-
   async function handleSubmit() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/expenses/${id}/submit`, {
@@ -481,7 +533,7 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
       toast.success("Expense claim submitted for approval");
     } else {
       const data = await res.json();
@@ -505,7 +557,7 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
       toast.success("Reversed and moved back to draft");
     } else {
       const data = await res.json();
@@ -521,7 +573,7 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
       toast.success("Pulled back to draft — you can edit it now");
     } else {
       const data = await res.json();
@@ -537,8 +589,9 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
-      toast.success("Expense claim approved");
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
+      // With an approval workflow, a middle step only passes it on.
+      toast.success(data.finalized === false ? "Approved. It's now with the next approver." : "Expense claim approved");
     } else {
       const data = await res.json();
       toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
@@ -557,7 +610,7 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
       setRejectOpen(false);
       setRejectReason("");
       toast.success("Expense claim rejected");
@@ -576,7 +629,7 @@ export default function ExpenseDetailPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setClaim((prev) => (prev ? { ...prev, ...data.expenseClaim } : prev));
+      setClaim((prev) => ({ ...prev, ...data.expenseClaim }));
       setPayOpen(false);
       toast.success("Expense claim marked as paid");
     } else {
@@ -622,6 +675,14 @@ export default function ExpenseDetailPage() {
 
   const sc = statusConfig[claim.status] || statusConfig.draft;
 
+  // Item amounts are tax-inclusive; work out the tax in each one the same way
+  // approval posts it (lib/api/expense-claim-tax.ts).
+  const itemTax = (item: ExpenseDetail["items"][number]) => {
+    const rate = item.taxRateId ? taxRateById.get(item.taxRateId) : undefined;
+    return { rate, tax: rate ? splitExpenseItemTax(item.amount, rate).tax : 0 };
+  };
+  const taxTotal = claim.items.reduce((sum, item) => sum + itemTax(item).tax, 0);
+
   return (
     <ContentReveal>
       <div className="space-y-6">
@@ -640,6 +701,7 @@ export default function ExpenseDetailPage() {
                 {claim.submittedByUser?.name || claim.submittedByUser?.email || "Unknown"}
                 {claim.submittedAt && <span> · Submitted {formatDate(claim.submittedAt)}</span>}
               </p>
+              <TagPicker entityType="expense" entityId={claim.id} className="mt-1.5" />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -732,6 +794,11 @@ export default function ExpenseDetailPage() {
           </div>
         </div>
 
+        {/* Approval workflow progress: who has approved and whose turn it is */}
+        {["draft", "submitted", "rejected"].includes(claim.status) && (
+          <ApprovalPanel entityType="expense" entityId={id} mode="progress" />
+        )}
+
         {/* Gradient divider */}
         <div className="h-px bg-gradient-to-r from-brand-500/20 via-border to-transparent" />
 
@@ -778,15 +845,16 @@ export default function ExpenseDetailPage() {
         {/* View mode - expense items table */}
         <div className="rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
-            <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b bg-muted/50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="grid min-w-[700px] grid-cols-[100px_1fr_100px_140px_120px_100px] gap-2 border-b bg-muted/50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span>Date</span>
               <span>Description</span>
               <span>Category</span>
               <span>Receipt</span>
+              <span className="text-right">Tax</span>
               <span className="text-right">Amount</span>
             </div>
             {claim.items.map((item) => (
-              <div key={item.id} className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 transition-colors">
+              <div key={item.id} className="grid min-w-[700px] grid-cols-[100px_1fr_100px_140px_120px_100px] gap-2 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 transition-colors">
                 <span className="text-sm tabular-nums">{item.date}</span>
                 <div>
                   <p className="text-sm font-medium">{item.description}</p>
@@ -802,17 +870,31 @@ export default function ExpenseDetailPage() {
                     <span className="text-sm text-muted-foreground">-</span>
                   )}
                 </span>
+                {(() => {
+                  const { rate, tax } = itemTax(item);
+                  return rate ? (
+                    <div className="text-right">
+                      <p className="text-sm font-mono tabular-nums">{formatMoney(tax, claim.currencyCode)}</p>
+                      <p className="text-xs text-muted-foreground">{rate.name} ({formatRate(rate.rate)})</p>
+                    </div>
+                  ) : (
+                    <span className="text-right text-sm text-muted-foreground">-</span>
+                  );
+                })()}
                 <span className="text-right text-sm font-mono font-medium tabular-nums">
                   {formatMoney(item.amount, claim.currencyCode)}
                 </span>
               </div>
             ))}
             {/* Total row */}
-            <div className="grid min-w-[580px] grid-cols-[100px_1fr_100px_140px_100px] gap-2 bg-muted/50 px-4 py-3">
+            <div className="grid min-w-[700px] grid-cols-[100px_1fr_100px_140px_120px_100px] gap-2 bg-muted/50 px-4 py-3">
               <span />
               <span />
               <span />
               <span className="text-sm font-semibold">Total</span>
+              <span className="text-right text-sm font-mono tabular-nums">
+                {taxTotal > 0 ? formatMoney(taxTotal, claim.currencyCode) : "-"}
+              </span>
               <span className="text-right text-sm font-mono font-bold tabular-nums">
                 {formatMoney(claim.totalAmount, claim.currencyCode)}
               </span>
@@ -826,7 +908,7 @@ export default function ExpenseDetailPage() {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         claim={claim}
-        onSaved={loadClaim}
+        taxRates={taxRates}
       />
 
       {confirmDialog}

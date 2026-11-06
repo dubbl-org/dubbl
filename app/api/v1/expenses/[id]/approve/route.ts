@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { expenseClaim } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { assertNotLocked } from "@/lib/api/period-lock";
-import { createExpenseClaimApprovalJournalEntry } from "@/lib/api/expense-claims";
+import { approveEntity } from "@/lib/approvals/entities";
 
+const approveSchema = z.object({
+  comment: z.string().optional(),
+});
+
+// Approve a submitted claim (requires approve:expenses). Full approval posts
+// the approval entry (DR expense accounts / CR Employee Reimbursements
+// Payable, dated today) and flips the claim to approved atomically. When an
+// approval workflow applies, only the current step's approver can act and the
+// claim posts only after the last step.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,61 +21,14 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "approve:expenses");
+    const body = await request.json().catch(() => ({}));
+    const parsed = approveSchema.parse(body);
 
-    const found = await db.query.expenseClaim.findFirst({
-      where: and(
-        eq(expenseClaim.id, id),
-        eq(expenseClaim.organizationId, ctx.organizationId),
-        notDeleted(expenseClaim.deletedAt)
-      ),
-      with: {
-        items: {
-          with: { account: true },
-        },
-      },
-    });
+    const outcome = await approveEntity(ctx, "expense", id, parsed.comment);
 
-    if (!found) return notFound("Expense claim");
-    if (found.status !== "submitted") {
-      return NextResponse.json(
-        { error: "Only submitted expense claims can be approved" },
-        { status: 400 }
-      );
-    }
+    logAudit({ ctx, action: "approve", entityType: "expense", entityId: id, changes: { previousStatus: "submitted", posted: outcome.finalized }, request });
 
-    const approvedAt = new Date();
-    // Approval posts a GL entry dated today — don't let it land in a locked or
-    // closed period.
-    await assertNotLocked(ctx.organizationId, approvedAt.toISOString().slice(0, 10), ctx);
-    // Post the approval entry (DR expense accounts / CR Employee Reimbursements
-    // Payable) and flip status to approved atomically, so the obligation is
-    // recognized in AP the moment the claim is approved.
-    const updated = await db.transaction(async (tx) => {
-      const entry = await createExpenseClaimApprovalJournalEntry(
-        ctx,
-        found,
-        tx,
-        approvedAt.toISOString().slice(0, 10)
-      );
-
-      const [row] = await tx
-        .update(expenseClaim)
-        .set({
-          status: "approved",
-          approvedBy: ctx.userId,
-          approvedAt,
-          journalEntryId: entry.id,
-          updatedAt: approvedAt,
-        })
-        .where(eq(expenseClaim.id, id))
-        .returning();
-      return row;
-    });
-
-    logAudit({ ctx, action: "approve", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
-
-    return NextResponse.json({ expenseClaim: updated });
+    return NextResponse.json({ expenseClaim: outcome.entity, request: outcome.request, finalized: outcome.finalized });
   } catch (err) {
     return handleError(err);
   }

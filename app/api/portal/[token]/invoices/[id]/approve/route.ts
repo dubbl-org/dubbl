@@ -26,11 +26,18 @@ export async function POST(
       where: and(
         eq(quote.id, id),
         eq(quote.organizationId, access.organizationId),
-        eq(quote.contactId, access.contactId)
+        eq(quote.contactId, access.contactId),
+        isNull(quote.deletedAt)
       ),
     });
 
     if (!q) return notFound("Quote");
+    // Same rules as /api/v1/portal/[token]/quotes/[id]/accept: only a sent,
+    // unexpired quote can be accepted (never a draft, declined or converted one).
+    if (q.status !== "sent") return error("Only sent quotes can be accepted", 400);
+    if (q.expiryDate < new Date().toISOString().split("T")[0]) {
+      return error("This quote has expired", 400);
+    }
 
     const [updated] = await db
       .update(quote)

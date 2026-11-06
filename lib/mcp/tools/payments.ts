@@ -13,8 +13,14 @@ import {
 } from "@/lib/api/journal-automation";
 import { isValidCurrencyCode } from "@/lib/currency/iso4217";
 import { decimalToCents } from "@/lib/money";
+import { checkPaymentBankAccount } from "@/lib/api/payment-bank-account";
+import { BillPaymentError } from "@/lib/api/bill-payment";
 import { wrapTool } from "@/lib/mcp/errors";
+import { isCashPayment, restoreAppliedCredits } from "@/lib/api/payment-credits";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
+import { allocateUnappliedPayment } from "@/lib/api/payment-allocate";
 
 /**
  * MCP tools for STANDALONE / on-account payment records — a single cash
@@ -50,6 +56,11 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
         .string()
         .optional()
         .describe("Filter by the customer/supplier contact UUID"),
+      includeCredits: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Also return the records that apply a credit note, customer prepayment or supplier credit to a document (no money moved). Defaults to false: only real payments"),
       limit: z
         .number()
         .int()
@@ -75,6 +86,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
         if (params.type) conditions.push(eq(payment.type, params.type));
         if (params.contactId)
           conditions.push(eq(payment.contactId, params.contactId));
+        if (!params.includeCredits) conditions.push(isCashPayment());
 
         const offset = (params.page - 1) * params.limit;
         const payments = await db.query.payment.findMany({
@@ -156,7 +168,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
         .string()
         .nullable()
         .optional()
-        .describe("UUID of the bank account the cash moved through (optional)"),
+        .describe("UUID of the bank account (from list_bank_accounts) the cash moved through. Its ledger account takes the cash leg; it must be in the documents' currency or the base currency. Omit for the default bank account (ledger account 1100)"),
       currencyCode: z
         .string()
         .length(3)
@@ -271,6 +283,18 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
         }
         const currencyCode = providedCurrency ?? docCurrency ?? "USD";
 
+        // A chosen bank account must exist and be able to carry this
+        // currency; otherwise the cash leg would silently fall back to 1100.
+        if (params.bankAccountId) {
+          const bankError = await checkPaymentBankAccount(
+            ctx.organizationId,
+            params.bankAccountId,
+            [currencyCode],
+            expectedDocType
+          );
+          if (bankError) throw new BillPaymentError(bankError);
+        }
+
         // Generate payment number
         const paymentNumber = await getNextNumber(
           ctx.organizationId,
@@ -304,6 +328,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
               createdBy: ctx.userId,
             })
             .returning();
+          emitPaymentReceived(ctx.organizationId, [created.id]);
 
           await tx.insert(paymentAllocation).values(
             params.allocations.map((a) => ({
@@ -386,6 +411,8 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
           return { created, journalEntry };
         });
 
+        await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
+
         const result = await db.query.payment.findFirst({
           where: eq(payment.id, created.id),
           with: { contact: true, allocations: true },
@@ -397,7 +424,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "record_payment_batch",
-    "Record ONE standalone payment that settles multiple documents in a batch for a single contact. UNLIKE the other payment tools, each allocation `amount` here is a DECIMAL number of currency units (e.g. 12.50, NOT cents) — it is converted to cents internally, and the payment total is the sum of those allocations. A 'received' batch can only settle invoices (AR); a 'made' batch only bills (AP); all settled documents must share one currency. Atomically: inserts the payment + allocation rows, updates each document's amountPaid/amountDue and status ('paid' or 'partial'), posts the GL journal entry (DR Bank / CR AR for received; DR AP / CR Bank for made), and links it. NOTE: this batch path does NOT enforce a period lock and does NOT cap the total against a separate amount (the total IS the allocations). Returns the created payment with its contact and allocations (amounts in integer cents).",
+    "Record ONE standalone payment that settles multiple documents in a batch for a single contact. UNLIKE the other payment tools, each allocation `amount` here is a DECIMAL number of currency units (e.g. 12.50, NOT cents) — it is converted to cents internally, and the payment total is the sum of those allocations. A 'received' batch can only settle invoices (AR); a 'made' batch only bills (AP); all settled documents must share one currency. Atomically: inserts the payment + allocation rows, updates each document's amountPaid/amountDue and status ('paid' or 'partial'), posts the GL journal entry (DR Bank / CR AR for received; DR AP / CR Bank for made), and links it. Fails if `date` is in a locked period. The total IS the allocations (there is no separate amount to cap against). Returns the created payment with its contact and allocations (amounts in integer cents).",
     {
       contactId: z
         .string()
@@ -417,7 +444,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
       bankAccountId: z
         .string()
         .optional()
-        .describe("UUID of the bank account the cash moved through (optional)"),
+        .describe("UUID of the bank account (from list_bank_accounts) the cash moved through. Its ledger account takes the cash leg; it must be in the documents' currency or the base currency. Omit for the default bank account (ledger account 1100)"),
       reference: z
         .string()
         .optional()
@@ -553,6 +580,21 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
           throw new Error("All settled documents must share the same currency");
         }
 
+        // The payment posts a GL entry on params.date — block locked periods.
+        await assertNotLocked(ctx.organizationId, params.date, ctx);
+
+        // A chosen bank account must exist and be able to carry this
+        // currency; otherwise the cash leg would silently fall back to 1100.
+        if (params.bankAccountId) {
+          const bankError = await checkPaymentBankAccount(
+            ctx.organizationId,
+            params.bankAccountId,
+            [...batchCurrencies],
+            expectedDocType
+          );
+          if (bankError) throw new BillPaymentError(bankError);
+        }
+
         // Atomic write sequence: the payment row, its allocations, the document
         // balance/status updates, the GL journal entry, and the payment ->
         // journalEntry link must all COMMIT TOGETHER or ROLL BACK TOGETHER. A
@@ -576,6 +618,7 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
               createdBy: ctx.userId,
             })
             .returning();
+          emitPaymentReceived(ctx.organizationId, [created.id]);
 
           // Create allocation records
           await tx.insert(paymentAllocation).values(
@@ -646,12 +689,32 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
         });
 
         // Return payment with allocations
+        await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
+
         const result = await db.query.payment.findFirst({
           where: eq(payment.id, created.id),
           with: { contact: true, allocations: true },
         });
 
         return { payment: result };
+      })
+  );
+
+  server.tool(
+    "allocate_payment",
+    "Put the unapplied (leftover) part of an existing payment toward an open invoice (for 'received' payments) or bill (for 'made' payments) of the same contact and currency. Matching only: the cash was already booked in full when the payment was recorded, so this adds an allocation and updates the document's amountPaid/amountDue/status, and posts NO journal entry and creates no new payment. amount is in integer cents and can't exceed the payment's unapplied amount or the document's amount due. Returns the allocation and the payment's remaining unapplied amount (cents).",
+    {
+      paymentId: z.string().describe("The UUID of the payment with unapplied money"),
+      documentId: z.string().describe("The UUID of the open invoice (received payment) or bill (made payment) to settle"),
+      amount: z.number().int().positive().describe("Amount to apply, in integer cents"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:payments");
+        return allocateUnappliedPayment(ctx.organizationId, params.paymentId, {
+          documentId: params.documentId,
+          amount: params.amount,
+        });
       })
   );
 
@@ -738,6 +801,10 @@ export function registerPaymentTools(server: McpServer, ctx: AuthContext) {
               }
             }
           }
+
+          // A credit note / prepayment / supplier credit applied through this
+          // carrier gets its amount back so it can be used again.
+          await restoreAppliedCredits(tx, ctx.organizationId, existing.allocations);
 
           // Reverse the payment's own GL entry (DR Bank/CR AR, or DR AP/CR Bank)
           // so the bank and the control accounts come back in line. A zero-cash

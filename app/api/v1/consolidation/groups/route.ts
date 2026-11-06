@@ -5,9 +5,14 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, ok, created } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
+import { organization } from "@/lib/db/schema";
+import { checkConsolidation } from "@/lib/api/check-limit";
 
 const createSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  // Defaults to this organization's base currency.
+  presentationCurrency: currencyCodeSchema.optional(),
 });
 
 export async function GET(request: Request) {
@@ -38,12 +43,18 @@ export async function POST(request: Request) {
     const ctx = await getAuthContext(request);
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await checkConsolidation(ctx.organizationId);
 
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+      columns: { defaultCurrency: true },
+    });
     const [group] = await db
       .insert(consolidationGroup)
       .values({
         parentOrgId: ctx.organizationId,
         name: parsed.name,
+        presentationCurrency: parsed.presentationCurrency ?? org?.defaultCurrency ?? "USD",
       })
       .returning();
 

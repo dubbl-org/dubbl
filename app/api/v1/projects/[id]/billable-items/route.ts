@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
-  project,
   projectBillableItem,
   bill,
   billLine,
 } from "@/lib/db/schema";
 import { eq, and, isNull, inArray, notInArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { syncProjectBilling } from "@/lib/api/project-billing";
 import { handleError, notFound, validationError } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
@@ -38,14 +37,9 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
+    // Items on voided/deleted invoices are released back to "registered".
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     const items = await db
       .select()
@@ -170,19 +164,11 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = registerSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     // Resolve bill-line costs/descriptions in one query (org-scoped).
     const billLineIds = parsed.items
@@ -286,20 +272,12 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
     const itemId = url.searchParams.get("itemId");
     const parsed = deleteSchema.parse({ itemId });
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     const existing = await db.query.projectBillableItem.findFirst({
       where: and(

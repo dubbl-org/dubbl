@@ -203,18 +203,42 @@ export async function closeFiscalYear(
     .set({ isClosed: true })
     .where(eq(fiscalYear.id, fy.id));
 
-  await db
-    .delete(periodLock)
-    .where(eq(periodLock.organizationId, organizationId));
-
-  await db.insert(periodLock).values({
-    organizationId,
-    lockDate: fy.endDate,
-    lockedBy: userId,
-    reason: `Fiscal year ${fy.name} closed`,
-  });
+  await lockThroughYearEnd(organizationId, fy.endDate, userId, `Fiscal year ${fy.name} closed`);
 
   return { success: true };
+}
+
+/**
+ * After a year is closed, make sure past dates are locked at least through its
+ * end. Only ever moves the lock date forward: a later lock date (and any
+ * advisor lock date) is kept as it is.
+ */
+export async function lockThroughYearEnd(
+  organizationId: string,
+  endDate: string,
+  userId: string | null | undefined,
+  reason: string
+): Promise<void> {
+  const lock = await db.query.periodLock.findFirst({
+    where: eq(periodLock.organizationId, organizationId),
+  });
+
+  if (!lock) {
+    await db.insert(periodLock).values({
+      organizationId,
+      lockDate: endDate,
+      lockedBy: userId ?? null,
+      reason,
+    });
+    return;
+  }
+
+  if (lock.lockDate >= endDate) return;
+
+  await db
+    .update(periodLock)
+    .set({ lockDate: endDate, lockedBy: userId ?? null, reason })
+    .where(eq(periodLock.id, lock.id));
 }
 
 export async function reopenFiscalYear(

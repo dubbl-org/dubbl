@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bill, billLine } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  releaseBillPurchaseOrderQuantities,
+  recountBillPurchaseOrders,
+} from "@/app/api/v1/bills/_procurement";
+import { bill, billLine, organization } from "@/lib/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { toBaseAmounts } from "@/lib/currency/base-amount";
-import { decimalToMinorUnits } from "@/lib/money";
-import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { buildBillLines, loadBillTaxContext } from "@/lib/api/bill-lines";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 // Optional full line-set replacement on update (draft bills only). Lets callers
-// edit lines AND set the FU-SURFACE inventory / warehouse / project / GRN
-// dimensions. When omitted, only the bill header fields in the body are updated.
+// edit lines AND set the inventory / warehouse / project / GRN dimensions.
+// When omitted, only the bill header fields in the body are updated.
 const updateLineSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().default(1),
@@ -33,6 +38,8 @@ const updateLineSchema = z.object({
 const updateHeaderSchema = z
   .object({
     contactId: z.string().min(1).optional(),
+    // The supplier's own invoice number. Blank keeps the current number.
+    billNumber: z.string().nullable().optional(),
     issueDate: z.string().min(1).optional(),
     dueDate: z.string().min(1).optional(),
     reference: z.string().nullable().optional(),
@@ -42,6 +49,8 @@ const updateHeaderSchema = z
 
 const updateSchema = updateHeaderSchema.extend({
   lines: z.array(updateLineSchema).min(1).optional(),
+  // Save even when another bill from this supplier has the same number.
+  confirmDuplicate: z.boolean().optional(),
 });
 
 export async function GET(
@@ -115,57 +124,70 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
-    const { lines, ...header } = parsed;
+    const { lines, billNumber: rawBillNumber, confirmDuplicate, ...header } = parsed;
+    if (lines) await assertLineStockRefs(ctx.organizationId, lines);
 
-    // Recompute totals from the new line set (mirrors POST), and persist the
-    // FU-SURFACE inventory / warehouse / project / GRN dimensions per line.
+    if (header.issueDate) await assertNotLocked(ctx.organizationId, header.issueDate);
+
     const headerUpdate: Record<string, unknown> = {
       ...header,
       updatedAt: new Date(),
     };
 
-    if (lines) {
-      const taxRateIds = lines.map((l) => l.taxRateId).filter(Boolean) as string[];
-      const ratesMap = await preloadTaxRates(taxRateIds);
-
-      let subtotal = 0;
-      const processedLines = lines.map((l, i) => {
-        const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
-        const discountAmount = l.discountPercent
-          ? Math.round((grossAmount * l.discountPercent) / 10000)
-          : 0;
-        const amount = grossAmount - discountAmount;
-        subtotal += amount;
-        const taxRateId = l.taxRateId || null;
-        const taxAmount = taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0;
-        return {
-          description: l.description,
-          quantity: Math.round(l.quantity * 100),
-          unitPrice: decimalToMinorUnits(l.unitPrice, existing.currencyCode),
-          accountId: l.accountId || null,
-          taxRateId,
-          discountPercent: l.discountPercent,
-          taxAmount,
-          amount,
-          inventoryItemId: l.inventoryItemId || null,
-          warehouseId: l.warehouseId || null,
-          projectId: l.projectId || null,
-          goodsReceiptLineId: l.goodsReceiptLineId || null,
-          sortOrder: i,
-        };
+    // A changed supplier bill number goes through the same duplicate check as
+    // create, honouring the org's duplicateBillStrategy.
+    const billNumber = rawBillNumber?.trim();
+    const contactId = header.contactId ?? existing.contactId;
+    if (billNumber && (billNumber !== existing.billNumber || contactId !== existing.contactId)) {
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, ctx.organizationId),
+        columns: { duplicateBillStrategy: true },
       });
+      const strategy = org?.duplicateBillStrategy ?? "warn";
+      if (strategy === "block" || (strategy === "warn" && !confirmDuplicate)) {
+        const dup = await db.query.bill.findFirst({
+          where: and(
+            eq(bill.organizationId, ctx.organizationId),
+            eq(bill.contactId, contactId),
+            eq(bill.billNumber, billNumber),
+            ne(bill.status, "void"),
+            ne(bill.id, id),
+            notDeleted(bill.deletedAt)
+          ),
+          columns: { id: true, billNumber: true },
+        });
+        if (dup) {
+          return NextResponse.json(
+            {
+              error: `A bill with number "${billNumber}" already exists for this supplier`,
+              ...(strategy === "warn" ? { warning: "duplicate_bill", hint: "Resubmit with confirmDuplicate=true to save it anyway" } : {}),
+              duplicate: { id: dup.id, billNumber: dup.billNumber },
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+    if (billNumber) headerUpdate.billNumber = billNumber;
 
-      const taxTotal = processedLines.reduce((s, l) => s + l.taxAmount, 0);
-      const total = subtotal + taxTotal;
-      headerUpdate.subtotal = subtotal;
-      headerUpdate.taxTotal = taxTotal;
-      headerUpdate.total = total;
-      headerUpdate.amountDue = total - existing.amountPaid;
+    // Recompute totals from the new line set (same math as create), and persist
+    // the inventory / warehouse / project / GRN dimensions per line.
+    if (lines) {
+      const { rates, kinds } = await loadBillTaxContext(lines);
+      const built = buildBillLines(lines, existing.currencyCode, rates, kinds);
+      headerUpdate.subtotal = built.subtotal;
+      headerUpdate.taxTotal = built.taxTotal;
+      headerUpdate.total = built.total;
+      headerUpdate.amountDue = built.amountDue - existing.amountPaid;
 
-      await db.delete(billLine).where(eq(billLine.billId, id));
-      await db.insert(billLine).values(
-        processedLines.map((l) => ({ billId: id, ...l }))
-      );
+      await db.transaction(async (tx) => {
+        await tx.delete(billLine).where(eq(billLine.billId, id));
+        await tx.insert(billLine).values(
+          built.lines.map((l) => ({ billId: id, ...l }))
+        );
+        // Linked purchase orders: count the new lines instead of the old ones.
+        await recountBillPurchaseOrders(ctx.organizationId, id, tx);
+      });
     }
 
     const [updated] = await db
@@ -207,8 +229,12 @@ export async function DELETE(
       );
     }
 
-    await db.delete(billLine).where(eq(billLine.billId, id));
-    await db.update(bill).set(softDelete()).where(eq(bill.id, id));
+    await db.transaction(async (tx) => {
+      // Give the linked purchase orders back what this bill counted as billed.
+      await releaseBillPurchaseOrderQuantities(ctx.organizationId, id, tx);
+      await tx.delete(billLine).where(eq(billLine.billId, id));
+      await tx.update(bill).set(softDelete()).where(eq(bill.id, id));
+    });
 
     logAudit({
       ctx,

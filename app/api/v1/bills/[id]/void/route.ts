@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import {
+  findBillGrniEntries,
+  releaseBillPurchaseOrderQuantities,
+  resolveProcurementLines,
+  reverseBillGrniPostings,
+} from "@/app/api/v1/bills/_procurement";
 import { bill, billLine, inventoryItem } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
@@ -44,15 +50,27 @@ export async function POST(
     // A bill posts to the GL (expense/inventory, input VAT, AP) and receives
     // stock only once it leaves draft and a journalEntryId is stamped. A draft
     // never posted, so voiding it is a pure status flip.
-    const wasPosted = !!found.journalEntryId;
+    // Lines matched to a goods receipt post a separate GRNI clearing entry
+    // (and no main entry at all when every line is matched), so look for those
+    // too: the bill counts as posted if either exists.
+    const allLines = await db.query.billLine.findMany({ where: eq(billLine.billId, id) });
+    const grniEntries = await findBillGrniEntries(ctx.organizationId, found, allLines);
+    const wasPosted = !!found.journalEntryId || grniEntries.length > 0;
     if (wasPosted) {
       await assertNotLocked(ctx.organizationId, found.issueDate, ctx);
+      for (const e of grniEntries) {
+        if (e.date !== found.issueDate) await assertNotLocked(ctx.organizationId, e.date, ctx);
+      }
     }
 
-    const lines = wasPosted
-      ? await db.query.billLine.findMany({ where: eq(billLine.billId, id) })
-      : [];
-    const stockLines = lines.filter((l) => l.inventoryItemId);
+    const lines = wasPosted ? allLines : [];
+    // Stock on matched lines came in with the goods receipt, not the bill, so
+    // only unmatched stock lines are taken back out.
+    const { matched } = wasPosted
+      ? await resolveProcurementLines(ctx, lines)
+      : { matched: [] };
+    const matchedIds = new Set(matched.map((m) => m.billLine.id));
+    const stockLines = lines.filter((l) => l.inventoryItemId && !matchedIds.has(l.id));
 
     const [updated] = await db.transaction(async (tx) => {
       // Reverse the bill's GL impact (DR Expense/Inventory, DR Input VAT, CR AP)
@@ -95,6 +113,15 @@ export async function POST(
           createdBy: ctx.userId,
         });
       }
+
+      // Reverse the GRNI clearing / price variance entry from goods receipt
+      // matching, and reopen the receipts.
+      if (wasPosted) {
+        await reverseBillGrniPostings(ctx, found, allLines, tx);
+      }
+
+      // Give the linked purchase orders back what this bill counted as billed.
+      await releaseBillPurchaseOrderQuantities(ctx.organizationId, found.id, tx);
 
       return tx
         .update(bill)

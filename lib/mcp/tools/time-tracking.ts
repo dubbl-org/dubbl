@@ -1,19 +1,39 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { timeEntry, runningTimer, timesheet, member } from "@/lib/db/schema";
+import { timeEntry, runningTimer, timesheet, timesheetEntry, payrollEmployee, project, member, projectTask } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { ProjectError, ProjectNotFoundError, requireProjectAccess } from "@/lib/api/project-access";
+import { resolveTimeEntryRate, syncProjectBilling } from "@/lib/api/project-billing";
+import { localISODate, timeEntryChangeError } from "@/lib/projects/rules";
+
+/** A task id must belong to the project the time is logged on. */
+async function assertTaskInProject(projectId: string, taskId: string | null | undefined) {
+  if (!taskId) return;
+  const task = await db.query.projectTask.findFirst({
+    where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, projectId)),
+    columns: { id: true },
+  });
+  if (!task) throw new ProjectNotFoundError("Task");
+}
+
+/** Elapsed seconds of a running timer (paused timers keep their accumulated time). */
+function timerSeconds(timer: { pausedAt: Date | null; startedAt: Date; accumulatedSeconds: number }, now = new Date()) {
+  return timer.pausedAt
+    ? timer.accumulatedSeconds
+    : timer.accumulatedSeconds + Math.floor((now.getTime() - timer.startedAt.getTime()) / 1000);
+}
 
 export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
   // ─── Time Entries ────────────────────────────────────────────────
 
   server.tool(
     "list_time_entries",
-    "List time entries with optional filters by project, user, date range, and billable status. Returns paginated results with total count.",
+    "List time entries with optional filters by project, user, date range, and billable status. Without projectId it lists the current user's own entries; with projectId it lists everyone's entries on that project (narrow with userId). minutes is the duration; hourlyRate is cents per hour; invoiceId is set while the entry is on a live invoice. Returns paginated results with total count.",
     {
       projectId: z
         .string()
@@ -53,10 +73,15 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const conditions = [eq(timeEntry.userId, ctx.userId)];
+        const conditions = [];
 
         if (params.projectId) {
+          await requireProjectAccess(ctx, params.projectId, "view");
+          // Entries on voided/deleted invoices are unbilled again.
+          await syncProjectBilling(db, ctx.organizationId, [params.projectId]);
           conditions.push(eq(timeEntry.projectId, params.projectId));
+        } else {
+          conditions.push(eq(timeEntry.userId, ctx.userId));
         }
         if (params.userId) {
           conditions.push(eq(timeEntry.userId, params.userId));
@@ -96,7 +121,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_time_entry",
-    "Create a new time entry for the current user. Hourly rate is in integer cents (e.g. $50/hr = 5000). Minutes is the duration worked.",
+    "Log a time entry for the current user on a project (needs contributor access). Minutes is the duration worked. hourlyRateCents is the billing rate in integer cents (e.g. $50/hr = 5000); omit it to use the person's project member rate, else the project's hourly rate. Returns the entry.",
     {
       projectId: z
         .string()
@@ -123,8 +148,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
         .int()
         .min(0)
         .optional()
-        .default(0)
-        .describe("Hourly rate in cents (e.g. $50/hr = 5000)"),
+        .describe("Hourly rate in cents (e.g. $50/hr = 5000); omit to use the member or project rate"),
       taskId: z
         .string()
         .optional()
@@ -133,6 +157,8 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:time-tracking");
+        const { project: proj } = await requireProjectAccess(ctx, params.projectId, "contribute");
+        await assertTaskInProject(params.projectId, params.taskId);
 
         const [created] = await db
           .insert(timeEntry)
@@ -143,10 +169,11 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
             minutes: params.minutes,
             description: params.description ?? null,
             isBillable: params.isBillable,
-            hourlyRate: params.hourlyRateCents,
+            hourlyRate: params.hourlyRateCents ?? (await resolveTimeEntryRate(db, proj, ctx.userId)),
             taskId: params.taskId ?? null,
           })
           .returning();
+        await syncProjectBilling(db, ctx.organizationId, [params.projectId]);
 
         return { entry: created };
       })
@@ -154,7 +181,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_time_entry",
-    "Update an existing time entry owned by the current user. Only provided fields are updated.",
+    "Update a time entry. Your own entries need contributor access on the project; other people's need manager access. While the entry is on an invoice (not voided or deleted) only description and taskId can change. Only provided fields are updated.",
     {
       entryId: z
         .string()
@@ -192,14 +219,27 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:time-tracking");
 
-        const existing = await db.query.timeEntry.findFirst({
-          where: and(
-            eq(timeEntry.id, params.entryId),
-            eq(timeEntry.userId, ctx.userId)
-          ),
+        const found = await db.query.timeEntry.findFirst({
+          where: eq(timeEntry.id, params.entryId),
+          columns: { projectId: true },
         });
+        if (!found) throw new ProjectNotFoundError("Time entry");
+        const { access } = await requireProjectAccess(ctx, found.projectId, "contribute");
+        await syncProjectBilling(db, ctx.organizationId, [found.projectId]);
+        const existing = (await db.query.timeEntry.findFirst({ where: eq(timeEntry.id, params.entryId) }))!;
 
-        if (!existing) throw new Error("Time entry not found");
+        const blocked = timeEntryChangeError(
+          existing,
+          {
+            date: params.date,
+            minutes: params.minutes,
+            isBillable: params.isBillable,
+            hourlyRate: params.hourlyRateCents,
+          },
+          { userId: ctx.userId, access }
+        );
+        if (blocked) throw new ProjectError(blocked.message, blocked.status);
+        await assertTaskInProject(existing.projectId, params.taskId);
 
         const updates: Record<string, unknown> = {};
         if (params.date !== undefined) updates.date = params.date;
@@ -214,6 +254,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
           .set(updates)
           .where(eq(timeEntry.id, params.entryId))
           .returning();
+        await syncProjectBilling(db, ctx.organizationId, [existing.projectId]);
 
         return { entry: updated };
       })
@@ -221,7 +262,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "delete_time_entry",
-    "Permanently delete a time entry owned by the current user.",
+    "Permanently delete a time entry. Your own entries need contributor access; other people's need manager access. Invoiced time (on an invoice that is not voided or deleted) can't be deleted.",
     {
       entryId: z
         .string()
@@ -231,16 +272,20 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:time-tracking");
 
-        const existing = await db.query.timeEntry.findFirst({
-          where: and(
-            eq(timeEntry.id, params.entryId),
-            eq(timeEntry.userId, ctx.userId)
-          ),
+        const found = await db.query.timeEntry.findFirst({
+          where: eq(timeEntry.id, params.entryId),
+          columns: { projectId: true },
         });
+        if (!found) throw new ProjectNotFoundError("Time entry");
+        const { access } = await requireProjectAccess(ctx, found.projectId, "contribute");
+        await syncProjectBilling(db, ctx.organizationId, [found.projectId]);
+        const existing = (await db.query.timeEntry.findFirst({ where: eq(timeEntry.id, params.entryId) }))!;
 
-        if (!existing) throw new Error("Time entry not found");
+        const blocked = timeEntryChangeError(existing, "delete", { userId: ctx.userId, access });
+        if (blocked) throw new ProjectError(blocked.message, blocked.status);
 
         await db.delete(timeEntry).where(eq(timeEntry.id, params.entryId));
+        await syncProjectBilling(db, ctx.organizationId, [found.projectId]);
 
         return { deleted: true, entryId: params.entryId };
       })
@@ -250,7 +295,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "start_timer",
-    "Start a new running timer for the current user. Only one timer can be running per user at a time.",
+    "Start a running timer for the current user on a project (needs contributor access). Only one timer can run per user at a time. Returns the timer.",
     {
       projectId: z
         .string()
@@ -271,12 +316,14 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        await requireProjectAccess(ctx, params.projectId, "contribute");
+        await assertTaskInProject(params.projectId, params.taskId);
         const existingTimer = await db.query.runningTimer.findFirst({
           where: eq(runningTimer.userId, ctx.userId),
         });
 
         if (existingTimer) {
-          throw new Error("A timer is already running. Stop it before starting a new one.");
+          throw new ProjectError("A timer is already running. Stop it before starting a new one.", 409);
         }
 
         const [created] = await db
@@ -297,7 +344,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "stop_timer",
-    "Stop a running timer by ID, calculate elapsed time, create a time entry, and delete the timer. Returns the created time entry.",
+    "Stop a running timer by ID: logs a time entry dated today (the user's elapsed time rounded to whole minutes, at least 1) at the member or project billing rate, then deletes the timer. Returns the created time entry and elapsedSeconds.",
     {
       timerId: z
         .string()
@@ -312,20 +359,13 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
           ),
         });
 
-        if (!timer) throw new Error("Running timer not found");
+        if (!timer) throw new ProjectNotFoundError("Running timer");
+        const { project: proj } = await requireProjectAccess(ctx, timer.projectId, "contribute");
 
         const now = new Date();
-        let totalSeconds = timer.accumulatedSeconds;
-
-        // If the timer is not paused, add the time since startedAt
-        if (!timer.pausedAt) {
-          totalSeconds += Math.floor(
-            (now.getTime() - timer.startedAt.getTime()) / 1000
-          );
-        }
-
+        const totalSeconds = timerSeconds(timer, now);
         const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
-        const today = now.toISOString().split("T")[0];
+        const today = localISODate(now);
 
         const [entry] = await db
           .insert(timeEntry)
@@ -337,13 +377,14 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
             description: timer.description,
             minutes: totalMinutes,
             isBillable: timer.isBillable,
-            hourlyRate: 0,
+            hourlyRate: await resolveTimeEntryRate(db, proj, ctx.userId),
           })
           .returning();
 
         await db
           .delete(runningTimer)
           .where(eq(runningTimer.id, params.timerId));
+        await syncProjectBilling(db, ctx.organizationId, [timer.projectId]);
 
         return { entry, elapsedSeconds: totalSeconds };
       })
@@ -359,7 +400,69 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
           where: eq(runningTimer.userId, ctx.userId),
         });
 
-        return { timer: timer ?? null };
+        return { timer: timer ?? null, elapsedSeconds: timer ? timerSeconds(timer) : 0 };
+      })
+  );
+
+  server.tool(
+    "pause_timer",
+    "Pause the current user's running timer by ID. The elapsed time so far is kept. Returns the timer and elapsedSeconds.",
+    {
+      timerId: z.string().describe("UUID of the running timer"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const timer = await db.query.runningTimer.findFirst({
+          where: and(eq(runningTimer.id, params.timerId), eq(runningTimer.userId, ctx.userId)),
+        });
+        if (!timer) throw new ProjectNotFoundError("Running timer");
+        if (timer.pausedAt) return { timer, elapsedSeconds: timer.accumulatedSeconds };
+        const now = new Date();
+        const [updated] = await db
+          .update(runningTimer)
+          .set({ pausedAt: now, accumulatedSeconds: timerSeconds(timer, now) })
+          .where(eq(runningTimer.id, timer.id))
+          .returning();
+        return { timer: updated, elapsedSeconds: updated.accumulatedSeconds };
+      })
+  );
+
+  server.tool(
+    "resume_timer",
+    "Resume the current user's paused timer by ID. Returns the timer and elapsedSeconds.",
+    {
+      timerId: z.string().describe("UUID of the running timer"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const timer = await db.query.runningTimer.findFirst({
+          where: and(eq(runningTimer.id, params.timerId), eq(runningTimer.userId, ctx.userId)),
+        });
+        if (!timer) throw new ProjectNotFoundError("Running timer");
+        if (!timer.pausedAt) return { timer, elapsedSeconds: timerSeconds(timer) };
+        const [updated] = await db
+          .update(runningTimer)
+          .set({ pausedAt: null, startedAt: new Date() })
+          .where(eq(runningTimer.id, timer.id))
+          .returning();
+        return { timer: updated, elapsedSeconds: updated.accumulatedSeconds };
+      })
+  );
+
+  server.tool(
+    "discard_timer",
+    "Throw away the current user's running timer by ID without logging any time.",
+    {
+      timerId: z.string().describe("UUID of the running timer"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const [removed] = await db
+          .delete(runningTimer)
+          .where(and(eq(runningTimer.id, params.timerId), eq(runningTimer.userId, ctx.userId)))
+          .returning({ id: runningTimer.id });
+        if (!removed) throw new ProjectNotFoundError("Running timer");
+        return { discarded: true, timerId: params.timerId };
       })
   );
 
@@ -446,7 +549,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "submit_timesheet",
-    "Submit a draft timesheet for approval. Only timesheets in 'draft' status can be submitted.",
+    "Submit a payroll timesheet for approval. Works for drafts and for timesheets that were sent back ('rejected'); it needs at least some hours entered. Clears any earlier rejection reason. Returns the timesheet.",
     {
       timesheetId: z
         .string()
@@ -454,7 +557,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:time-tracking");
+        requireRole(ctx, "manage:timesheets");
 
         const existing = await db.query.timesheet.findFirst({
           where: and(
@@ -465,15 +568,17 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
         });
 
         if (!existing) throw new Error("Timesheet not found");
-        if (existing.status !== "draft") {
-          throw new Error("Only draft timesheets can be submitted");
+        if (existing.status !== "draft" && existing.status !== "rejected") {
+          throw new Error("Only draft or sent-back timesheets can be submitted");
         }
+        if (existing.totalHours <= 0) throw new Error("Add the hours worked before submitting");
 
         const [updated] = await db
           .update(timesheet)
           .set({
             status: "submitted",
             submittedAt: new Date(),
+            rejectionReason: null,
             updatedAt: new Date(),
           })
           .where(eq(timesheet.id, params.timesheetId))
@@ -485,7 +590,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "approve_timesheet",
-    "Approve a submitted timesheet. Only timesheets in 'submitted' status can be approved. Records the approving member.",
+    "Approve a submitted payroll timesheet. Only timesheets in 'submitted' status can be approved. Approved hours are paid in the next pay run covering the period (regular hours, weekly overtime and shift premiums). Records the approving member. Requires the approve:payroll permission.",
     {
       timesheetId: z
         .string()
@@ -493,7 +598,7 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:time-tracking");
+        requireRole(ctx, "approve:payroll");
 
         const existing = await db.query.timesheet.findFirst({
           where: and(
@@ -529,6 +634,111 @@ export function registerTimeTrackingTools(server: McpServer, ctx: AuthContext) {
           .returning();
 
         return { timesheet: updated };
+      })
+  );
+
+  server.tool(
+    "reject_timesheet",
+    "Send a submitted payroll timesheet back to the employee, optionally saying why. It can then be edited and submitted again. Requires the approve:payroll permission. Returns the timesheet.",
+    {
+      timesheetId: z.string().uuid().describe("UUID of the submitted timesheet"),
+      reason: z.string().optional().describe("What needs fixing, shown on the timesheet"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "approve:payroll");
+        const existing = await db.query.timesheet.findFirst({
+          where: and(
+            eq(timesheet.id, params.timesheetId),
+            eq(timesheet.organizationId, ctx.organizationId),
+            notDeleted(timesheet.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Timesheet not found");
+        if (existing.status !== "submitted") throw new Error("Only submitted timesheets can be rejected");
+        const [updated] = await db
+          .update(timesheet)
+          .set({ status: "rejected", rejectionReason: params.reason || null, updatedAt: new Date() })
+          .where(eq(timesheet.id, existing.id))
+          .returning();
+        return { timesheet: updated };
+      })
+  );
+
+  server.tool(
+    "create_timesheet",
+    "Create an empty draft payroll timesheet for an employee and period. Add hours with add_timesheet_entry, then submit_timesheet. Dates are YYYY-MM-DD. Requires the manage:timesheets permission. Returns the timesheet.",
+    {
+      employeeId: z.string().uuid().describe("UUID of the payroll employee"),
+      periodStart: z.string().describe("First day of the period (YYYY-MM-DD)"),
+      periodEnd: z.string().describe("Last day of the period (YYYY-MM-DD), on or after periodStart"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:timesheets");
+        if (params.periodEnd < params.periodStart) throw new Error("The period end must be on or after its start");
+        const emp = await db.query.payrollEmployee.findFirst({
+          where: and(
+            eq(payrollEmployee.id, params.employeeId),
+            eq(payrollEmployee.organizationId, ctx.organizationId),
+            notDeleted(payrollEmployee.deletedAt)
+          ),
+          columns: { id: true },
+        });
+        if (!emp) throw new Error("Employee not found");
+        const [created] = await db
+          .insert(timesheet)
+          .values({ organizationId: ctx.organizationId, ...params })
+          .returning();
+        return { timesheet: created };
+      })
+  );
+
+  server.tool(
+    "add_timesheet_entry",
+    "Add hours worked on one day to a payroll timesheet that is a draft or was sent back. The date must be inside the timesheet period. shiftType 'regular' hours count towards weekly overtime; 'overtime' hours are always paid at the overtime multiplier; night/weekend/holiday add that shift's premium. Requires the manage:timesheets permission. Returns the entry.",
+    {
+      timesheetId: z.string().uuid().describe("UUID of the timesheet"),
+      date: z.string().describe("Day worked (YYYY-MM-DD), inside the timesheet period"),
+      hours: z.number().positive().max(24).describe("Hours worked that day, more than 0 and at most 24 (e.g. 7.5)"),
+      shiftType: z.enum(["regular", "overtime", "night", "weekend", "holiday"]).optional().describe("Kind of shift; defaults to regular"),
+      description: z.string().optional().describe("What was worked on"),
+      projectId: z.string().uuid().optional().describe("Optional project UUID the hours were for"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:timesheets");
+        const { timesheetId, ...values } = params;
+        const ts = await db.query.timesheet.findFirst({
+          where: and(
+            eq(timesheet.id, timesheetId),
+            eq(timesheet.organizationId, ctx.organizationId),
+            notDeleted(timesheet.deletedAt)
+          ),
+        });
+        if (!ts) throw new Error("Timesheet not found");
+        if (ts.status !== "draft" && ts.status !== "rejected") {
+          throw new Error("Entries can only be added while a timesheet is a draft or was sent back");
+        }
+        if (values.date < ts.periodStart || values.date > ts.periodEnd) {
+          throw new Error(`The date must be within the timesheet period (${ts.periodStart} to ${ts.periodEnd})`);
+        }
+        if (values.projectId) {
+          const proj = await db.query.project.findFirst({
+            where: and(eq(project.id, values.projectId), eq(project.organizationId, ctx.organizationId)),
+            columns: { id: true },
+          });
+          if (!proj) throw new Error("Project not found");
+        }
+        const entry = await db.transaction(async (tx) => {
+          const [row] = await tx.insert(timesheetEntry).values({ timesheetId, ...values }).returning();
+          await tx
+            .update(timesheet)
+            .set({ totalHours: sql`${timesheet.totalHours} + ${values.hours}`, updatedAt: new Date() })
+            .where(eq(timesheet.id, timesheetId));
+          return row;
+        });
+        return { entry };
       })
   );
 }

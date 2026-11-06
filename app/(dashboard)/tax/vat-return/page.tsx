@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { ArrowUpRight, ArrowDownLeft, Printer, ChevronDown, ChevronRight } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import Link from "next/link";
 
 interface VatBox {
@@ -42,7 +43,7 @@ const CALCULATED_BOXES = ["3", "5"];
 const KEY_BOX = "5";
 // Boxes backed by control-account journal lines (drillable via the
 // /transactions endpoint). Mirrors BOX_ACCOUNT in lib/reports/tax-return.ts.
-const DRILLABLE_BOXES = ["1", "4"];
+const DRILLABLE_BOXES = ["1", "2", "4"];
 
 type Basis = "accrual" | "cash";
 
@@ -50,76 +51,44 @@ export default function VatReturnPage() {
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [basis, setBasis] = useState<Basis>("accrual");
+  // null = the organization's VAT scheme (Settings), until the user picks one.
+  const [basisChoice, setBasis] = useState<Basis | null>(null);
   // Flat-rate scheme percentage as the user types it (e.g. "14.5"). Empty = off.
   const [flatRatePercent, setFlatRatePercent] = useState("");
   const [flatRateOn, setFlatRateOn] = useState(false);
-  const [boxes, setBoxes] = useState<VatBox[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Per-box drill-down: which box is open, plus its loaded/loading transactions.
-  const [openBox, setOpenBox] = useState<string | null>(null);
-  const [drillData, setDrillData] = useState<Record<string, BoxTransaction[]>>({});
-  const [drillLoading, setDrillLoading] = useState<string | null>(null);
+  // Per-box drill-down: which box is open, for which period/basis.
+  const [opened, setOpened] = useState<{ box: string; period: string } | null>(null);
   useDocumentTitle("Tax · VAT Return");
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams({ startDate, endDate, basis });
-    // The API takes the flat rate in basis points (1450 = 14.5%). Only send it
-    // when the scheme is switched on and a positive percentage is entered.
-    const pct = Number(flatRatePercent);
-    if (flatRateOn && Number.isFinite(pct) && pct > 0) {
-      params.set("flatRatePercent", String(Math.round(pct * 100)));
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetch(`/api/v1/reports/vat-return?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setBoxes(data.boxes || []);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate, basis, flatRateOn, flatRatePercent]);
+  const params = new URLSearchParams({ startDate, endDate });
+  if (basisChoice) params.set("basis", basisChoice);
+  // The API takes the flat rate in basis points (1450 = 14.5%). Only send it
+  // when the scheme is switched on and a positive percentage is entered.
+  const pct = Number(flatRatePercent);
+  const flatRate = flatRateOn && Number.isFinite(pct) && pct > 0;
+  if (flatRate) {
+    params.set("flatRatePercent", String(Math.round(pct * 100)));
+  }
+  // The flat rate follows typing, so those answers aren't remembered for prefetching.
+  const { data, loading } = useApi<{ boxes?: VatBox[]; basis?: Basis; currency?: string }>(`/api/v1/reports/vat-return?${params}`, { keepPrevious: true, learn: !flatRate });
+  const boxes = data?.boxes || [];
+  const basis: Basis = basisChoice ?? data?.basis ?? "accrual";
+  const currency = data?.currency || "USD";
+  const money = (cents: number) => formatMoney(cents, currency);
 
-  // Any change to the period/basis invalidates the cached drill-down rows.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOpenBox(null);
-    setDrillData({});
-  }, [startDate, endDate, basis]);
+  // Any change to the period/basis closes the drill-down.
+  const period = `${startDate}|${endDate}|${basis}`;
+  const openBox = opened?.period === period ? opened.box : null;
+  const { data: drillJson, loading: drillLoading } = useApi<{ transactions?: BoxTransaction[] }>(
+    openBox ? `/api/v1/reports/vat-return/transactions?${new URLSearchParams({ box: openBox, startDate, endDate, basis })}` : null
+  );
+  const drillRows = drillJson ? drillJson.transactions || [] : undefined;
 
   const toggleDrill = useCallback(
     (box: string) => {
-      if (openBox === box) {
-        setOpenBox(null);
-        return;
-      }
-      setOpenBox(box);
-      if (drillData[box]) return; // already loaded for this period
-      const orgId = localStorage.getItem("activeOrgId");
-      if (!orgId) return;
-      const params = new URLSearchParams({ box, startDate, endDate, basis });
-      setDrillLoading(box);
-      fetch(`/api/v1/reports/vat-return/transactions?${params}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          setDrillData((prev) => ({ ...prev, [box]: data.transactions || [] }));
-        })
-        .finally(() => setDrillLoading((cur) => (cur === box ? null : cur)));
+      setOpened(openBox === box ? null : { box, period });
     },
-    [openBox, drillData, startDate, endDate, basis]
+    [openBox, period]
   );
 
   const outputVat = boxes.find((b) => b.box === "1")?.amount || 0;
@@ -142,6 +111,7 @@ export default function VatReturnPage() {
         <ExportButton
           data={boxes.map((b) => ({ box: b.box, description: b.label, amount: b.amount }))}
           columns={["box", "description", "amount"]}
+          moneyColumns={["amount"]}
           filename="vat-return"
         />
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
@@ -187,7 +157,7 @@ export default function VatReturnPage() {
           <p className="text-[11px] text-muted-foreground">
             {basis === "accrual"
               ? "Counts VAT on the date you raise or enter a document."
-              : "Counts VAT only when the payment actually goes in or out."}
+              : "Counts VAT when invoices and bills are paid, in proportion to each payment."}
           </p>
         </div>
 
@@ -242,7 +212,7 @@ export default function VatReturnPage() {
                     <span className="text-muted-foreground">Output VAT (Sales)</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium">
-                    {formatMoney(outputVat)}
+                    {money(outputVat)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -259,7 +229,7 @@ export default function VatReturnPage() {
                     <span className="text-muted-foreground">Input VAT (Purchases)</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium">
-                    {formatMoney(inputVat)}
+                    {money(inputVat)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -277,7 +247,7 @@ export default function VatReturnPage() {
                   "font-mono text-sm tabular-nums font-semibold",
                   netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
                 )}>
-                  {formatMoney(Math.abs(netVat))}
+                  {money(Math.abs(netVat))}
                 </span>
               </div>
             </div>
@@ -299,7 +269,7 @@ export default function VatReturnPage() {
                   "mt-1 text-2xl font-bold font-mono tabular-nums",
                   netVat >= 0 ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
                 )}>
-                  {formatMoney(Math.abs(netVat))}
+                  {money(Math.abs(netVat))}
                 </p>
               </div>
               <div className={cn(
@@ -323,7 +293,7 @@ export default function VatReturnPage() {
               All Boxes
             </h3>
             <p className="text-[11px] text-muted-foreground mb-2">
-              Tap Box 1 or Box 4 to see the transactions behind the figure.
+              Tap Box 1, 2 or 4 to see the transactions behind the figure.
             </p>
             <div className="rounded-lg border overflow-hidden">
               {boxes.map((b, i) => {
@@ -331,8 +301,8 @@ export default function VatReturnPage() {
                 const isCalc = CALCULATED_BOXES.includes(b.box);
                 const isDrillable = DRILLABLE_BOXES.includes(b.box);
                 const isOpen = openBox === b.box;
-                const rows = drillData[b.box];
-                const isDrillLoading = drillLoading === b.box;
+                const rows = isOpen ? drillRows : undefined;
+                const isDrillLoading = isOpen && drillLoading;
 
                 const rowInner = (
                   <>
@@ -367,7 +337,7 @@ export default function VatReturnPage() {
                         isKey && netVat < 0 && "text-brand-600 dark:text-brand-400",
                         !isKey && "font-medium"
                       )}>
-                        {formatMoney(Math.abs(b.amount))}
+                        {money(Math.abs(b.amount))}
                       </p>
                     </div>
                   </>
@@ -418,8 +388,8 @@ export default function VatReturnPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {rows.map((t) => (
-                                  <tr key={t.journalLineId} className="border-t border-border/60">
+                                {rows.map((t, ti) => (
+                                  <tr key={`${t.journalLineId}-${ti}`} className="border-t border-border/60">
                                     <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{t.date}</td>
                                     <td className="py-1.5 pr-3 whitespace-nowrap font-mono">
                                       #{t.entryNumber}
@@ -427,7 +397,7 @@ export default function VatReturnPage() {
                                     <td className="py-1.5 pr-3">{t.description || "—"}</td>
                                     <td className="py-1.5 pr-3 text-muted-foreground">{t.reference || "—"}</td>
                                     <td className="py-1.5 pl-3 text-right font-mono tabular-nums">
-                                      {formatMoney(t.amount)}
+                                      {money(t.amount)}
                                     </td>
                                   </tr>
                                 ))}
@@ -438,7 +408,7 @@ export default function VatReturnPage() {
                                     Total ({rows.length} {rows.length === 1 ? "line" : "lines"})
                                   </td>
                                   <td className="py-1.5 pl-3 text-right font-mono tabular-nums">
-                                    {formatMoney(rows.reduce((s, t) => s + t.amount, 0))}
+                                    {money(rows.reduce((s, t) => s + t.amount, 0))}
                                   </td>
                                 </tr>
                               </tfoot>

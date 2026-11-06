@@ -10,11 +10,14 @@ import { WelcomeEmail } from "@/lib/email/templates/welcome";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { getSiteSetting } from "@/lib/site-settings";
 import { toAppUrl } from "@/lib/public-url";
+import { hasRegistrationInvite } from "@/lib/api/registration-invite";
 
 const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
+  // Invite link token, when sign-up started from /invite/<token>
+  inviteToken: z.string().max(128).optional(),
 });
 
 export async function POST(request: Request) {
@@ -48,10 +51,12 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
-      if (registrationMode === "invite_only") {
-        // TODO: check invitation table for pending invite
+      if (
+        registrationMode === "invite_only" &&
+        !(await hasRegistrationInvite(parsed.email, parsed.inviteToken))
+      ) {
         return NextResponse.json(
-          { error: "Registration is by invitation only" },
+          { error: "Registration is by invitation only. Use the email address you were invited with, or your invite link." },
           { status: 403 }
         );
       }

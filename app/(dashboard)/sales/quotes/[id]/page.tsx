@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Send, Check, X, FileText } from "lucide-react";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
@@ -34,33 +35,26 @@ const statusLabels: Record<string, string> = {
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [q, setQ] = useState<QuoteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const quoteUrl = `/api/v1/quotes/${id}`;
+  const { data, loading } = useApi<{ quote?: QuoteDetail }>(quoteUrl);
+  const q = data?.quote ?? null;
+  const { data: orgData } = useApi<{ organization?: { name?: string } }>("/api/v1/organization");
+  const orgName = orgData?.organization?.name || "";
+  const cache = useApiCache();
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
-  const [orgName, setOrgName] = useState("");
   useEntityTitle(q?.quoteNumber);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/quotes/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.quote) setQ(data.quote); }).finally(() => setLoading(false));
-    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
-  }, [id, orgId]);
 
   async function action(path: string) {
     if (!orgId) return;
     const res = await fetch(`/api/v1/quotes/${id}/${path}`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); setQ((prev) => prev ? { ...prev, ...(data.quote || {}) } : prev); toast.success("Done"); }
+    if (res.ok) { const json = await res.json(); cache.update<{ quote?: QuoteDetail }>(quoteUrl, (prev) => prev.quote ? { ...prev, quote: { ...prev.quote, ...(json.quote || {}) } } : prev); toast.success("Done"); }
     else toast.error("Failed");
   }
 
   function handleSendComplete() {
-    if (!orgId) return;
-    fetch(`/api/v1/quotes/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.quote) setQ(data.quote); });
+    // The send request refreshes the cached quote by itself.
     setEmailHistoryKey((k) => k + 1);
   }
 

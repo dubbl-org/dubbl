@@ -184,9 +184,13 @@ export default function AdminSettingsPage() {
                   Stripe status
                 </Label>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {stripeConfigured
-                    ? "Stripe is configured. Billing features are active."
-                    : "Stripe is not configured. All organizations get unlimited features."}
+                  {settings.self_hosted_unlimited === "true"
+                    ? "Unlimited mode is always on. All organizations get unlimited features."
+                    : settings.self_hosted_unlimited === "false"
+                      ? "Unlimited mode is always off. Plan limits apply."
+                      : stripeConfigured
+                        ? "Stripe is configured. Billing features are active."
+                        : "Stripe is not configured. All organizations get unlimited features."}
                 </p>
               </div>
               <Badge
@@ -211,7 +215,7 @@ export default function AdminSettingsPage() {
                   save({ self_hosted_unlimited: v })
                 }
               >
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-60">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,7 +227,7 @@ export default function AdminSettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                When enabled, all organizations get unlimited Pro features without needing Stripe.
+                When enabled, all organizations get every feature with no limits, without needing Stripe.
               </p>
             </div>
           </div>

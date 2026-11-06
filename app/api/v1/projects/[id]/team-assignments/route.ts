@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTeamAssignment } from "@/lib/db/schema";
+import { projectTeamAssignment, team } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
+import { requireProjectAccess } from "@/lib/api/project-access";
 import { handleError, notFound, validationError } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { addTeamAssignmentMembers, releaseTeamAssignmentMembers } from "@/lib/api/project-team-members";
 import { z } from "zod";
 
 const assignTeamSchema = z.object({
-  teamId: z.string().min(1),
+  teamId: z.string().uuid(),
   defaultRole: z.enum(["manager", "contributor", "viewer"]).default("contributor"),
 });
 
@@ -21,15 +21,7 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
 
     const assignments = await db.query.projectTeamAssignment.findMany({
       where: eq(projectTeamAssignment.projectId, id),
@@ -61,20 +53,20 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = assignTeamSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
+    await requireProjectAccess(ctx, id, "manage");
+
+    const orgTeam = await db.query.team.findFirst({
       where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
+        eq(team.id, parsed.teamId),
+        eq(team.organizationId, ctx.organizationId)
       ),
     });
 
-    if (!proj) return notFound("Project");
+    if (!orgTeam) return notFound("Team");
 
     // Check for duplicate assignment
     const existing = await db.query.projectTeamAssignment.findFirst({
@@ -86,16 +78,21 @@ export async function POST(
 
     if (existing) return validationError("Team already assigned to this project");
 
-    const [created] = await db
-      .insert(projectTeamAssignment)
-      .values({
-        projectId: id,
-        teamId: parsed.teamId,
-        defaultRole: parsed.defaultRole,
-      })
-      .returning();
+    // Assigning the team adds its people as project members with the chosen role.
+    const { created, addedMembers } = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(projectTeamAssignment)
+        .values({
+          projectId: id,
+          teamId: parsed.teamId,
+          defaultRole: parsed.defaultRole,
+        })
+        .returning();
+      const addedMembers = await addTeamAssignmentMembers(tx, created);
+      return { created, addedMembers };
+    });
 
-    return NextResponse.json({ assignment: created }, { status: 201 });
+    return NextResponse.json({ assignment: created, addedMembers }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }
@@ -108,30 +105,26 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
     const teamId = url.searchParams.get("teamId");
     if (!teamId) return validationError("teamId is required");
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
+    await requireProjectAccess(ctx, id, "manage");
 
-    if (!proj) return notFound("Project");
-
-    await db
-      .delete(projectTeamAssignment)
-      .where(
-        and(
-          eq(projectTeamAssignment.projectId, id),
-          eq(projectTeamAssignment.teamId, teamId)
+    // People who got access through this team lose it (unless another assigned team includes them).
+    await db.transaction(async (tx) => {
+      const removed = await tx
+        .delete(projectTeamAssignment)
+        .where(
+          and(
+            eq(projectTeamAssignment.projectId, id),
+            eq(projectTeamAssignment.teamId, teamId)
+          )
         )
-      );
+        .returning({ id: projectTeamAssignment.id });
+      await releaseTeamAssignmentMembers(tx, removed.map((r) => r.id));
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

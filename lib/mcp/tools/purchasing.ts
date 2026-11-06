@@ -7,6 +7,7 @@ import {
   bill,
   billLine,
   billPurchaseOrder,
+  billPurchaseOrderLine,
   goodsReceipt,
   goodsReceiptLine,
   procurementSettings,
@@ -23,7 +24,9 @@ import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToMinorUnits, formatMoney } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { wrapTool } from "@/lib/mcp/errors";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 import { sendDocumentEmail } from "@/lib/email/document-sender";
 import {
   getNextEntryNumber,
@@ -37,8 +40,7 @@ import {
 import {
   getProcurementSettings,
   threeWayMatch,
-  derivePurchaseOrderStatusAfterReceipt,
-  derivePurchaseOrderStatusAfterBilling,
+  derivePurchaseOrderStatus,
   resolveConvertLineAllocations,
   DEFAULT_PROCUREMENT_SETTINGS,
 } from "@/lib/api/procurement";
@@ -49,6 +51,8 @@ import {
   type RemittanceGroup,
 } from "@/lib/api/remittance";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { emitBillCreated } from "@/lib/webhooks/events";
 
 function renderRemittanceHtml(
   orgName: string,
@@ -208,6 +212,8 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:bills");
+        await assertLineStockRefs(ctx.organizationId, params.lines);
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
 
         const poNumber = await getNextNumber(
           ctx.organizationId,
@@ -239,6 +245,7 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
             unitPrice: decimalToMinorUnits(l.unitPrice, params.currencyCode),
             accountId: l.accountId ?? null,
             taxRateId,
+            discountPercent: l.discountPercent,
             taxAmount,
             amount,
             inventoryItemId: l.inventoryItemId ?? null,
@@ -347,6 +354,125 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
           page: params.page,
           limit: params.limit,
         };
+      })
+  );
+
+  // ─── Get a purchase order ───────────────────────────────────────────
+  server.tool(
+    "get_purchase_order",
+    "Get one purchase order by ID with its supplier and lines (each with account and tax rate). Amounts are integer cents; line quantity, quantityReceived and quantityBilled are stored x100 (5 units = 500), so a line is part received when 0 < quantityReceived < quantity.",
+    {
+      purchaseOrderId: z.string().describe("The UUID of the purchase order"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const found = await db.query.purchaseOrder.findFirst({
+          where: and(
+            eq(purchaseOrder.id, params.purchaseOrderId),
+            eq(purchaseOrder.organizationId, ctx.organizationId),
+            notDeleted(purchaseOrder.deletedAt)
+          ),
+          with: { contact: true, lines: { with: { account: true, taxRate: true } } },
+        });
+        if (!found) throw new Error("Purchase order not found");
+        return { purchaseOrder: found };
+      })
+  );
+
+  // ─── Edit a draft purchase order ────────────────────────────────────
+  server.tool(
+    "update_purchase_order",
+    "Edit a DRAFT purchase order (mirrors PATCH /purchase-orders/:id). Only provided header fields change; sending lines replaces every line and recalculates subtotal, tax and total. Unit prices are decimals (e.g. 12.50 for $12.50). Editing cancels any approval the order had. Returns the updated purchase order with amounts in integer cents.",
+    {
+      purchaseOrderId: z.string().describe("The UUID of the draft purchase order"),
+      contactId: z.string().optional().describe("New supplier contact UUID"),
+      issueDate: z.string().optional().describe("New issue date (YYYY-MM-DD)"),
+      deliveryDate: z.string().nullable().optional().describe("Expected delivery date (YYYY-MM-DD), or null to clear it"),
+      reference: z.string().nullable().optional().describe("Reference, or null to clear it"),
+      notes: z.string().nullable().optional().describe("Notes, or null to clear them"),
+      lines: z
+        .array(
+          z.object({
+            description: z.string().min(1).describe("Line item description"),
+            quantity: z.number().optional().default(1).describe("Quantity ordered, in whole units (decimals allowed)"),
+            unitPrice: z.number().optional().default(0).describe("Unit price as a decimal (e.g. 12.50 for $12.50)"),
+            accountId: z.string().optional().describe("Expense/asset account UUID for this line"),
+            taxRateId: z.string().optional().describe("Tax rate UUID"),
+            discountPercent: z.number().int().min(0).max(10000).optional().default(0).describe("Discount in basis points (1000 = 10%)"),
+          })
+        )
+        .min(1)
+        .optional()
+        .describe("Replacement line items; omit to keep the current lines"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:bills");
+        const existing = await db.query.purchaseOrder.findFirst({
+          where: and(
+            eq(purchaseOrder.id, params.purchaseOrderId),
+            eq(purchaseOrder.organizationId, ctx.organizationId),
+            notDeleted(purchaseOrder.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Purchase order not found");
+        if (existing.status !== "draft") throw new Error("Only draft purchase orders can be edited");
+
+        // An approval covers the order as it was, so editing cancels it.
+        await cancelApprovalRequests(ctx.organizationId, "purchase_order", existing.id);
+
+        const update: Record<string, unknown> = { updatedAt: new Date() };
+        for (const key of ["contactId", "issueDate", "deliveryDate", "reference", "notes"] as const) {
+          if (params[key] !== undefined) update[key] = params[key];
+        }
+
+        if (params.lines) {
+          const ratesMap = await preloadTaxRates(
+            params.lines.map((l) => l.taxRateId).filter(Boolean) as string[]
+          );
+          let subtotal = 0;
+          const lines = params.lines.map((l, i) => {
+            const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
+            const amount = grossAmount - (l.discountPercent ? Math.round((grossAmount * l.discountPercent) / 10000) : 0);
+            subtotal += amount;
+            const taxRateId = l.taxRateId ?? null;
+            return {
+              purchaseOrderId: existing.id,
+              description: l.description,
+              quantity: Math.round(l.quantity * 100),
+              unitPrice: decimalToMinorUnits(l.unitPrice, existing.currencyCode),
+              accountId: l.accountId ?? null,
+              taxRateId,
+              discountPercent: l.discountPercent,
+              taxAmount: taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0,
+              amount,
+              sortOrder: i,
+            };
+          });
+          const taxTotal = lines.reduce((s, l) => s + l.taxAmount, 0);
+          update.subtotal = subtotal;
+          update.taxTotal = taxTotal;
+          update.total = subtotal + taxTotal;
+          await db.delete(purchaseOrderLine).where(eq(purchaseOrderLine.purchaseOrderId, existing.id));
+          await db.insert(purchaseOrderLine).values(lines);
+        }
+
+        const [updated] = await db
+          .update(purchaseOrder)
+          .set(update)
+          .where(eq(purchaseOrder.id, existing.id))
+          .returning();
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "update",
+          entityType: "purchase_order",
+          entityId: existing.id,
+          changes: { total: updated.total },
+        });
+
+        return { purchaseOrder: updated };
       })
   );
 
@@ -577,9 +703,10 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
             return {
               quantity: l.quantity,
               quantityReceived: l.quantityReceived + (recv?.qtyScaled ?? 0),
+              quantityBilled: l.quantityBilled,
             };
           });
-          const newPoStatus = derivePurchaseOrderStatusAfterReceipt(updatedLines);
+          const newPoStatus = derivePurchaseOrderStatus(updatedLines);
           if (po.status !== "closed") {
             await tx
               .update(purchaseOrder)
@@ -869,6 +996,7 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
               createdBy: ctx.userId,
             })
             .returning();
+          emitBillCreated(ctx.organizationId, [createdBill.id]);
 
           await tx
             .insert(billLine)
@@ -879,6 +1007,18 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
             .values({ billId: createdBill.id, purchaseOrderId: found.id })
             .onConflictDoNothing();
 
+          // Record what this bill counted per PO line, so voiding or deleting it
+          // gives back exactly that much.
+          const counted = items.filter((it) => it.qtyScaled > 0);
+          if (counted.length > 0) {
+            await tx.insert(billPurchaseOrderLine).values(
+              counted.map((it) => ({
+                billId: createdBill.id,
+                purchaseOrderLineId: it.poLine.id,
+                quantity: it.qtyScaled,
+              }))
+            );
+          }
           for (const it of items) {
             await tx
               .update(purchaseOrderLine)
@@ -892,10 +1032,11 @@ export function registerPurchasingTools(server: McpServer, ctx: AuthContext) {
             const it = items.find((x) => x.poLine.id === l.id);
             return {
               quantity: l.quantity,
+              quantityReceived: l.quantityReceived,
               quantityBilled: l.quantityBilled + (it?.qtyScaled ?? 0),
             };
           });
-          const newStatus = derivePurchaseOrderStatusAfterBilling(updatedLines);
+          const newStatus = derivePurchaseOrderStatus(updatedLines);
 
           await tx
             .update(purchaseOrder)

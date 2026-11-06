@@ -15,6 +15,10 @@ const createSchema = z.object({
   minIncome: z.number().int(),
   maxIncome: z.number().int().nullable().optional(),
   rate: z.number().int().min(0).max(10000),
+  // null = applies to every filing status / every year.
+  filingStatus: z.enum(["single", "married_joint", "married_separate", "head_of_household"]).nullable().optional(),
+  taxYear: z.number().int().min(2000).max(2100).nullable().optional(),
+  baseAmountCents: z.number().int().min(0).nullable().optional(),
 });
 
 export async function GET(request: Request) {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { formatDay } from "@/components/dashboard/explorer/cells";
+import { useApi } from "@/lib/query/use-api";
+import { ApiError } from "@/lib/query/api";
 
 export interface Aging {
   current: number;
@@ -130,33 +131,16 @@ export function StatementPreview({
   endDate?: string;
   currency?: string | null;
 }) {
-  const key = `${contactId}:${side}:${startDate}:${endDate}`;
-  const [state, setState] = useState<{ key: string; data: Statement | null; error?: string } | null>(null);
-  const current = state?.key === key ? state : null;
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams();
-    if (startDate) params.set("startDate", startDate);
-    if (endDate) params.set("endDate", endDate);
-    const path = side === "customer" ? "statement" : "supplier-statement";
-    fetch(`/api/v1/contacts/${contactId}/${path}?${params}`, { headers: { "x-organization-id": orgId } })
-      .then(async (r) => {
-        const json = await r.json().catch(() => ({}));
-        if (!cancelled) setState({ key, data: r.ok ? (json as Statement) : null, error: r.ok ? undefined : json.error });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ key, data: null, error: "Couldn't load the statement" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [key, contactId, side, startDate, endDate]);
+  const params = new URLSearchParams();
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  const path = side === "customer" ? "statement" : "supplier-statement";
+  const { data, error, loading } = useApi<Statement>(`/api/v1/contacts/${contactId}/${path}?${params}`);
+  // The route's own `{ error }` text when it sent one.
+  const errorMessage = error instanceof ApiError && typeof (error.body as { error?: unknown } | null)?.error === "string" ? error.message : undefined;
 
   const money = (c: number) => formatMoney(c, currency || "USD");
-  const lines = current?.data?.transactions ?? [];
+  const lines = data?.transactions ?? [];
   const shown = lines.slice(-10);
 
   return (
@@ -164,14 +148,14 @@ export function StatementPreview({
       <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">
         Statement{startDate && endDate ? ` · ${formatDay(startDate)} – ${formatDay(endDate)}` : ""}
       </p>
-      {!current ? (
+      {loading ? (
         <div className="space-y-2">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-2/3" />
         </div>
-      ) : !current.data ? (
-        <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12.5px] text-muted-foreground">{current.error || "Couldn't load the statement"}</p>
+      ) : !data ? (
+        <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-[12.5px] text-muted-foreground">{errorMessage || "Couldn't load the statement"}</p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border/80">
           <table className="w-full text-[12.5px]">
@@ -188,7 +172,7 @@ export function StatementPreview({
                 <td className="px-3 py-2" colSpan={3}>
                   Opening balance
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">{money(current.data.openingBalance)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{money(data.openingBalance)}</td>
               </tr>
               {lines.length > shown.length && (
                 <tr className="border-t border-border/60 text-muted-foreground">
@@ -224,7 +208,7 @@ export function StatementPreview({
           </table>
           <div className="flex justify-between border-t border-border/80 bg-foreground/[0.015] px-3 py-2.5 text-[13px] font-semibold">
             <span>{side === "customer" ? "Closing balance" : "You owe them"}</span>
-            <span className="tabular-nums">{money(current.data.closingBalance)}</span>
+            <span className="tabular-nums">{money(data.closingBalance)}</span>
           </div>
         </div>
       )}

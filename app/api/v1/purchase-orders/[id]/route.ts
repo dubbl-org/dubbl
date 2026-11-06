@@ -3,12 +3,15 @@ import { db } from "@/lib/db";
 import { purchaseOrder, purchaseOrderLine } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { decimalToMinorUnits } from "@/lib/money";
+import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { z } from "zod";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -16,6 +19,10 @@ const lineSchema = z.object({
   unitPrice: z.number().default(0),
   accountId: z.string().nullable().optional(),
   taxRateId: z.string().nullable().optional(),
+  discountPercent: z.number().int().min(0).max(10000).default(0),
+  // Stock item this line orders; goods receipts and bills then move stock.
+  inventoryItemId: z.string().uuid().nullable().optional(),
+  warehouseId: z.string().uuid().nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -83,27 +90,43 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+    if (parsed.lines) await assertLineStockRefs(ctx.organizationId, parsed.lines);
+
+    // An approval covers the order as it was: editing it cancels any pending
+    // or granted approval, so it has to be submitted again.
+    await cancelApprovalRequests(ctx.organizationId, "purchase_order", id);
 
     // If lines are provided, replace them all
     if (parsed.lines) {
+      // Same math as create: discount off the line, tax on top of what's left.
+      const ratesMap = await preloadTaxRates(
+        parsed.lines.map((l) => l.taxRateId).filter(Boolean) as string[]
+      );
       let subtotal = 0;
       const processedLines = parsed.lines.map((l, i) => {
-        const amount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
+        const grossAmount = decimalToMinorUnits(l.quantity * l.unitPrice, existing.currencyCode);
+        const discountAmount = l.discountPercent ? Math.round(grossAmount * l.discountPercent / 10000) : 0;
+        const amount = grossAmount - discountAmount;
         subtotal += amount;
+        const taxRateId = l.taxRateId || null;
         return {
           purchaseOrderId: id,
           description: l.description,
           quantity: Math.round(l.quantity * 100),
           unitPrice: decimalToMinorUnits(l.unitPrice, existing.currencyCode),
           accountId: l.accountId || null,
-          taxRateId: l.taxRateId || null,
-          taxAmount: 0,
+          taxRateId,
+          inventoryItemId: l.inventoryItemId || null,
+          warehouseId: l.warehouseId || null,
+          discountPercent: l.discountPercent,
+          taxAmount: taxRateId ? calcTax(amount, ratesMap.get(taxRateId) ?? 0) : 0,
           amount,
           sortOrder: i,
         };
       });
 
-      const total = subtotal;
+      const taxTotal = processedLines.reduce((s, l) => s + l.taxAmount, 0);
+      const total = subtotal + taxTotal;
 
       // Delete old lines and insert new ones
       await db.delete(purchaseOrderLine).where(eq(purchaseOrderLine.purchaseOrderId, id));
@@ -118,7 +141,7 @@ export async function PATCH(
           reference: parsed.reference !== undefined ? parsed.reference : existing.reference,
           notes: parsed.notes !== undefined ? parsed.notes : existing.notes,
           subtotal,
-          taxTotal: 0,
+          taxTotal,
           total,
           updatedAt: new Date(),
         })
@@ -179,6 +202,8 @@ export async function DELETE(
 
     await db.delete(purchaseOrderLine).where(eq(purchaseOrderLine.purchaseOrderId, id));
     await db.update(purchaseOrder).set(softDelete()).where(eq(purchaseOrder.id, id));
+    // Nothing left to approve.
+    await cancelApprovalRequests(ctx.organizationId, "purchase_order", id, ["pending"]);
 
     logAudit({
       ctx,

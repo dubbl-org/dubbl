@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 import { BackToReports, ReportHelp } from "./_components";
+import { DownloadLink } from "@/components/dashboard/download-link";
 
 export interface BreakdownRow {
   key: string;
@@ -47,27 +49,12 @@ export function SalesBreakdown({
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [state, setState] = useState<{ key: string; rows: BreakdownRow[] } | null>(null);
-  const key = `${startDate}:${endDate}`;
+  const { data, loading } = useApi<Record<string, unknown>>(`${endpoint}?${new URLSearchParams({ startDate, endDate })}`, { keepPrevious: true });
+  // `pick` is a pure mapper defined by the page
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => (data ? pick(data) : []), [data]);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch(`${endpoint}?${new URLSearchParams({ startDate, endDate })}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((json) => !cancelled && setState({ key: `${startDate}:${endDate}`, rows: pick(json) }))
-      .catch(() => !cancelled && setState({ key: `${startDate}:${endDate}`, rows: [] }));
-    return () => {
-      cancelled = true;
-    };
-    // `pick` is a pure mapper defined by the page
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint, startDate, endDate]);
-
-  if (!state) return <BrandLoader />;
-  const loading = state.key !== key;
-  const rows = state.rows;
+  if (loading) return <BrandLoader />;
   const total = rows.reduce((s, r) => s + r.net, 0);
   const tax = rows.reduce((s, r) => s + r.tax, 0);
   const count = rows.reduce((s, r) => s + r.count, 0);
@@ -78,12 +65,12 @@ export function SalesBreakdown({
     <ContentReveal className="space-y-6">
       <BackToReports />
       <PageHeader title={title} description={description}>
-        <a href={download("pdf")} className="inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
+        <DownloadLink href={download("pdf")} filename="report.pdf" className="inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
           Download PDF
-        </a>
-        <a href={download("xlsx")} className="inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
+        </DownloadLink>
+        <DownloadLink href={download("xlsx")} filename="report.xlsx" className="inline-flex h-8 items-center rounded-lg border border-border/80 px-3 text-[13px] font-medium hover:bg-foreground/[0.03]">
           Spreadsheet
-        </a>
+        </DownloadLink>
       </PageHeader>
       <ReportHelp>{help}</ReportHelp>
       <DateRangeFilter startDate={startDate} endDate={endDate} onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
@@ -105,9 +92,7 @@ export function SalesBreakdown({
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/80 py-12 text-center text-[13px] text-muted-foreground">
           No sales were invoiced in this period.
         </div>

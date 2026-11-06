@@ -53,7 +53,6 @@ function PrimaryBadge() {
 export default function PeoplePage() {
   useDocumentTitle("Contacts · People");
   const [adding, setAdding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const config = useMemo<ExplorerConfig<Person>>(
     () => ({
@@ -184,13 +183,13 @@ export default function PeoplePage() {
 
   return (
     <>
-      <Explorer config={config} refreshKey={refreshKey} />
-      <AddPersonDialog open={adding} onOpenChange={setAdding} onAdded={() => setRefreshKey((k) => k + 1)} />
+      <Explorer config={config} />
+      <AddPersonDialog open={adding} onOpenChange={setAdding} />
     </>
   );
 }
 
-function AddPersonDialog({ open, onOpenChange, onAdded }: { open: boolean; onOpenChange: (o: boolean) => void; onAdded: () => void }) {
+function AddPersonDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const [contactId, setContactId] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -213,7 +212,6 @@ function AddPersonDialog({ open, onOpenChange, onAdded }: { open: boolean; onOpe
         isPrimary,
       });
       toast.success("Person added");
-      onAdded();
       setContactId("");
       setIsPrimary(false);
       onOpenChange(false);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useApi } from "@/lib/query/use-api";
 
 export interface PipelineStage {
   id: string;
@@ -42,31 +43,11 @@ export function openStages(pipeline: Pipeline | null | undefined) {
   return stages.filter((s) => s.id !== WON_STAGE && s.id !== LOST_STAGE);
 }
 
-/** Loads the workspace's pipelines once. */
+/** Loads the workspace's pipelines (cached). */
 export function usePipelines() {
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch("/api/v1/crm/pipelines", { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : { pipelines: [] }))
-      .then((data) => {
-        if (!cancelled) setPipelines(data.pipelines ?? []);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [version]);
-
-  return { pipelines, loading, reload: () => setVersion((v) => v + 1) };
+  const { data, loading, refetch } = useApi<{ pipelines: Pipeline[] }>("/api/v1/crm/pipelines");
+  const pipelines = useMemo(() => data?.pipelines ?? [], [data]);
+  return { pipelines, loading, reload: refetch };
 }
 
 /** Find a stage's name and colour in whichever pipeline owns it. */

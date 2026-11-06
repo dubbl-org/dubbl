@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,8 @@ import {
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { downloadFile } from "@/components/dashboard/download-link";
 
 interface TaxFormItem {
   id: string;
@@ -68,14 +70,28 @@ const statusBadge = (status: string) => {
   }
 };
 
-const years = Array.from({ length: 7 }, (_, i) => 2020 + i);
+// The current year and the five before it (the API accepts 2020 onwards).
+// Year-end forms are usually prepared for the year that just ended, so that is
+// the default.
+const CURRENT_YEAR = new Date().getFullYear();
+const years = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i).filter((y) => y >= 2020);
+const DEFAULT_YEAR = String(Math.max(2020, CURRENT_YEAR - 1));
+
+async function downloadPdf(form: { id: string; formType: string; taxYear: number; recipientName: string }) {
+  const label = form.formType === "w2" ? "W-2" : form.formType === "1099_misc" ? "1099-MISC" : "1099-NEC";
+  try {
+    await downloadFile(`/api/v1/payroll/tax-forms/${form.id}/pdf`, `${label}-${form.taxYear}-${form.recipientName}.pdf`);
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't download the PDF");
+  }
+}
 
 export default function TaxFormsPage() {
   const router = useRouter();
-  const [generations, setGenerations] = useState<TaxGeneration[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ data?: TaxGeneration[] }>("/api/v1/payroll/tax-forms");
+  const generations = data?.data ?? [];
   const [generating, setGenerating] = useState(false);
-  const [taxYear, setTaxYear] = useState("2025");
+  const [taxYear, setTaxYear] = useState(DEFAULT_YEAR);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   useDocumentTitle("Payroll · Tax Forms");
 
@@ -83,22 +99,6 @@ export default function TaxFormsPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId") || ""
       : "";
-
-  const fetchGenerations = useCallback(() => {
-    if (!orgId) return;
-    fetch("/api/v1/payroll/tax-forms", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setGenerations(data.data);
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchGenerations();
-  }, [fetchGenerations]);
 
   async function handleGenerate(formType: "1099_nec" | "w2") {
     setGenerating(true);
@@ -122,9 +122,11 @@ export default function TaxFormsPage() {
 
       const data = await res.json();
       toast.success(
-        `Generated ${data.formsGenerated} ${formType === "1099_nec" ? "1099-NEC" : "W-2"} form(s)`
+        `Generated ${data.formsGenerated} ${formType === "1099_nec" ? "1099-NEC" : "W-2"} form(s)` +
+          (data.replacedPrevious ? `, replacing the earlier ${taxYear} batch` : "")
       );
-      fetchGenerations();
+      await refetch();
+      if (data.generation?.id) setExpandedId(data.generation.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate");
     } finally {
@@ -221,9 +223,8 @@ export default function TaxFormsPage() {
               </TableRow>
             ) : (
               generations.map((gen) => (
-                <>
+                <Fragment key={gen.id}>
                   <TableRow
-                    key={gen.id}
                     className="cursor-pointer"
                     onClick={() =>
                       setExpandedId(expandedId === gen.id ? null : gen.id)
@@ -254,7 +255,7 @@ export default function TaxFormsPage() {
                   {expandedId === gen.id &&
                     gen.forms &&
                     gen.forms.length > 0 && (
-                      <TableRow key={`${gen.id}-forms`}>
+                      <TableRow>
                         <TableCell colSpan={5} className="p-0">
                           <div className="bg-muted/30 px-4 py-3">
                             <Table>
@@ -299,12 +300,10 @@ export default function TaxFormsPage() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
+                                        aria-label="Download PDF"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          window.open(
-                                            `/api/v1/payroll/tax-forms/${form.id}/pdf`,
-                                            "_blank"
-                                          );
+                                          downloadPdf(form);
                                         }}
                                       >
                                         <Download className="size-3.5" />
@@ -318,7 +317,7 @@ export default function TaxFormsPage() {
                         </TableCell>
                       </TableRow>
                     )}
-                </>
+                </Fragment>
               ))
             )}
           </TableBody>

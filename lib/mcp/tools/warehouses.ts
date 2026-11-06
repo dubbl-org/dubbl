@@ -3,10 +3,11 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { warehouse, warehouseStock, inventoryItem, auditLog } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
-import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { createWarehouse, deleteWarehouse, updateWarehouse } from "@/lib/api/warehouses";
 
 /**
  * Warehouse MCP tools.
@@ -60,7 +61,7 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
   // ─── Create warehouse ─────────────────────────────────────────────
   server.tool(
     "create_warehouse",
-    "Create a warehouse (physical stock location). name and code are required; code must be unique within the org. Optionally set an address and mark it as the default warehouse. There are no monetary fields on a warehouse. Returns the created warehouse.",
+    "Create a location (warehouse). name and code are required; code must be unique within the org (409 otherwise). Making it the default clears the default flag on the others, so there's only ever one default. There are no monetary fields on a location. Returns the created location.",
     {
       name: z.string().min(1).describe("Warehouse name"),
       code: z.string().min(1).describe("Warehouse code (unique within the org)"),
@@ -72,22 +73,20 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
       isDefault: z
         .boolean()
         .optional()
-        .describe("Whether this is the default warehouse (default false)"),
+        .describe("Whether this is the default location for new stock (default false)"),
+      isActive: z.boolean().optional().describe("Whether the location is active (default true); inactive locations can't be the default"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:inventory");
 
-        const [created] = await db
-          .insert(warehouse)
-          .values({
-            organizationId: ctx.organizationId,
-            name: params.name,
-            code: params.code,
-            address: params.address ?? null,
-            isDefault: params.isDefault,
-          })
-          .returning();
+        const created = await createWarehouse(ctx.organizationId, {
+          name: params.name,
+          code: params.code,
+          address: params.address ?? null,
+          isDefault: params.isDefault,
+          isActive: params.isActive,
+        });
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
@@ -104,7 +103,7 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
   // ─── Update warehouse ─────────────────────────────────────────────
   server.tool(
     "update_warehouse",
-    "Update a warehouse's fields. Only the fields you pass are changed; code must remain unique within the org. There are no monetary fields on a warehouse. Returns the updated warehouse.",
+    "Update a location's fields. Only the fields you pass change; code must stay unique within the org. Setting isDefault clears it on the other locations; deactivating a location also stops it being the default. Returns the updated location.",
     {
       warehouseId: z.string().uuid().describe("The UUID of the warehouse to update"),
       name: z.string().min(1).optional().describe("Warehouse name"),
@@ -123,20 +122,7 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
 
         const { warehouseId, ...fields } = params;
 
-        const existing = await db.query.warehouse.findFirst({
-          where: and(
-            eq(warehouse.id, warehouseId),
-            eq(warehouse.organizationId, ctx.organizationId),
-            notDeleted(warehouse.deletedAt)
-          ),
-        });
-        if (!existing) throw new Error("Warehouse not found");
-
-        const [updated] = await db
-          .update(warehouse)
-          .set({ ...fields, updatedAt: new Date() })
-          .where(eq(warehouse.id, warehouseId))
-          .returning();
+        const { updated } = await updateWarehouse(ctx.organizationId, warehouseId, fields);
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
@@ -154,7 +140,7 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
   // ─── Delete warehouse ─────────────────────────────────────────────
   server.tool(
     "delete_warehouse",
-    "Soft-delete a warehouse (sets deletedAt; the row and its stock history are retained). The warehouse stops appearing in lists and lookups. Returns { success: true }.",
+    "Delete a location (moves it to the trash; its stock history is kept). Fails with 409 while the location still holds stock or has open transfers: move the stock out with a transfer first. Returns { success: true }.",
     {
       warehouseId: z.string().uuid().describe("The UUID of the warehouse to delete"),
     },
@@ -162,16 +148,7 @@ export function registerWarehouseTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:inventory");
 
-        const existing = await db.query.warehouse.findFirst({
-          where: and(
-            eq(warehouse.id, params.warehouseId),
-            eq(warehouse.organizationId, ctx.organizationId),
-            notDeleted(warehouse.deletedAt)
-          ),
-        });
-        if (!existing) throw new Error("Warehouse not found");
-
-        await db.update(warehouse).set(softDelete()).where(eq(warehouse.id, params.warehouseId));
+        await deleteWarehouse(ctx.organizationId, params.warehouseId);
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,

@@ -69,16 +69,16 @@ export interface TypeMeta {
 
 export const TYPES: TypeMeta[] = [
   { type: "invoice_overdue", label: "Invoice overdue", description: "An invoice passes its due date unpaid", category: "receivables", icon: FileWarning, color: "#EF4444" },
-  { type: "payment_received", label: "Payment received", description: "A customer payment is recorded", category: "receivables", icon: CircleDollarSign, color: "#10B981" },
+  { type: "payment_received", label: "Payment received", description: "A customer pays one of your invoices", category: "receivables", icon: CircleDollarSign, color: "#10B981" },
   { type: "approval_needed", label: "Approval needed", description: "Something is waiting for your sign-off", category: "approvals", icon: ShieldCheck, color: "#8B5CF6" },
   { type: "task_assigned", label: "Task assigned", description: "Someone assigns you a task", category: "tasks", icon: ListTodo, color: "#6366F1" },
-  { type: "low_bank_balance", label: "Low bank balance", description: "An account drops below its alert threshold", category: "banking", icon: Landmark, color: "#F59E0B" },
-  { type: "budget_exceeded", label: "Budget exceeded", description: "Spending crosses a budget threshold", category: "banking", icon: Gauge, color: "#F59E0B" },
-  { type: "payroll_due", label: "Payroll due", description: "A pay run is coming up", category: "payroll", icon: CalendarClock, color: "#14B8A6" },
+  { type: "low_bank_balance", label: "Low bank balance", description: "An account drops below its alert amount", category: "banking", icon: Landmark, color: "#F59E0B" },
+  { type: "budget_exceeded", label: "Budget exceeded", description: "Spending reaches a budget's alert level", category: "banking", icon: Gauge, color: "#F59E0B" },
+  { type: "payroll_due", label: "Payroll due", description: "A draft pay run's period ends within 3 days", category: "payroll", icon: CalendarClock, color: "#14B8A6" },
   { type: "inventory_low", label: "Low stock", description: "An item falls below its reorder point", category: "inventory", icon: Package, color: "#F59E0B" },
   { type: "stripe_payment_failed", label: "Stripe payment failed", description: "A Stripe charge or invoice payment fails", category: "integrations", icon: CreditCard, color: "#EF4444" },
-  { type: "webhook_exhausted", label: "Sync events failed", description: "Integration events fail after every retry", category: "integrations", icon: Webhook, color: "#EF4444" },
-  { type: "system_alert", label: "System", description: "Imports, syncs and account notices", category: "system", icon: Info, color: "#71717A" },
+  { type: "webhook_exhausted", label: "Sync events failed", description: "Stripe events fail after every retry", category: "integrations", icon: Webhook, color: "#EF4444" },
+  { type: "system_alert", label: "System", description: "A backup, report or reminder fails", category: "system", icon: Info, color: "#71717A" },
 ];
 
 const TYPE_MAP = new Map(TYPES.map((t) => [t.type, t]));
@@ -118,9 +118,9 @@ const ENTITY_ROUTES: Record<string, { label: string; href: (id: string) => strin
   payroll_run: { label: "Pay run", href: (id) => `/payroll/runs/${id}` },
   project: { label: "Project", href: (id) => `/projects/${id}` },
   contact: { label: "Contact", href: (id) => `/contacts/${id}` },
-  stripe_integration: { label: "Stripe", href: () => `/settings/integrations` },
-  stripe_invoice: { label: "Stripe", href: () => `/settings/integrations` },
-  payment_intent: { label: "Stripe", href: () => `/settings/integrations` },
+  stripe_integration: { label: "Stripe", href: () => `/settings/integrations/stripe` },
+  stripe_invoice: { label: "Stripe", href: () => `/settings/integrations/stripe` },
+  payment_intent: { label: "Stripe", href: () => `/settings/integrations/stripe` },
 };
 
 /** Where to go when the notification doesn't point at a specific record. */
@@ -132,8 +132,8 @@ const TYPE_ROUTES: Record<string, { label: string; href: string }> = {
   budget_exceeded: { label: "Budgets", href: "/accounting/budgets" },
   payroll_due: { label: "Pay runs", href: "/payroll/runs" },
   inventory_low: { label: "Inventory", href: "/inventory" },
-  stripe_payment_failed: { label: "Stripe", href: "/settings/integrations" },
-  webhook_exhausted: { label: "Integrations", href: "/settings/integrations" },
+  stripe_payment_failed: { label: "Stripe", href: "/settings/integrations/stripe" },
+  webhook_exhausted: { label: "Stripe", href: "/settings/integrations/stripe" },
 };
 
 /** Document numbers people recognise, e.g. INV-00042, BILL-12, PO-3001. */

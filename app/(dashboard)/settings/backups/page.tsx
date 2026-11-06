@@ -15,6 +15,7 @@ import {
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { toast } from "sonner";
+import { useApi } from "@/lib/query/use-api";
 
 interface Backup {
   id: string;
@@ -47,10 +48,7 @@ function getOrgId(): string | null {
 }
 
 export default function BackupsPage() {
-  const [backups, setBackups] = useState<Backup[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [creating, setCreating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -63,30 +61,14 @@ export default function BackupsPage() {
   const [deleteBackup, setDeleteBackup] = useState<Backup | null>(null);
 
   const limit = 20;
+  const { data, loading, error } = useApi<{ data?: Backup[]; total?: number }>(`/api/v1/backups?page=${page}&limit=${limit}`, { keepPrevious: true });
+  const backups = data?.data || [];
+  const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
 
-  function fetchBackups(p = page) {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    fetch(`/api/v1/backups?page=${p}&limit=${limit}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setBackups(data.data || []);
-        setTotal(data.total || 0);
-      })
-      .catch(() => {
-        toast.error("Failed to load backups");
-      })
-      .finally(() => setLoading(false));
-  }
-
   useEffect(() => {
-    fetchBackups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+    if (error) toast.error("Failed to load backups");
+  }, [error]);
 
   async function confirmCreate() {
     const orgId = getOrgId();
@@ -103,7 +85,6 @@ export default function BackupsPage() {
       }
       toast.success("Backup created");
       setCreateOpen(false);
-      fetchBackups();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create backup");
     } finally {
@@ -153,7 +134,6 @@ export default function BackupsPage() {
       });
       if (!res.ok) throw new Error();
       toast.success("Backup uploaded");
-      fetchBackups();
     } catch {
       toast.error("Failed to upload backup");
     }
@@ -195,12 +175,11 @@ export default function BackupsPage() {
         },
         body: JSON.stringify({ confirm: true }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to restore backup");
       toast.success("Backup restored. A snapshot of your previous data was saved automatically.");
       setRestoreBackup(null);
-      fetchBackups();
-    } catch {
-      toast.error("Failed to restore backup");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to restore backup");
     } finally {
       setRestoringId(null);
     }
@@ -219,7 +198,6 @@ export default function BackupsPage() {
       if (!res.ok) throw new Error();
       toast.success("Backup deleted");
       setDeleteBackup(null);
-      fetchBackups();
     } catch {
       toast.error("Failed to delete backup");
     } finally {
@@ -447,7 +425,7 @@ export default function BackupsPage() {
             <DialogDescription>
               This will replace all current data with the snapshot from{" "}
               {restoreBackup && new Date(restoreBackup.createdAt).toLocaleString()}.
-              A snapshot of your current data will be saved automatically before restoring.
+              Records added since then move to the trash. A snapshot of your current data will be saved automatically before restoring, and if any record can&apos;t be restored, nothing changes.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

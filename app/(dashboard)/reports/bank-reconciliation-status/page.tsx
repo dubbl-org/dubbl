@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -17,6 +16,7 @@ import {
 import { ExportButton } from "@/components/dashboard/export-button";
 import { formatMoney } from "@/lib/money";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface AgingBucket {
   count: number;
@@ -58,37 +58,10 @@ function fmtDate(d: string | null | undefined): string {
 }
 
 export default function BankReconciliationStatusPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<StatusData | null>(null);
+  const { data: report, loading } = useApi<StatusData>(`/api/v1/reports/bank-reconciliation-status`);
+  const data = report?.accounts ? report : null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-
-    fetch(`/api/v1/reports/bank-reconciliation-status`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.accounts) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const accounts = data?.accounts ?? [];
 
@@ -141,9 +114,7 @@ export default function BankReconciliationStatusPage() {
         your real bank balance. Accountants call this bank reconciliation.
       </ReportHelp>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : accounts.length === 0 ? (
+      {accounts.length === 0 ? (
         <ContentReveal>
           <div className="rounded-lg border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
             No bank accounts yet. Add a bank account to start tracking what&apos;s

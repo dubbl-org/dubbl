@@ -41,6 +41,9 @@ const createSchema = z.object({
   usefulLifeMonths: z.number().int().min(1).optional(),
   depreciationMethod: depreciationMethodEnum.optional(),
   convention: conventionEnum.optional(),
+  // Declining-balance yearly rate in basis points (2000 = 20%); null = double
+  // declining balance. Defaults to the category's rate when omitted.
+  depreciationRateBp: z.number().int().min(1).max(100000).nullable().optional(),
   // Units-of-production inputs.
   totalExpectedUnits: z.number().int().min(0).nullable().optional(),
   unitOfMeasure: z.string().nullable().optional(),
@@ -125,6 +128,12 @@ export async function POST(request: Request) {
       "straight_line";
     const convention =
       parsed.convention ?? category?.defaultConvention ?? "full_month";
+    const depreciationRateBp =
+      depreciationMethod !== "declining_balance"
+        ? null
+        : parsed.depreciationRateBp !== undefined
+          ? parsed.depreciationRateBp
+          : category?.defaultDepreciationRateBp ?? null;
     const assetAccountId =
       parsed.assetAccountId ?? category?.assetAccountId ?? null;
     const depreciationAccountId =
@@ -159,6 +168,7 @@ export async function POST(request: Request) {
         usefulLifeMonths,
         depreciationMethod,
         convention,
+        depreciationRateBp,
         totalExpectedUnits: parsed.totalExpectedUnits ?? null,
         unitOfMeasure: parsed.unitOfMeasure ?? null,
         netBookValue: parsed.purchasePrice,

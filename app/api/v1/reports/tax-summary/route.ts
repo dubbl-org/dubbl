@@ -6,15 +6,17 @@ import {
   billLine,
   bill,
   taxRate,
-  taxComponent,
 } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, isNull, notInArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
+import { requireRole } from "@/lib/api/require-role";
+import { splitCompoundTax } from "@/lib/tax/compound";
 
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "view:data");
     const url = new URL(request.url);
     const startDate =
       url.searchParams.get("startDate") ||
@@ -37,7 +39,7 @@ export async function GET(request: Request) {
       .select({
         taxRateId: invoiceLine.taxRateId,
         totalTax: sql<number>`COALESCE(SUM(${invoiceLine.taxAmount}), 0)`,
-        totalNet: sql<number>`COALESCE(SUM(${invoiceLine.quantity} * ${invoiceLine.unitPrice} / 100), 0)`,
+        totalNet: sql<number>`COALESCE(SUM(${invoiceLine.amount}), 0)`,
         lineCount: sql<number>`COUNT(*)`,
       })
       .from(invoiceLine)
@@ -45,7 +47,8 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(invoice.organizationId, ctx.organizationId),
-          notInArray(invoice.status, ["draft", "void"]),
+          notInArray(invoice.status, ["draft", "void", "pending_approval", "rejected"]),
+          isNull(invoice.deletedAt),
           gte(invoice.issueDate, startDate),
           lte(invoice.issueDate, endDate),
           sql`${invoiceLine.taxRateId} IS NOT NULL`
@@ -58,7 +61,7 @@ export async function GET(request: Request) {
       .select({
         taxRateId: billLine.taxRateId,
         totalTax: sql<number>`COALESCE(SUM(${billLine.taxAmount}), 0)`,
-        totalNet: sql<number>`COALESCE(SUM(${billLine.quantity} * ${billLine.unitPrice} / 100), 0)`,
+        totalNet: sql<number>`COALESCE(SUM(${billLine.amount}), 0)`,
         lineCount: sql<number>`COUNT(*)`,
       })
       .from(billLine)
@@ -66,7 +69,8 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(bill.organizationId, ctx.organizationId),
-          notInArray(bill.status, ["draft", "void"]),
+          notInArray(bill.status, ["draft", "void", "pending_approval"]),
+          isNull(bill.deletedAt),
           gte(bill.issueDate, startDate),
           lte(bill.issueDate, endDate),
           sql`${billLine.taxRateId} IS NOT NULL`
@@ -96,6 +100,22 @@ export async function GET(request: Request) {
         inputNet,
         inputTransactions: Number(input?.lineCount || 0),
         netTax: outputTax - inputTax,
+        // Compound rates: the tax shared between the parts by part rate, the
+        // same split used when documents post.
+        parts: (rate.components ?? []).length
+          ? (() => {
+              const parts = rate.components.map((c) => ({ rate: c.rate, accountId: c.accountId }));
+              const out = splitCompoundTax(outputTax, parts);
+              const inp = splitCompoundTax(inputTax, parts);
+              return rate.components.map((c, i) => ({
+                name: c.name,
+                rate: c.rate,
+                accountId: c.accountId,
+                outputTax: out[i]?.amount ?? 0,
+                inputTax: inp[i]?.amount ?? 0,
+              }));
+            })()
+          : [],
       };
     });
 

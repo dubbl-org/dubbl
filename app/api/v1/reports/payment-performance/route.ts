@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       .select({
         contactId: invoice.contactId,
         contactName: contact.name,
-        avgDaysToCollect: sql<number>`AVG(${invoice.paidAt}::date - ${invoice.issueDate}::date)`,
+        avgDaysToCollect: sql<number>`AVG(${invoice.paidAt}::date - ${invoice.issueDate}::date)`.as("avg_days_to_collect"),
         avgTermDays: sql<number>`AVG(${invoice.dueDate}::date - ${invoice.issueDate}::date)`,
         invoiceCount: sql<number>`COUNT(*)`,
         totalCollected: sql<number>`COALESCE(SUM(${invoice.total}), 0)`,
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       .select({
         contactId: bill.contactId,
         contactName: contact.name,
-        avgDaysToPay: sql<number>`AVG(${bill.paidAt}::date - ${bill.issueDate}::date)`,
+        avgDaysToPay: sql<number>`AVG(${bill.paidAt}::date - ${bill.issueDate}::date)`.as("avg_days_to_pay"),
         avgTermDays: sql<number>`AVG(${bill.dueDate}::date - ${bill.issueDate}::date)`,
         billCount: sql<number>`COUNT(*)`,
         totalPaid: sql<number>`COALESCE(SUM(${bill.total}), 0)`,

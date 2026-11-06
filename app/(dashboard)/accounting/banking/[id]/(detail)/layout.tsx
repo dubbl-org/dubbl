@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import type {
   BankAccountDetail,
   Transaction,
@@ -45,6 +46,16 @@ import {
   SplitAccountSheet,
 } from "../_components";
 import { ACCOUNT_TYPE_LABELS } from "../_components";
+
+interface BankAccountListItem {
+  id: string;
+  accountName: string;
+  bankName: string | null;
+  currencyCode: string;
+  accountType: BankAccountSummary["accountType"];
+  balance: number;
+  chartAccountId: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Context
@@ -116,10 +127,22 @@ export default function BankAccountDetailLayout({ children }: { children: React.
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
-  const [account, setAccount] = useState<BankAccountDetail | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [imports, setImports] = useState<StatementImport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const accountUrl = `/api/v1/bank-accounts/${id}`;
+  const accountQuery = useApi<{ bankAccount?: BankAccountDetail | null }>(accountUrl);
+  const txQuery = useApi<{ data?: Transaction[] }>(`/api/v1/bank-accounts/${id}/transactions`);
+  const importsQuery = useApi<{ imports?: StatementImport[] }>(`/api/v1/bank-accounts/${id}/imports`);
+  // Other own bank accounts (transfer targets)
+  const bankAccountsQuery = useApi<{ bankAccounts?: BankAccountListItem[] }>(`/api/v1/bank-accounts`);
+  const cache = useApiCache();
+  const account = accountQuery.data?.bankAccount || null;
+  const transactions = useMemo(() => txQuery.data?.data || [], [txQuery.data]);
+  const imports = useMemo(() => importsQuery.data?.imports || [], [importsQuery.data]);
+  const loading = accountQuery.loading || txQuery.loading || importsQuery.loading;
+  const setAccount = useCallback(
+    (fn: (prev: BankAccountDetail | null) => BankAccountDetail | null) =>
+      cache.update<{ bankAccount?: BankAccountDetail | null }>(accountUrl, (d) => ({ ...d, bankAccount: fn(d.bankAccount ?? null) })),
+    [cache, accountUrl]
+  );
 
   // Import sheet state
   const [importOpen, setImportOpen] = useState(false);
@@ -155,62 +178,33 @@ export default function BankAccountDetailLayout({ children }: { children: React.
   const [transferTx, setTransferTx] = useState<Transaction | null>(null);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
 
-  // Other own bank accounts (transfer targets)
-  const [bankAccounts, setBankAccounts] = useState<BankAccountSummary[]>([]);
-
   useEntityTitle(account?.accountName ?? undefined);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
+  const refetchAccount = accountQuery.refetch;
+  const refetchTransactions = txQuery.refetch;
+  const refetchImports = importsQuery.refetch;
   const fetchData = useCallback(() => {
-    if (!orgId) return;
-    setLoading(true);
-    const headers = { "x-organization-id": orgId };
+    void refetchAccount();
+    void refetchTransactions();
+    void refetchImports();
+  }, [refetchAccount, refetchTransactions, refetchImports]);
 
-    Promise.all([
-      fetch(`/api/v1/bank-accounts/${id}`, { headers }).then((r) => r.json()),
-      fetch(`/api/v1/bank-accounts/${id}/transactions`, { headers }).then((r) => r.json()),
-      fetch(`/api/v1/bank-accounts/${id}/imports`, { headers }).then((r) => r.json()),
-    ])
-      .then(([accountData, txData, importData]) => {
-        setAccount(accountData.bankAccount || null);
-        setTransactions(txData.data || []);
-        setImports(importData.imports || []);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Load the org's other bank accounts once — used as transfer targets.
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/bank-accounts`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        const list = (data.bankAccounts ?? []).map((b: {
-          id: string;
-          accountName: string;
-          bankName: string | null;
-          currencyCode: string;
-          accountType: BankAccountSummary["accountType"];
-          balance: number;
-          chartAccountId: string | null;
-        }) => ({
-          id: b.id,
-          accountName: b.accountName,
-          bankName: b.bankName,
-          currencyCode: b.currencyCode,
-          accountType: b.accountType,
-          balance: b.balance,
-          hasLedgerAccount: Boolean(b.chartAccountId),
-        }));
-        setBankAccounts(list);
-      })
-      .catch(() => {});
-  }, [orgId]);
+  // The org's bank accounts — used as transfer targets.
+  const bankAccounts = useMemo<BankAccountSummary[]>(
+    () =>
+      (bankAccountsQuery.data?.bankAccounts ?? []).map((b) => ({
+        id: b.id,
+        accountName: b.accountName,
+        bankName: b.bankName,
+        currencyCode: b.currencyCode,
+        accountType: b.accountType,
+        balance: b.balance,
+        hasLedgerAccount: Boolean(b.chartAccountId),
+      })),
+    [bankAccountsQuery.data]
+  );
 
   const summary = useMemo(() => {
     const unreconciled = transactions.filter((tx) => tx.status === "unreconciled").length;
@@ -236,7 +230,6 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success("Marked as cleared");
-      fetchData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't mark as cleared");
     }
@@ -252,7 +245,6 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success("Transaction status updated");
-      fetchData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update status");
     }
@@ -271,7 +263,6 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success("Moved back to your to-do list");
-      fetchData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't undo this");
     }
@@ -397,13 +388,20 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Request failed");
-      toast.success(`Imported ${data.import.imported} transactions`);
+      // Bank rules run on every import: say what they did.
+      const rules = data.import.rules as { applied: number; reconciled: number } | undefined;
+      const ruleParts = rules && rules.applied > 0
+        ? [
+            rules.reconciled ? `${rules.reconciled} categorized by your rules` : null,
+            rules.applied - rules.reconciled ? `${rules.applied - rules.reconciled} given a suggested category` : null,
+          ].filter(Boolean).join(", ")
+        : "";
+      toast.success(`Imported ${data.import.imported} transactions`, ruleParts ? { description: ruleParts } : undefined);
       setImportOpen(false);
       setSelectedFile(null);
       setManualContent("");
       setFormat("auto");
       setPreview(null);
-      fetchData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to import");
     } finally {
@@ -579,7 +577,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         loading={matchLoading}
         currencyCode={cur}
         orgId={orgId}
-        onMatched={() => { setMatchTx(null); fetchData(); }}
+        onMatched={() => setMatchTx(null)}
       />
 
       {/* Create Expense Sheet */}
@@ -588,7 +586,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         onClose={() => setExpenseTx(null)}
         currencyCode={cur}
         orgId={orgId}
-        onCreated={() => { setExpenseTx(null); fetchData(); }}
+        onCreated={() => setExpenseTx(null)}
       />
 
       {/* Match to Invoice Sheet (incoming) */}
@@ -600,7 +598,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         loading={matchInvoiceLoading}
         currencyCode={cur}
         orgId={orgId}
-        onMatched={() => { setMatchInvoiceTx(null); fetchData(); }}
+        onMatched={() => setMatchInvoiceTx(null)}
       />
 
       {/* Categorize Sheet (any account: income, expense, loan, owner, transfer) */}
@@ -609,7 +607,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         onClose={() => setCategorizeTx(null)}
         currencyCode={cur}
         orgId={orgId}
-        onCategorized={() => { setCategorizeTx(null); fetchData(); }}
+        onCategorized={() => setCategorizeTx(null)}
         onSwitchToTransfer={(t) => { setCategorizeTx(null); setTransferTx(t); }}
         onSwitchToSplit={(t) => { setCategorizeTx(null); setSplitTx(t); }}
       />
@@ -625,7 +623,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         loading={unifiedMatchLoading}
         currencyCode={cur}
         orgId={orgId}
-        onMatched={() => { setUnifiedMatchTx(null); fetchData(); }}
+        onMatched={() => setUnifiedMatchTx(null)}
       />
 
       {/* Transfer Sheet (move money between own bank accounts) */}
@@ -636,7 +634,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         currentBankAccountId={account.id}
         currencyCode={cur}
         orgId={orgId}
-        onTransferred={() => { setTransferTx(null); fetchData(); }}
+        onTransferred={() => setTransferTx(null)}
       />
 
       {/* Split Sheet (code one line across multiple accounts) */}
@@ -645,7 +643,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
         onClose={() => setSplitTx(null)}
         currencyCode={cur}
         orgId={orgId}
-        onSplit={() => { setSplitTx(null); fetchData(); }}
+        onSplit={() => setSplitTx(null)}
       />
     </BankAccountContext.Provider>
   );

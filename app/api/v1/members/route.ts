@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
+import { memberCapacity } from "@/lib/api/check-limit";
 import { db } from "@/lib/db";
 import { member, users, organization } from "@/lib/db/schema";
-import { subscription } from "@/lib/db/schema/billing";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { getEffectiveLimits } from "@/lib/plans";
 import { z } from "zod";
 import { render } from "@react-email/render";
 import { createElement } from "react";
@@ -24,7 +23,11 @@ export async function GET(request: Request) {
 
     const members = await db.query.member.findMany({
       where: eq(member.organizationId, ctx.organizationId),
-      with: { user: { columns: { id: true, name: true, email: true, image: true } }, customRole: true },
+      with: {
+        user: { columns: { id: true, name: true, email: true, image: true } },
+        customRole: true,
+        teamMemberships: { with: { team: { columns: { id: true, name: true, color: true } } } },
+      },
     });
 
     return NextResponse.json({
@@ -36,6 +39,7 @@ export async function GET(request: Request) {
         role: m.role,
         customRoleId: m.customRoleId || null,
         customRoleName: m.customRole?.name || null,
+        teams: m.teamMemberships.map((tm) => tm.team),
         createdAt: m.createdAt.toISOString(),
       })),
     });
@@ -82,57 +86,12 @@ export async function POST(request: Request) {
     }
 
     // Enforce billing status
-    const sub = await db.query.subscription.findFirst({
-      where: eq(subscription.organizationId, ctx.organizationId),
-    });
-    const billingStatus = sub?.status ?? "active";
-    if (billingStatus === "past_due" || billingStatus === "incomplete") {
-      return NextResponse.json(
-        { error: "Your billing is past due. Update your payment method to invite members." },
-        { status: 402 }
-      );
+    const capacity = await memberCapacity(ctx.organizationId);
+    if (!capacity.billingOk) {
+      return NextResponse.json({ error: capacity.reason }, { status: 402 });
     }
-
-    // Enforce member limit
-    const [memberCountResult] = await db
-      .select({ count: count() })
-      .from(member)
-      .where(eq(member.organizationId, ctx.organizationId));
-    const limits = getEffectiveLimits(sub ?? null);
-    const plan = sub?.plan ?? "free";
-    const seatCount = sub?.seatCount ?? 1;
-
-    // Determine effective member cap:
-    // - overrideMembers (enterprise override) takes priority
-    // - Free: hard limit from plan (1)
-    // - Pro: per-seat model, use seatCount from subscription
-    // - Business: unlimited
-    let memberMax: number;
-    if (sub?.overrideMembers != null) {
-      memberMax = sub.overrideMembers;
-    } else if (plan === "pro") {
-      memberMax = seatCount;
-    } else {
-      memberMax = limits.members;
-    }
-
-    if (memberCountResult.count >= memberMax) {
-      if (plan === "free") {
-        return NextResponse.json(
-          { error: "Free plan is limited to 1 member. Upgrade to Pro to invite your team." },
-          { status: 403 }
-        );
-      }
-      if (plan === "pro") {
-        return NextResponse.json(
-          { error: `You've used all ${seatCount} seats. Add more seats in billing settings.` },
-          { status: 403 }
-        );
-      }
-      return NextResponse.json(
-        { error: `You've reached your plan's limit of ${memberMax} members. Upgrade your plan or contact support.` },
-        { status: 403 }
-      );
+    if (!capacity.canAdd) {
+      return NextResponse.json({ error: capacity.reason }, { status: 403 });
     }
 
     const [newMember] = await db

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown, Plus, Loader2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useApi } from "@/lib/query/use-api";
 
 interface Contact {
   id: string;
@@ -52,36 +53,24 @@ interface ContactPickerProps {
 
 export function ContactPicker({ value, onChange, type, placeholder = "Select contact..." }: ContactPickerProps) {
   const [open, setOpen] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(true);
-  const fetchedRef = useRef(false);
+  // Contacts load once the popover has been opened (or a contact is already selected, to show its name)
+  const [opened, setOpened] = useState(false);
   const { open: openDrawer } = useCreateDrawer();
 
-  // Fetch contacts when popover opens for the first time
-  useEffect(() => {
-    if (!open || fetchedRef.current) return;
-    fetchedRef.current = true;
+  const params = new URLSearchParams({ limit: "200" });
+  if (type) params.set("type", type);
+  const { data, loading } = useApi<{ data?: Contact[] }>(opened || value ? `/api/v1/contacts?${params}` : null);
+  const contacts = data?.data ?? [];
 
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    const params = new URLSearchParams({ limit: "200" });
-    if (type) params.set("type", type);
-
-    fetch(`/api/v1/contacts?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) setContacts(data.data);
-      })
-      .finally(() => setLoading(false));
-  }, [open, type]);
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen) setOpened(true);
+  }
 
   const selected = contacts.find((c) => c.id === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
 import { cn, safeCallbackUrl } from "@/lib/utils";
+import { clearQueryCache } from "@/lib/query/client";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -74,6 +75,11 @@ function SignInContent() {
   // across retries.
   const [needsTotp, setNeedsTotp] = useState(false);
   const [totp, setTotp] = useState("");
+
+  // Whoever signs in next mustn't open on the last account's cached data.
+  useEffect(() => {
+    void clearQueryCache();
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/providers-config")

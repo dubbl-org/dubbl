@@ -7,6 +7,14 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { z } from "zod";
+
+const updateSchema = z.object({
+  issueDate: z.string().min(1).optional(),
+  reference: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
 
 export async function GET(
   request: Request,
@@ -62,7 +70,10 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    // Header fields only: totals, status and balances are owned by the
+    // create/send/apply/void flows and must not be set directly.
+    const body = updateSchema.parse(await request.json());
+    if (body.issueDate) await assertNotLocked(ctx.organizationId, body.issueDate, ctx);
     const [updated] = await db
       .update(debitNote)
       .set({ ...body, updatedAt: new Date() })

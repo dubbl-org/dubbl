@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Plus, RefreshCw, Calendar, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
+import { useApi, useApis } from "@/lib/query/use-api";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
@@ -81,7 +82,7 @@ function endingSoon(t: RecurringTemplate) {
   return d != null && d >= 0 && d <= 30;
 }
 
-async function toggle(templates: RecurringTemplate[], verb: "Paused" | "Resumed", helpers: ExplorerHelpers, onDone: () => void) {
+async function toggle(templates: RecurringTemplate[], verb: "Paused" | "Resumed", helpers: ExplorerHelpers) {
   const results = await Promise.allSettled(templates.map((t) => postJson(`/api/v1/recurring/${t.id}/pause`)));
   const ok = results.filter((r) => r.status === "fulfilled").length;
   const failed = results.length - ok;
@@ -89,16 +90,13 @@ async function toggle(templates: RecurringTemplate[], verb: "Paused" | "Resumed"
   if (failed) toast.error(`${failed} couldn't be changed`);
   helpers.clearSelection();
   helpers.refresh();
-  onDone();
 }
 
 export default function RecurringInvoicesPage() {
   const { open: openDrawer } = useCreateDrawer();
-  const [stripVersion, setStripVersion] = useState(0);
   useDocumentTitle("Sales · Recurring Invoices");
 
   const config = useMemo<ExplorerConfig<RecurringTemplate>>(() => {
-    const bump = () => setStripVersion((v) => v + 1);
     return {
       id: "recurring-invoices",
       endpoint: "/api/v1/recurring",
@@ -207,10 +205,10 @@ export default function RecurringInvoicesPage() {
         const resumable = selected.filter((t) => t.status === "paused");
         return (
           <>
-            <ActionButton icon={<Pause className="size-3.5" />} run={() => toggle(pausable, "Paused", helpers, bump)} className={pausable.length ? undefined : "pointer-events-none opacity-40"}>
+            <ActionButton icon={<Pause className="size-3.5" />} run={() => toggle(pausable, "Paused", helpers)} className={pausable.length ? undefined : "pointer-events-none opacity-40"}>
               Pause{pausable.length ? ` (${pausable.length})` : ""}
             </ActionButton>
-            <ActionButton icon={<Play className="size-3.5" />} run={() => toggle(resumable, "Resumed", helpers, bump)} className={resumable.length ? undefined : "pointer-events-none opacity-40"}>
+            <ActionButton icon={<Play className="size-3.5" />} run={() => toggle(resumable, "Resumed", helpers)} className={resumable.length ? undefined : "pointer-events-none opacity-40"}>
               Resume{resumable.length ? ` (${resumable.length})` : ""}
             </ActionButton>
           </>
@@ -246,12 +244,12 @@ export default function RecurringInvoicesPage() {
           actions={
             <>
               {t.status === "active" && (
-                <ActionButton icon={<Pause className="size-3.5" />} run={() => toggle([t], "Paused", helpers, bump)}>
+                <ActionButton icon={<Pause className="size-3.5" />} run={() => toggle([t], "Paused", helpers)}>
                   Pause
                 </ActionButton>
               )}
               {t.status === "paused" && (
-                <ActionButton primary icon={<Play className="size-3.5" />} run={() => toggle([t], "Resumed", helpers, bump)}>
+                <ActionButton primary icon={<Play className="size-3.5" />} run={() => toggle([t], "Resumed", helpers)}>
                   Resume
                 </ActionButton>
               )}
@@ -267,52 +265,42 @@ export default function RecurringInvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <UpcomingStrip version={stripVersion} />
+      <UpcomingStrip />
       <Explorer config={config} />
     </div>
   );
 }
 
-/** GET with the active workspace; resolves to null on any failure. */
-function get(url: string) {
-  const orgId = localStorage.getItem("activeOrgId");
-  return fetch(url, { headers: orgId ? { "x-organization-id": orgId } : {} })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+interface PreviewResponse {
+  template?: { name?: string; contactName?: string; lineTotal?: number };
+  upcoming?: { date: string; occurrence: number }[];
 }
 
 /** The next invoices your active templates will create, soonest first. */
-function UpcomingStrip({ version }: { version: number }) {
-  const [upcoming, setUpcoming] = useState<Upcoming[]>([]);
+function UpcomingStrip() {
+  const { data: list } = useApi<{ data?: RecurringTemplate[] }>("/api/v1/recurring?type=invoice&status=active&sortBy=nextRun&sortOrder=asc&limit=5");
+  const active = useMemo(() => (list?.data ?? []).slice(0, 5), [list]);
+  // One preview per template, fetched in parallel through the shared cache.
+  const previews = useApis<PreviewResponse>(active.map((t) => `/api/v1/recurring/${t.id}/preview?count=3`));
 
-  useEffect(() => {
-    if (!localStorage.getItem("activeOrgId")) return;
-    let cancelled = false;
-    get("/api/v1/recurring?type=invoice&status=active&sortBy=nextRun&sortOrder=asc&limit=5").then((list) => {
-      const active = ((list?.data ?? []) as RecurringTemplate[]).slice(0, 5);
-      Promise.all(
-        active.map((t) =>
-          get(`/api/v1/recurring/${t.id}/preview?count=3`).then((d) =>
-            d
-              ? {
-                  id: t.id,
-                  templateName: d.template?.name || t.name,
-                  contactName: d.template?.contactName || t.contact?.name || "",
-                  lineTotal: d.template?.lineTotal || 0,
-                  currency: t.currencyCode,
-                  dates: (d.upcoming ?? []) as Upcoming["dates"],
-                }
-              : null
-          )
-        )
-      ).then((results) => {
-        if (!cancelled) setUpcoming(results.filter((r): r is Upcoming => r !== null && r.dates.length > 0));
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [version]);
+  // Like before, the strip appears once every preview has answered; a failed preview is skipped.
+  const upcoming: Upcoming[] = previews.loading
+    ? []
+    : active
+        .map((t, i) => {
+          const d = previews.data[i];
+          return d
+            ? {
+                id: t.id,
+                templateName: d.template?.name || t.name,
+                contactName: d.template?.contactName || t.contact?.name || "",
+                lineTotal: d.template?.lineTotal || 0,
+                currency: t.currencyCode,
+                dates: d.upcoming ?? [],
+              }
+            : null;
+        })
+        .filter((r): r is Upcoming => r !== null && r.dates.length > 0);
 
   if (upcoming.length === 0) return null;
 
@@ -350,19 +338,8 @@ function UpcomingStrip({ version }: { version: number }) {
 
 /** The next few invoice dates for one template. */
 function UpcomingDates({ id }: { id: string }) {
-  const [state, setState] = useState<{ id: string; dates: { date: string; occurrence: number }[] } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    get(`/api/v1/recurring/${id}/preview?count=6`).then((d) => {
-      if (!cancelled) setState({ id, dates: d?.upcoming ?? [] });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  const loading = state?.id !== id;
+  const { data, loading } = useApi<PreviewResponse>(`/api/v1/recurring/${id}/preview?count=6`);
+  const dates = data?.upcoming ?? [];
 
   return (
     <div className="mt-6">
@@ -372,9 +349,9 @@ function UpcomingDates({ id }: { id: string }) {
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-2/3" />
         </div>
-      ) : state.dates.length > 0 ? (
+      ) : dates.length > 0 ? (
         <div className="divide-y divide-border/60 rounded-xl border border-border/80">
-          {state.dates.map((d) => (
+          {dates.map((d) => (
             <div key={d.date} className="flex items-center gap-3 px-3 py-2 text-[13px]">
               <Calendar className="size-3.5 text-muted-foreground" />
               <span className="flex-1 tabular-nums">{formatDay(d.date)}</span>

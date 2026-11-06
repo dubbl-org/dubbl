@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Send, Ban, FileText } from "lucide-react";
@@ -26,6 +26,7 @@ import {
 import { formatMoney, decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
@@ -67,7 +68,7 @@ const statusColors: Record<string, string> = {
 // Plain-language status labels (end users aren't accountants).
 const statusLabels: Record<string, string> = {
   draft: "draft",
-  sent: "sent",
+  sent: "available",
   applied: "used",
   void: "cancelled",
 };
@@ -83,60 +84,41 @@ interface BillOption {
 export default function DebitNoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [dn, setDn] = useState<DebitNoteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/debit-notes/${id}`;
+  const cache = useApiCache();
+  const { data, loading } = useApi<{ debitNote?: DebitNoteDetail }>(url);
+  const dn = data?.debitNote ?? null;
+  const setDn = (fn: (prev: DebitNoteDetail) => DebitNoteDetail) =>
+    cache.update<{ debitNote?: DebitNoteDetail }>(url, (d) => (d.debitNote ? { ...d, debitNote: fn(d.debitNote) } : d));
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyBillId, setApplyBillId] = useState("");
   const [applyAmount, setApplyAmount] = useState("");
-  const [bills, setBills] = useState<BillOption[]>([]);
 
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
-  const [orgName, setOrgName] = useState("");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(dn?.debitNoteNumber);
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/debit-notes/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.debitNote) setDn(data.debitNote);
-      })
-      .finally(() => setLoading(false));
-    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
-  }, [id, orgId]);
+  const { data: orgData } = useApi<{ organization?: { name?: string } }>("/api/v1/organization");
+  const orgName = orgData?.organization?.name || "";
 
   // Fetch outstanding bills for the same supplier for the apply dialog
-  useEffect(() => {
-    if (!orgId || !applyOpen) return;
-    fetch(`/api/v1/bills?limit=100`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setBills(
-            data.data.filter((b: BillOption & { status: string; contactId: string | null }) =>
-              ["pending_approval", "received", "partial", "overdue"].includes(b.status) &&
-              b.amountDue > 0 &&
-              (!dn?.contactId || b.contactId === dn.contactId)
-            )
-          );
-        }
-      });
-  }, [orgId, applyOpen, dn?.contactId]);
+  const { data: billsData } = useApi<{ data?: (BillOption & { status: string; contactId: string | null })[] }>(applyOpen ? `/api/v1/bills?limit=100` : null);
+  const contactId = dn?.contactId;
+  const bills = useMemo<BillOption[]>(
+    () =>
+      (billsData?.data ?? []).filter((b) =>
+        ["received", "partial", "overdue"].includes(b.status) &&
+        b.amountDue > 0 &&
+        (!contactId || b.contactId === contactId)
+      ),
+    [billsData, contactId]
+  );
 
   function handleSendComplete() {
-    if (!orgId) return;
-    fetch(`/api/v1/debit-notes/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.debitNote) setDn(data.debitNote); });
     setEmailHistoryKey((k) => k + 1);
   }
 
@@ -159,7 +141,7 @@ export default function DebitNoteDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setDn((prev) => prev ? { ...prev, ...data.debitNote } : prev);
+        setDn((prev) => ({ ...prev, ...data.debitNote }));
         setApplyOpen(false);
         setApplyBillId("");
         setApplyAmount("");
@@ -174,10 +156,13 @@ export default function DebitNoteDetailPage() {
   }
 
   async function handleVoid() {
-    if (!orgId) return;
+    if (!orgId || !dn) return;
     await confirm({
       title: "Cancel this supplier credit?",
-      description: "This stops the credit from being used against any bill. You can't undo this.",
+      description:
+        dn.status === "draft"
+          ? "This stops the credit from being used against any bill. You can't undo this."
+          : "This takes the credit back out of your books and puts any amount it took off bills back on them, so you owe that again. You can't undo this.",
       confirmLabel: "Cancel supplier credit",
       destructive: true,
       onConfirm: async () => {
@@ -187,8 +172,11 @@ export default function DebitNoteDetailPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          setDn((prev) => prev ? { ...prev, ...data.debitNote } : prev);
+          setDn((prev) => ({ ...prev, ...data.debitNote }));
           toast.success("Supplier credit cancelled");
+        } else {
+          const data = await res.json().catch(() => ({}));
+          toast.error(typeof data.error === "string" ? data.error : "Couldn't cancel this supplier credit");
         }
       },
     });

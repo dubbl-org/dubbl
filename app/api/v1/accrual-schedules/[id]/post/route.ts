@@ -10,6 +10,7 @@ import { eq, and, asc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
+import { assertNotLocked } from "@/lib/api/period-lock";
 
 async function getNextEntryNumber(organizationId: string) {
   const [maxResult] = await db
@@ -56,6 +57,9 @@ export async function POST(
     if (!nextEntry) {
       return validationError("All entries have already been posted");
     }
+
+    // The month posts on its period date; refuse a locked period.
+    await assertNotLocked(ctx.organizationId, nextEntry.periodDate, ctx);
 
     // Create journal entry: DR reverseAccountId, CR accountId
     const entryNumber = await getNextEntryNumber(ctx.organizationId);

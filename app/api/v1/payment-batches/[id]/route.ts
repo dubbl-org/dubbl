@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { paymentBatch, paymentBatchItem } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { paymentBatch, paymentBatchItem, bill } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { checkPaymentBankAccount } from "@/lib/api/payment-bank-account";
 
 const addItemSchema = z.object({
   billId: z.string().min(1),
@@ -18,6 +19,9 @@ const addItemSchema = z.object({
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  // Change the bank account the batch pays from; null = the default bank
+  // ledger account (1100).
+  bankAccountId: z.string().uuid().nullable().optional(),
   addItems: z.array(addItemSchema).optional(),
   removeItemIds: z.array(z.string()).optional(),
 });
@@ -43,6 +47,7 @@ export async function GET(
             contact: true,
           },
         },
+        bankAccount: { columns: { id: true, accountName: true, currencyCode: true } },
       },
     });
 
@@ -82,6 +87,37 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    // The bank account must be able to pay every bill left in the batch.
+    const bankAccountId =
+      parsed.bankAccountId !== undefined ? parsed.bankAccountId : existing.bankAccountId;
+    if (bankAccountId) {
+      const removed = new Set(parsed.removeItemIds ?? []);
+      const billIds = [
+        ...existing.items.filter((i) => !removed.has(i.id)).map((i) => i.billId),
+        ...(parsed.addItems ?? []).map((i) => i.billId),
+      ].filter((b): b is string => !!b);
+      const bills = billIds.length
+        ? await db.query.bill.findMany({
+            where: and(eq(bill.organizationId, ctx.organizationId), inArray(bill.id, billIds)),
+            columns: { currencyCode: true },
+          })
+        : [];
+      const bankError = await checkPaymentBankAccount(
+        ctx.organizationId,
+        bankAccountId,
+        bills.map((b) => b.currencyCode)
+      );
+      if (bankError) {
+        return NextResponse.json({ error: bankError }, { status: 400 });
+      }
+    }
+    if (parsed.bankAccountId !== undefined) {
+      await db
+        .update(paymentBatch)
+        .set({ bankAccountId: parsed.bankAccountId })
+        .where(eq(paymentBatch.id, id));
+    }
 
     // Update batch name
     if (parsed.name) {
@@ -147,6 +183,7 @@ export async function PATCH(
             contact: true,
           },
         },
+        bankAccount: { columns: { id: true, accountName: true, currencyCode: true } },
       },
     });
 

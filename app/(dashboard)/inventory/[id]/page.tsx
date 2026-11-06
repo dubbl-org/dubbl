@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2, Save, Loader2, Warehouse, Printer, Scale } from "lucide-react";
@@ -22,7 +22,10 @@ import { centsToDecimal, formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi } from "@/lib/query/use-api";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
+import { AccountPicker } from "@/components/dashboard/account-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryItem } from "./layout";
 import JsBarcode from "jsbarcode";
 
@@ -43,7 +46,11 @@ export default function InventoryItemDetailsPage() {
   const [categoryId, setCategoryId] = useState(item.categoryId || "");
   const [invPurchasePrice, setInvPurchasePrice] = useState(centsToDecimal(item.purchasePrice));
   const [invSalePrice, setInvSalePrice] = useState(centsToDecimal(item.salePrice));
-  const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStockEntry[]>([]);
+  const [costMethod, setCostMethod] = useState<string>(item.costMethod === "fifo" ? "fifo" : "average");
+  const [unitOfMeasure, setUnitOfMeasure] = useState(item.unitOfMeasure || "");
+  const [inventoryAccountId, setInventoryAccountId] = useState(item.inventoryAccountId || "");
+  const [costAccountId, setCostAccountId] = useState(item.costAccountId || "");
+  const [revenueAccountId, setRevenueAccountId] = useState(item.revenueAccountId || "");
   // "Revalue stock" sheet: set the book value directly (mark-to-market) without
   // changing the count.
   const [revalueOpen, setRevalueOpen] = useState(false);
@@ -55,15 +62,9 @@ export default function InventoryItemDetailsPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  // Fetch per-warehouse stock
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/inventory/${id}/warehouse-stock`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setWarehouseStocks(data.data || []));
-  }, [id, orgId]);
+  // Per-warehouse stock
+  const { data: warehouseStockJson } = useApi<{ data?: WarehouseStockEntry[] }>(`/api/v1/inventory/${id}/warehouse-stock`);
+  const warehouseStocks = warehouseStockJson?.data || [];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,16 +88,24 @@ export default function InventoryItemDetailsPage() {
           purchasePrice: Math.round(parseFloat(invPurchasePrice || "0") * 100),
           salePrice: Math.round(parseFloat(invSalePrice || "0") * 100),
           reorderPoint: parseInt(form.get("reorderPoint") as string) || 0,
+          costMethod,
+          unitOfMeasure: unitOfMeasure.trim() || null,
+          inventoryAccountId: inventoryAccountId || null,
+          costAccountId: costAccountId || null,
+          revenueAccountId: revenueAccountId || null,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to update item");
+      }
       const data = await res.json();
       setItem(() => data.inventoryItem);
       setEntityTitle(data.inventoryItem.name);
       toast.success("Item updated");
-    } catch {
-      toast.error("Failed to update item");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update item");
     } finally {
       setSaving(false);
     }
@@ -290,6 +299,52 @@ export default function InventoryItemDetailsPage() {
                 min={0}
                 defaultValue={item.reorderPoint}
               />
+            </div>
+          </div>
+        </Section>
+
+        <div className="h-px bg-border" />
+
+        <Section title="Costing and accounts" description="How this item's cost is worked out and where it posts in your books.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Costing method</Label>
+              <Select value={costMethod} onValueChange={setCostMethod}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="average">Average cost</SelectItem>
+                  <SelectItem value="fifo">First in, first out</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {costMethod !== (item.costMethod === "fifo" ? "fifo" : "average") && item.quantityOnHand > 0
+                  ? "Switching keeps the current book value. The units on hand carry over at today's average cost."
+                  : "Average spreads cost evenly. First in, first out sells the oldest stock first."}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="unitOfMeasure">Unit</Label>
+              <Input
+                id="unitOfMeasure"
+                value={unitOfMeasure}
+                onChange={(e) => setUnitOfMeasure(e.target.value)}
+                placeholder="e.g. each, kg, box"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Inventory account</Label>
+              <AccountPicker value={inventoryAccountId} onChange={setInventoryAccountId} typeFilter={["asset"]} placeholder="Default: Inventory" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cost of sales account</Label>
+              <AccountPicker value={costAccountId} onChange={setCostAccountId} typeFilter={["expense"]} placeholder="Default: Cost of Goods Sold" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sales account</Label>
+              <AccountPicker value={revenueAccountId} onChange={setRevenueAccountId} typeFilter={["revenue"]} placeholder="None" />
+              <p className="text-[11px] text-muted-foreground">Filled in on invoice lines when you pick this item.</p>
             </div>
           </div>
         </Section>

@@ -10,6 +10,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { checkPaymentBankAccount } from "@/lib/api/payment-bank-account";
 
 const createSchema = z.object({
   billId: z.string().min(1),
@@ -18,6 +19,9 @@ const createSchema = z.object({
   currencyCode: currencyCodeSchema.default("USD"),
   scheduledDate: z.string().min(1),
   notes: z.string().nullable().optional(),
+  // The bank account (bank_account row) the payment will be made from.
+  // Omitted = the default bank ledger account (1100).
+  bankAccountId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(request: Request) {
@@ -46,7 +50,11 @@ export async function GET(request: Request) {
       orderBy: desc(scheduledPayment.scheduledDate),
       limit,
       offset,
-      with: { bill: { with: { contact: true } }, contact: true },
+      with: {
+        bill: { with: { contact: true } },
+        contact: true,
+        bankAccount: { columns: { id: true, accountName: true, currencyCode: true } },
+      },
     });
 
     const [countResult] = await db
@@ -88,6 +96,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Bill not found" }, { status: 404 });
     }
 
+    if (parsed.bankAccountId) {
+      const bankError = await checkPaymentBankAccount(ctx.organizationId, parsed.bankAccountId, [existingBill.currencyCode]);
+      if (bankError) {
+        return NextResponse.json({ error: bankError }, { status: 400 });
+      }
+    }
+
     const [created] = await db
       .insert(scheduledPayment)
       .values({
@@ -95,15 +110,22 @@ export async function POST(request: Request) {
         billId: parsed.billId,
         contactId: parsed.contactId,
         amount: parsed.amount,
-        currencyCode: parsed.currencyCode,
+        // The bill decides the currency (the client may omit it, which used
+        // to default a EUR bill's payment to USD).
+        currencyCode: existingBill.currencyCode,
         scheduledDate: parsed.scheduledDate,
+        bankAccountId: parsed.bankAccountId || null,
         notes: parsed.notes || null,
       })
       .returning();
 
     const result = await db.query.scheduledPayment.findFirst({
       where: eq(scheduledPayment.id, created.id),
-      with: { bill: { with: { contact: true } }, contact: true },
+      with: {
+        bill: { with: { contact: true } },
+        contact: true,
+        bankAccount: { columns: { id: true, accountName: true, currencyCode: true } },
+      },
     });
 
     logAudit({ ctx, action: "create", entityType: "scheduled_payment", entityId: created.id, request });

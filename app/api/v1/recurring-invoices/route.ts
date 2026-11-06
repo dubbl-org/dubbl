@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { db } from "@/lib/db";
 import { recurringTemplate, recurringTemplateLine } from "@/lib/db/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
@@ -9,6 +10,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -109,6 +111,15 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    // The contact's defaults (Contacts > Bookkeeping): account and tax rate for
+    // lines that don't set one, and no tax for a contact marked "Don't charge tax".
+    parsed.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+      parsed.lines,
+      await loadContactDefaults(ctx.organizationId, parsed.contactId),
+      "sales"
+    ));
+    // Only an explicitly chosen currency counts; the schema default is not a choice
+    await checkMultiCurrency(ctx.organizationId, body?.currencyCode ? parsed.currencyCode : null);
 
     const [created] = await db
       .insert(recurringTemplate)

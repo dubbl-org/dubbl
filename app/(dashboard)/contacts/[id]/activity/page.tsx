@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { X, Activity, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,75 +16,56 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import { DatePicker } from "@/components/ui/date-picker";
-import { useContactContext, getOrgId, activityTypeConfig } from "../layout";
+import { useApi } from "@/lib/query/use-api";
+import { apiGet } from "@/lib/query/api";
+import { useContactContext, activityTypeConfig } from "../layout";
 import type { ActivityItem } from "../layout";
+
+interface ActivityPage {
+  activity?: ActivityItem[];
+  hasMore?: boolean;
+  nextCursor?: string | null;
+}
 
 export default function ContactActivityPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   useContactContext();
 
-  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
-  const [activityHasMore, setActivityHasMore] = useState(true);
-  const [activityCursor, setActivityCursor] = useState<string | null>(null);
   const [activityStartDate, setActivityStartDate] = useState("");
   const [activityEndDate, setActivityEndDate] = useState("");
   const [activityTypeFilter, setActivityTypeFilter] = useState("all");
   const activitySentinelRef = useRef<HTMLDivElement>(null);
 
-  const fetchActivity = useCallback(
-    (cursor?: string | null) => {
-      const orgId = getOrgId();
-      if (!orgId) return;
-
-      const isLoadMore = !!cursor;
-      if (isLoadMore) {
-        setActivityLoadingMore(true);
-      } else {
-        setActivityCursor(null);
-        setActivityHasMore(true);
-        setActivityLoading(true);
-      }
-
-      const params = new URLSearchParams({ limit: "30" });
-      if (cursor) params.set("cursor", cursor);
-      if (activityStartDate) params.set("startDate", activityStartDate);
-      if (activityEndDate) params.set("endDate", activityEndDate);
-      if (activityTypeFilter !== "all") params.set("type", activityTypeFilter);
-
-      fetch(`/api/v1/contacts/${id}/activity?${params}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.activity) {
-            setActivityItems((prev) => isLoadMore ? [...prev, ...data.activity] : data.activity);
-          }
-          setActivityHasMore(data.hasMore ?? false);
-          setActivityCursor(data.nextCursor ?? null);
-        })
-        .catch(() => {})
-        .finally(() => {
-          setActivityLoading(false);
-          setActivityLoadingMore(false);
-        });
-    },
-    [id, activityStartDate, activityEndDate, activityTypeFilter]
+  // The first page follows the filters through the cache; later pages are loaded on scroll.
+  const params = new URLSearchParams({ limit: "30" });
+  if (activityStartDate) params.set("startDate", activityStartDate);
+  if (activityEndDate) params.set("endDate", activityEndDate);
+  if (activityTypeFilter !== "all") params.set("type", activityTypeFilter);
+  const activityUrl = `/api/v1/contacts/${id}/activity?${params}`;
+  const { data, loading: activityLoading, refreshing } = useApi<ActivityPage>(activityUrl, { keepPrevious: true });
+  const [more, setMore] = useState<{ url: string; pages: ActivityPage[] } | null>(null);
+  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
+  const morePages = more?.url === activityUrl ? more.pages : [];
+  const lastPage = morePages.length ? morePages[morePages.length - 1] : data;
+  const activityItems = useMemo(
+    () => [data, ...(more?.url === activityUrl ? more.pages : [])].flatMap((p) => p?.activity ?? []),
+    [data, more, activityUrl]
   );
+  const activityHasMore = lastPage ? lastPage.hasMore ?? false : true;
+  const activityCursor = lastPage?.nextCursor ?? null;
 
-  // Fetch activity on mount and when filters change
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- setState occurs in async .then(), not synchronously
-    fetchActivity(null);
-  }, [fetchActivity]);
-
-  // Infinite scroll
+  // Infinite scroll (not while the first page is still catching up with new filters)
   const loadMoreActivity = useCallback(() => {
-    if (activityLoadingMore || !activityHasMore || !activityCursor) return;
-    fetchActivity(activityCursor);
-  }, [activityLoadingMore, activityHasMore, activityCursor, fetchActivity]);
+    if (activityLoadingMore || refreshing || !activityHasMore || !activityCursor) return;
+    setActivityLoadingMore(true);
+    apiGet<ActivityPage>(`${activityUrl}&cursor=${encodeURIComponent(activityCursor)}`)
+      .then((page) =>
+        setMore((prev) => ({ url: activityUrl, pages: [...(prev?.url === activityUrl ? prev.pages : []), page] }))
+      )
+      .catch(() => {})
+      .finally(() => setActivityLoadingMore(false));
+  }, [activityLoadingMore, refreshing, activityHasMore, activityCursor, activityUrl]);
 
   useEffect(() => {
     const el = activitySentinelRef.current;

@@ -69,10 +69,11 @@ export function ShellRail() {
   const current = findModule(pathname)?.key;
 
   return (
-    <aside className="hidden w-[60px] shrink-0 flex-col items-center border-r border-foreground/[0.07] bg-foreground/[0.025] py-3 md:flex">
+    <aside data-shell="rail" className="hidden w-[60px] shrink-0 flex-col items-center border-r border-foreground/[0.07] bg-foreground/[0.025] py-3 md:flex">
       <Link
         href="/dashboard"
         aria-label="dubbl"
+        data-shell="rail-logo"
         className="flex size-9 shrink-0 items-center justify-center"
       >
         <Logo className="h-[17px] w-auto" />

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { team, teamMember, member } from "@/lib/db/schema";
+import { team, teamMember, member, projectTeamAssignment } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
+import { addMemberToTeamProjects, releaseTeamAssignmentMembers } from "@/lib/api/project-team-members";
 import { z } from "zod";
 
 const addMemberSchema = z.object({
@@ -84,13 +85,18 @@ export async function POST(
 
     if (existing) return validationError("Member is already in this team");
 
-    const [created] = await db
-      .insert(teamMember)
-      .values({
-        teamId: id,
-        memberId: parsed.memberId,
-      })
-      .returning();
+    // Joining the team also adds the person to the projects the team is assigned to.
+    const created = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(teamMember)
+        .values({
+          teamId: id,
+          memberId: parsed.memberId,
+        })
+        .returning();
+      await addMemberToTeamProjects(tx, id, parsed.memberId);
+      return created;
+    });
 
     return NextResponse.json({ teamMember: created }, { status: 201 });
   } catch (err) {
@@ -130,14 +136,22 @@ export async function DELETE(
 
     if (!existing) return notFound("Team member");
 
-    await db
-      .delete(teamMember)
-      .where(
-        and(
-          eq(teamMember.teamId, id),
-          eq(teamMember.memberId, memberId)
-        )
-      );
+    // Leaving the team also removes the project access the team gave them.
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(teamMember)
+        .where(
+          and(
+            eq(teamMember.teamId, id),
+            eq(teamMember.memberId, memberId)
+          )
+        );
+      const assignments = await tx
+        .select({ id: projectTeamAssignment.id })
+        .from(projectTeamAssignment)
+        .where(eq(projectTeamAssignment.teamId, id));
+      await releaseTeamAssignmentMembers(tx, assignments.map((a) => a.id), memberId);
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

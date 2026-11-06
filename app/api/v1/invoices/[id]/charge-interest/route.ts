@@ -22,6 +22,7 @@ import {
   calculateCompoundInterest,
 } from "@/lib/api/interest-calculator";
 import { z } from "zod";
+import { emitInvoiceCreated } from "@/lib/webhooks/events";
 
 const bodySchema = z.object({
   amount: z.number().optional(), // decimal override, converted to cents
@@ -213,6 +214,7 @@ export async function POST(
       .where(eq(invoice.id, interestInvoice.id));
 
     logAudit({ ctx, action: "charge_interest", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
+    emitInvoiceCreated(ctx.organizationId, [interestInvoice.id]);
 
     return NextResponse.json(
       {

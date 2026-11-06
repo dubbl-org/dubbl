@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowUpRight, ArrowDownLeft, Printer } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -33,30 +34,16 @@ export default function BasPage() {
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [fields, setFields] = useState<BasField[]>([]);
-  const [loading, setLoading] = useState(true);
+  // null = the organization's GST accounting method (Settings), until the user picks one.
+  const [basisChoice, setBasis] = useState<"accrual" | "cash" | null>(null);
+  const params = new URLSearchParams({ startDate, endDate });
+  if (basisChoice) params.set("basis", basisChoice);
+  const { data, loading } = useApi<{ fields?: BasField[]; basis?: "accrual" | "cash"; currency?: string }>(`/api/v1/reports/bas?${params}`, { keepPrevious: true });
+  const fields = data?.fields || [];
+  const basis = basisChoice ?? data?.basis ?? "accrual";
+  const currency = data?.currency || "AUD";
+  const money = (cents: number) => formatMoney(cents, currency);
   useDocumentTitle("Tax · BAS");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/bas?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setFields(data.fields || []);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
 
   const gstOnSales = fields.find((f) => f.field === "1A")?.amount || 0;
   const gstOnPurchases = fields.find((f) => f.field === "1B")?.amount || 0;
@@ -82,6 +69,7 @@ export default function BasPage() {
         <ExportButton
           data={fields.map((f) => ({ field: f.field, description: f.label, amount: f.amount }))}
           columns={["field", "description", "amount"]}
+          moneyColumns={["amount"]}
           filename="bas"
         />
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
@@ -97,6 +85,35 @@ export default function BasPage() {
         endDate={endDate}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
+
+      <div className="space-y-1.5 rounded-lg border bg-card p-4">
+        <p className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">Count GST</p>
+        <div className="inline-flex rounded-md border p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={basis === "accrual" ? "secondary" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setBasis("accrual")}
+          >
+            When you record it
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={basis === "cash" ? "secondary" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setBasis("cash")}
+          >
+            When money moves
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {basis === "accrual"
+            ? "Non-cash basis: counts GST on the date of the invoice or bill."
+            : "Cash basis: counts GST when invoices and bills are paid, in proportion to each payment."}
+        </p>
+      </div>
 
       {loading ? (
         <BrandLoader className="h-48" />
@@ -115,7 +132,7 @@ export default function BasPage() {
                     <span className="text-muted-foreground">GST on Sales (1A)</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium text-blue-600 dark:text-blue-400">
-                    {formatMoney(gstOnSales)}
+                    {money(gstOnSales)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -132,7 +149,7 @@ export default function BasPage() {
                     <span className="text-muted-foreground">GST on Purchases (1B)</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium text-orange-600 dark:text-orange-400">
-                    {formatMoney(gstOnPurchases)}
+                    {money(gstOnPurchases)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -150,7 +167,7 @@ export default function BasPage() {
                   "font-mono text-sm tabular-nums font-semibold",
                   netGst >= 0 ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
                 )}>
-                  {formatMoney(Math.abs(netGst))}
+                  {money(Math.abs(netGst))}
                 </span>
               </div>
             </div>
@@ -173,7 +190,7 @@ export default function BasPage() {
                     "mt-1 text-2xl font-bold font-mono tabular-nums",
                     netField.amount >= 0 ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
                   )}>
-                    {formatMoney(Math.abs(netField.amount))}
+                    {money(Math.abs(netField.amount))}
                   </p>
                 </div>
                 <div className={cn(
@@ -227,7 +244,7 @@ export default function BasPage() {
                         f.field === "1A" && "text-blue-600 dark:text-blue-400",
                         f.field === "1B" && "text-orange-600 dark:text-orange-400"
                       )}>
-                        {formatMoney(f.amount)}
+                        {money(f.amount)}
                       </span>
                     </div>
                   );
@@ -255,7 +272,7 @@ export default function BasPage() {
                       </div>
                       <p className="text-sm">{f.label}</p>
                     </div>
-                    <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(f.amount)}</span>
+                    <span className="font-mono text-sm tabular-nums font-medium">{money(f.amount)}</span>
                   </div>
                 ))}
               </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Cog, Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarChart3, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarChart3, ArrowRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { AssemblyOrderSheet, sendJson } from "@/components/dashboard/assembly-order-sheet";
 
 interface AssemblyOrder {
   id: string;
@@ -30,58 +32,62 @@ const STATUS_BADGE: Record<string, string> = {
   cancelled: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Planned",
+  in_progress: "Building",
+  completed: "Built",
+  cancelled: "Cancelled",
+};
+
 export default function AssemblyOrdersPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [orders, setOrders] = useState<AssemblyOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: AssemblyOrder[] }>("/api/v1/inventory/assembly-orders");
+  const orders = data?.data ?? [];
+  const [sheetOpen, setSheetOpen] = useState(false);
   useDocumentTitle("Inventory · Assembly");
-
-  function getHeaders() {
-    const orgId = localStorage.getItem("activeOrgId") || "";
-    return { "x-organization-id": orgId, "Content-Type": "application/json" };
-  }
-
-  async function fetchOrders() {
-    try {
-      const res = await fetch("/api/v1/inventory/assembly-orders", { headers: getHeaders() });
-      const data = await res.json();
-      if (data.data) setOrders(data.data);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { fetchOrders(); }, []);
 
   async function handleComplete(order: AssemblyOrder) {
     await confirm({
       title: `Complete assembly order?`,
-      description: `This will deduct components from inventory and add ${order.quantity} assembled items.`,
+      description: `The parts are used up at their current cost and ${order.quantity} finished item${order.quantity === 1 ? " is" : "s are"} added to stock. One journal entry is posted. This can't be undone.`,
       confirmLabel: "Complete",
       onConfirm: async () => {
-        const res = await fetch(`/api/v1/inventory/assembly-orders/${order.id}/complete`, {
-          method: "POST",
-          headers: getHeaders(),
-        });
-        const data = await res.json();
-        if (data.error) {
-          toast.error(typeof data.error === "string" ? data.error : "Something went wrong");
-        } else {
-          await fetchOrders();
+        try {
+          await sendJson(`/api/v1/inventory/assembly-orders/${order.id}/complete`, "POST");
           toast.success("Assembly completed");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Something went wrong");
+          throw err;
         }
       },
     });
   }
 
   async function handleStart(orderId: string) {
-    await fetch(`/api/v1/inventory/assembly-orders/${orderId}`, {
-      method: "PATCH",
-      headers: getHeaders(),
-      body: JSON.stringify({ status: "in_progress" }),
+    try {
+      await sendJson(`/api/v1/inventory/assembly-orders/${orderId}/start`, "POST");
+      toast.success("Marked as building");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    }
+  }
+
+  async function handleCancel(order: AssemblyOrder) {
+    await confirm({
+      title: "Cancel assembly order?",
+      description: "Nothing has been used up yet, so stock stays as it is.",
+      confirmLabel: "Cancel order",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await sendJson(`/api/v1/inventory/assembly-orders/${order.id}/cancel`, "POST");
+          toast.success("Assembly order cancelled");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Something went wrong");
+          throw err;
+        }
+      },
     });
-    await fetchOrders();
-    toast.success("Assembly started");
   }
 
   if (loading) return <BrandLoader />;
@@ -89,11 +95,17 @@ export default function AssemblyOrdersPage() {
   return (
     <ContentReveal>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold">Assembly Orders</h2>
-          <p className="text-sm text-muted-foreground">
-            Track assembly work orders and inventory transformations.
-          </p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Assembly orders</h2>
+            <p className="text-sm text-muted-foreground">
+              Build finished items from their parts, using up the parts&apos; stock.
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setSheetOpen(true)}>
+            <Plus className="mr-1.5 size-3.5" />
+            New assembly order
+          </Button>
         </div>
 
         {orders.length === 0 ? (
@@ -115,7 +127,7 @@ export default function AssemblyOrdersPage() {
                       </div>
                       <p className="text-sm font-medium">Standing Desk x10</p>
                     </div>
-                    <Badge variant="outline" className={STATUS_BADGE.draft + " text-[10px]"}>draft</Badge>
+                    <Badge variant="outline" className={STATUS_BADGE.draft + " text-[10px]"}>{STATUS_LABEL.draft}</Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground">BOM: Standing Desk Frame</p>
                 </div>
@@ -129,9 +141,9 @@ export default function AssemblyOrdersPage() {
                       </div>
                       <p className="text-sm font-medium">Assembling...</p>
                     </div>
-                    <Badge variant="outline" className={STATUS_BADGE.in_progress + " text-[10px]"}>in progress</Badge>
+                    <Badge variant="outline" className={STATUS_BADGE.in_progress + " text-[10px]"}>{STATUS_LABEL.in_progress}</Badge>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Components reserved from inventory</p>
+                  <p className="text-[11px] text-muted-foreground">Being built. Parts are used up when you complete it</p>
                 </div>
                 <div className="flex justify-center"><ArrowRight className="size-3.5 text-muted-foreground/30 rotate-90" /></div>
                 {/* Completed */}
@@ -143,7 +155,7 @@ export default function AssemblyOrdersPage() {
                       </div>
                       <p className="text-sm font-medium">Complete</p>
                     </div>
-                    <Badge variant="outline" className={STATUS_BADGE.completed + " text-[10px]"}>completed</Badge>
+                    <Badge variant="outline" className={STATUS_BADGE.completed + " text-[10px]"}>{STATUS_LABEL.completed}</Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground">10 finished items added to stock</p>
                 </div>
@@ -164,7 +176,7 @@ export default function AssemblyOrdersPage() {
                 },
                 {
                   title: "Track progress",
-                  desc: "Move orders from draft to in-progress to completed as your team works through them.",
+                  desc: "Move orders from planned to building to built as your team works through them.",
                   icon: Play,
                   color: "border-l-amber-400",
                 },
@@ -201,12 +213,13 @@ export default function AssemblyOrdersPage() {
                       {order.bom?.assemblyItem?.name || "Unknown"} x{order.quantity}
                     </h3>
                     <Badge variant="outline" className={STATUS_BADGE[order.status]}>
-                      {order.status.replace("_", " ")}
+                      {STATUS_LABEL[order.status] ?? order.status}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     BOM: {order.bom?.name || "Unknown"}
-                    {order.completedAt && ` · Completed ${new Date(order.completedAt).toLocaleDateString()}`}
+                    {order.completedAt && ` · Built ${new Date(order.completedAt).toLocaleDateString()}`}
+                    {order.notes && ` · ${order.notes}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -216,9 +229,14 @@ export default function AssemblyOrdersPage() {
                     </Button>
                   )}
                   {(order.status === "draft" || order.status === "in_progress") && (
-                    <Button size="sm" className="h-7 text-xs gap-1" onClick={() => handleComplete(order)}>
-                      <CheckCircle2 className="size-3" /> Complete
-                    </Button>
+                    <>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => handleCancel(order)}>
+                        <XCircle className="size-3" /> Cancel
+                      </Button>
+                      <Button size="sm" className="h-7 text-xs gap-1" onClick={() => handleComplete(order)}>
+                        <CheckCircle2 className="size-3" /> Complete
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -226,6 +244,7 @@ export default function AssemblyOrdersPage() {
           </div>
         )}
 
+        <AssemblyOrderSheet open={sheetOpen} onOpenChange={setSheetOpen} />
         {confirmDialog}
       </div>
     </ContentReveal>

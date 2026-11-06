@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -10,6 +10,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface ProfitabilityEntry {
   contactId: string;
@@ -24,45 +25,19 @@ interface ProfitabilityEntry {
 
 export default function ProfitabilityPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [entries, setEntries] = useState<ProfitabilityEntry[]>([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [totalCosts, setTotalCosts] = useState(0);
-  const [totalProfit, setTotalProfit] = useState(0);
-  const [overallMargin, setOverallMargin] = useState(0);
+  const { data, loading } = useApi<{ entries?: ProfitabilityEntry[]; totalRevenue?: number; totalCosts?: number; totalProfit?: number; overallMargin?: number }>(
+    `/api/v1/reports/profitability?${new URLSearchParams({ startDate, endDate, groupBy: "contact" })}`,
+    { keepPrevious: true }
+  );
+  const entries = data?.entries || [];
+  const totalRevenue = data?.totalRevenue || 0;
+  const totalCosts = data?.totalCosts || 0;
+  const totalProfit = data?.totalProfit || 0;
+  const overallMargin = data?.overallMargin || 0;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate, groupBy: "contact" });
-    fetch(`/api/v1/reports/profitability?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setEntries(data.entries || []);
-        setTotalRevenue(data.totalRevenue || 0);
-        setTotalCosts(data.totalCosts || 0);
-        setTotalProfit(data.totalProfit || 0);
-        setOverallMargin(data.overallMargin || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -108,9 +83,7 @@ export default function ProfitabilityPage() {
         />
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : entries.length === 0 ? (
+      {entries.length === 0 ? (
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No profitability data. Create invoices and bills to see per-contact profitability.</p>

@@ -3,7 +3,7 @@ import { timesheet } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, ok, notFound } from "@/lib/api/response";
+import { handleError, ok, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
@@ -48,6 +48,18 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    const ts = await db.query.timesheet.findFirst({
+      where: and(
+        eq(timesheet.id, id),
+        eq(timesheet.organizationId, ctx.organizationId),
+        notDeleted(timesheet.deletedAt)
+      ),
+    });
+    if (!ts) return notFound("Timesheet");
+    if (ts.status !== "draft" && ts.status !== "rejected") {
+      return validationError("Only a draft or sent-back timesheet can be changed");
+    }
 
     const [updated] = await db
       .update(timesheet)

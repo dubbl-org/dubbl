@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi } from "@/lib/query/use-api";
 import {
   Search,
   X,
@@ -185,95 +186,42 @@ function getDayLabel(dateStr: string): string {
 }
 
 export default function AuditLogPage() {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
-  const [entityTypeFilter, setEntityTypeFilter] = useState("all");
-  const [actionFilter, setActionFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [search, setSearchState] = useState("");
+  const debouncedSearch = useDebounce(search).trim();
+  const [entityTypeFilter, setEntityTypeFilterState] = useState("all");
+  const [actionFilter, setActionFilterState] = useState("all");
+  const [dateFrom, setDateFromState] = useState("");
+  const [dateTo, setDateToState] = useState("");
 
   const limit = 30;
-  const [allEntries, setAllEntries] = useState<AuditEntry[]>([]);
-  const [allTotal, setAllTotal] = useState(0);
 
   // Reset page on filter change
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPage(1);
-  }, [entityTypeFilter, actionFilter, dateFrom, dateTo]);
+  const setEntityTypeFilter = (v: string) => { setEntityTypeFilterState(v); setPage(1); };
+  const setActionFilter = (v: string) => { setActionFilterState(v); setPage(1); };
+  const setDateFrom = (v: string) => { setDateFromState(v); setPage(1); };
+  const setDateTo = (v: string) => { setDateToState(v); setPage(1); };
+  const setSearch = (v: string) => { setSearchState(v); setPage(1); };
 
-  // Fetch unfiltered data for tab counts (respects entity type + date, not action)
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-
-    const params = new URLSearchParams();
-    params.set("limit", "100");
-    if (entityTypeFilter !== "all") params.set("entityType", entityTypeFilter);
-    if (dateFrom) params.set("startDate", dateFrom);
-    if (dateTo) params.set("endDate", dateTo);
-
-    fetch(`/api/v1/audit-log?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setAllEntries(data.data || []);
-          setAllTotal(data.total || 0);
-        }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [entityTypeFilter, dateFrom, dateTo]);
-
-  // Fetch filtered data for display
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("limit", String(limit));
-    if (entityTypeFilter !== "all") params.set("entityType", entityTypeFilter);
-    if (actionFilter !== "all") params.set("action", actionFilter);
-    if (dateFrom) params.set("startDate", dateFrom);
-    if (dateTo) params.set("endDate", dateTo);
-
-    fetch(`/api/v1/audit-log?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setEntries(data.data || []);
-          setTotalCount(data.total || 0);
-        }
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [entityTypeFilter, actionFilter, dateFrom, dateTo, page]);
-
-  // Client-side search within fetched results
-  const filtered = useMemo(() => {
-    if (!debouncedSearch) return entries;
-    const q = debouncedSearch.toLowerCase();
-    return entries.filter(
-      (e) =>
-        e.userName.toLowerCase().includes(q) ||
-        e.entityId.toLowerCase().includes(q) ||
-        e.entityType.toLowerCase().includes(q) ||
-        e.action.toLowerCase().includes(q)
-    );
-  }, [entries, debouncedSearch]);
+  // One request: the page of entries plus, for the tabs, the count per action
+  // across every entry matching the other filters (search runs on the server).
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  if (entityTypeFilter !== "all") params.set("entityType", entityTypeFilter);
+  if (actionFilter !== "all") params.set("action", actionFilter);
+  if (dateFrom) params.set("startDate", dateFrom);
+  if (dateTo) params.set("endDate", dateTo);
+  if (debouncedSearch) params.set("search", debouncedSearch);
+  const { data, loading } = useApi<{
+    data?: AuditEntry[];
+    pagination?: { total: number };
+    actionCounts?: Record<string, number>;
+    allTotal?: number;
+  }>(`/api/v1/audit-log?${params}`, { keepPrevious: true });
+  const filtered = useMemo(() => data?.data || [], [data]);
+  const totalCount = data?.pagination?.total || 0;
+  const allTotal = data?.allTotal || 0;
 
   // Group by day
   const grouped = useMemo(() => {
@@ -292,16 +240,14 @@ export default function AuditLogPage() {
   const hasFilters = search || dateFrom || dateTo || entityTypeFilter !== "all" || actionFilter !== "all";
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Action counts from unfiltered data (so tabs always show correct totals)
+  // Keep the selected tab visible even when the other filters leave it at 0.
   const actionCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    allEntries.forEach((e) => {
-      counts[e.action] = (counts[e.action] || 0) + 1;
-    });
+    const counts = { ...(data?.actionCounts || {}) };
+    if (actionFilter !== "all" && !(actionFilter in counts)) counts[actionFilter] = 0;
     return counts;
-  }, [allEntries]);
+  }, [data, actionFilter]);
 
-  if (loading && entries.length === 0) return <BrandLoader />;
+  if (loading && filtered.length === 0) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-5">

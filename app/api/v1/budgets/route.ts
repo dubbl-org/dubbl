@@ -33,6 +33,8 @@ const createSchema = z.object({
   endDate: z.string().min(1),
   periodType: z.enum(["monthly", "weekly", "daily", "quarterly", "yearly", "custom"]).default("monthly"),
   isActive: z.boolean().default(true),
+  // Spending alert at this % of each period's budget; null turns it off
+  varianceThresholdPct: z.number().int().min(1).max(1000).nullable().optional(),
   lines: z.array(lineSchema).min(1),
 });
 
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
         endDate: parsed.endDate,
         periodType: parsed.periodType,
         isActive: parsed.isActive,
+        ...(parsed.varianceThresholdPct !== undefined && { varianceThresholdPct: parsed.varianceThresholdPct }),
       })
       .returning();
 

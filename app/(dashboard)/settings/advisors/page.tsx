@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useApi } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ import {
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, UserCheck, XCircle, Shield } from "lucide-react";
+import { Plus, XCircle, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 interface Advisor {
@@ -52,27 +53,12 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function AdvisorsPage() {
-  const [advisors, setAdvisors] = useState<Advisor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ advisors?: Advisor[] }>("/api/v1/advisors");
+  const advisors = data?.advisors || [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("accountant");
   const [saving, setSaving] = useState(false);
-
-  const fetchAdvisors = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/advisors", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setAdvisors(data.advisors || []))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    fetchAdvisors();
-  }, [fetchAdvisors]);
 
   const handleInvite = async () => {
     const orgId = localStorage.getItem("activeOrgId");
@@ -95,7 +81,6 @@ export default function AdvisorsPage() {
       toast.success("Advisor invited");
       setSheetOpen(false);
       setEmail("");
-      fetchAdvisors();
     } finally {
       setSaving(false);
     }
@@ -112,7 +97,6 @@ export default function AdvisorsPage() {
 
     if (res.ok) {
       toast.success("Access revoked");
-      fetchAdvisors();
     } else {
       toast.error("Failed to revoke access");
     }

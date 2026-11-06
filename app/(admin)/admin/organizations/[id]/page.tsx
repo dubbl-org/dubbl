@@ -39,10 +39,10 @@ import {
   Check,
   Gauge,
   StickyNote,
-  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PLAN_ORDER, PLAN_PRICES } from "@/lib/plans";
 
 interface OrgDetail {
   id: string;
@@ -73,7 +73,6 @@ interface Sub {
   overrideProjects?: number | null;
   overrideBankAccounts?: number | null;
   overrideMultiCurrency?: boolean | null;
-  storagePlan?: string;
   overrideEntriesPerMonth?: number | null;
 }
 
@@ -120,7 +119,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 const PLAN_COLORS: Record<string, string> = {
   free: "border-zinc-200 dark:border-zinc-700",
-  pro: "border-blue-200 dark:border-blue-800",
+  standard: "border-blue-200 dark:border-blue-800",
+  premium: "border-blue-300 dark:border-blue-700",
+  ultimate: "border-indigo-300 dark:border-indigo-700",
 };
 
 const LIMIT_FIELDS = [
@@ -142,7 +143,7 @@ export default function AdminOrgDetailPage({
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [members, setMembers] = useState<OrgMember[]>([]);
-  const [effectiveLimits, setEffectiveLimits] = useState<Limits | null>(null);
+  const [, setEffectiveLimits] = useState<Limits | null>(null);
   const [planDefaults, setPlanDefaults] = useState<Limits | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("plan");
@@ -264,7 +265,7 @@ export default function AdminOrgDetailPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          plan: "pro",
+          plan: "ultimate",
           status: "active",
           managedBy: "manual",
           customPlanName: "Enterprise",
@@ -384,8 +385,8 @@ export default function AdminOrgDetailPage({
             {/* Plan tier cards */}
             <div>
               <Label className="text-xs text-muted-foreground mb-3 block">Plan Tier</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {(["free", "pro"] as const).map((p) => (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {PLAN_ORDER.map((p) => (
                   <button
                     key={p}
                     onClick={() => { setEditPlan(p); markDirty(); }}
@@ -406,7 +407,7 @@ export default function AdminOrgDetailPage({
                     )}
                     <p className="text-sm font-semibold capitalize">{p}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {p === "free" ? "$0/mo" : "$12/seat/mo"}
+                      {p === "free" ? "$0/mo" : `$${PLAN_PRICES[p].monthly}/mo · unlimited users`}
                     </p>
                   </button>
                 ))}

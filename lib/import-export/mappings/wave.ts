@@ -31,6 +31,8 @@ export const waveInvoices: ColumnAlias[] = [
   { targetField: "lineUnitPrice", aliases: ["Price", "Unit Price"] },
   { targetField: "lineAmount", aliases: ["Amount", "Line Total"] },
   { targetField: "lineAccountCode", aliases: ["Account", "Income Account"] },
+  { targetField: "contactEmail", aliases: ["Customer Email", "Email"] },
+  { targetField: "currencyCode", aliases: ["Currency"] },
 ];
 
 export const waveBills: ColumnAlias[] = [

@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -171,6 +172,7 @@ export async function POST(
     // rate so a missing rate fails cleanly (422) before any writes.
     const currencyCode =
       transaction.currencyCode || sourceAccount.currencyCode;
+    await assertNotLocked(ctx.organizationId, transaction.date, ctx);
     await assertBaseRateAvailable(ctx.organizationId, currencyCode, transaction.date);
 
     const reference = transaction.reference || transaction.description;

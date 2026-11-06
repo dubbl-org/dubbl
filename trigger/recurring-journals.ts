@@ -1,4 +1,5 @@
 import { schedules } from "@trigger.dev/sdk";
+import { withWebhookEvents } from "@/lib/webhooks/events";
 import { processRecurringJournalsMaintenance } from "@/lib/api/recurring-generate";
 
 const retry = {
@@ -21,5 +22,5 @@ export const recurringJournalsTask = schedules.task({
   id: "recurring-journals",
   cron: "0 1 * * *", // daily, same window as invoicing-maintenance
   retry,
-  run: async () => processRecurringJournalsMaintenance(),
+  run: async () => withWebhookEvents(processRecurringJournalsMaintenance()),
 });

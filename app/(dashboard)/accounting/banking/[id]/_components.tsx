@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { AttachmentsButton, ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
@@ -115,6 +116,8 @@ export interface BankAccountDetail {
   // automatically; surfaced read-only so users can see the connection exists.
   chartAccountId?: string | null;
   chartAccount?: { id: string; name: string; code: string } | null;
+  // Alert owners/admins when the balance drops below this (cents); null = off
+  lowBalanceThreshold?: number | null;
 }
 
 export interface ImportPreviewRow {
@@ -431,6 +434,11 @@ export function TransactionRow({
           {derived === "categorized" && tx.accountName && (
             <span className="text-xs text-muted-foreground truncate shrink min-w-0" title={`Assigned to ${tx.accountName}`}>
               &rarr; {tx.accountName}
+            </span>
+          )}
+          {derived === "toReview" && tx.accountName && (
+            <span className="text-xs text-muted-foreground truncate shrink min-w-0" title="Suggested by a bank rule. Choose Categorize to confirm it.">
+              Suggested: {tx.accountName}
             </span>
           )}
           <Badge
@@ -1123,7 +1131,7 @@ export function CreateExpenseSheet({
   const [itemAmount, setItemAmount] = useState("");
   const [accountId, setAccountId] = useState("");
   const [taxRateId, setTaxRateId] = useState("none");
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const taxRates = useTaxRates(!!transaction && !!orgId);
   const [contactId, setContactId] = useState("");
   const [costCenterId, setCostCenterId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -1142,14 +1150,6 @@ export function CreateExpenseSheet({
       setProjectId("");
     }
   }, [transaction]);
-
-  useEffect(() => {
-    if (!transaction || !orgId || taxRates.length > 0) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
-      .catch(() => {});
-  }, [transaction, orgId, taxRates.length]);
 
   async function handleCreate() {
     if (!orgId || !transaction) return;
@@ -1318,6 +1318,12 @@ export interface TaxRateOption {
 // (purchase) contexts we also spell out how much can be claimed back, so users
 // don't silently under-reclaim: "VAT 20% · fully reclaimable", "· 50%
 // reclaimable", or "· not reclaimable" for blocked / US sales tax / 0%.
+/** The org's tax rates, loaded once a sheet that needs them opens. */
+function useTaxRates(enabled: boolean): TaxRateOption[] {
+  const { data } = useApi<{ taxRates?: TaxRateOption[] }>(enabled ? "/api/v1/tax-rates" : null);
+  return useMemo(() => data?.taxRates ?? [], [data]);
+}
+
 function taxOptionLabel(t: TaxRateOption, isPurchase: boolean): string {
   const pct = (t.rate / 100).toFixed(t.rate % 100 === 0 ? 0 : 2);
   const base = `${t.name} (${pct}%)`;
@@ -1417,16 +1423,23 @@ export function CategorizeSheet({
   const [contactId, setContactId] = useState("");
   const [memo, setMemo] = useState("");
   const [taxRateId, setTaxRateId] = useState("none");
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const taxRates = useTaxRates(!!transaction && !!orgId);
   const [costCenterId, setCostCenterId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   // Quick-choice ("what was this?") state.
-  const [accounts, setAccounts] = useState<(SpecialResolvableAccount & { defaultTaxRateId?: string | null })[]>([]);
-  const [isCompany, setIsCompany] = useState(false);
-  // Running balance of the director's / owner's loan, so the user can see where
-  // it stands before and after this line (null = not loaded / no such account).
-  const [loanBalance, setLoanBalance] = useState<{ accountId: string; balance: number; type: string } | null>(null);
+  // Load the org's accounts (also triggers the built-in category sync) and
+  // whether it's an incorporated company, so the quick choices can resolve to
+  // the right account behind the scenes.
+  const open = !!transaction && !!orgId;
+  const { data: accountsData } = useApi<{ accounts?: (SpecialResolvableAccount & { defaultTaxRateId?: string | null })[] }>(open ? "/api/v1/accounts" : null);
+  const accounts = useMemo(() => accountsData?.accounts ?? [], [accountsData]);
+  const { data: orgData } = useApi<{ organization?: { legalEntityType?: string | null; businessType?: string | null } } & { legalEntityType?: string | null; businessType?: string | null }>(open ? "/api/v1/organization" : null);
+  const isCompany = useMemo(() => {
+    const o = orgData?.organization ?? orgData ?? {};
+    const t = `${o.legalEntityType ?? ""} ${o.businessType ?? ""}`.toLowerCase();
+    return /ltd|limited|corp|\binc\b|company|gmbh|\bab\b|plc|llc|\boy\b|\bbv\b|sarl|srl|\bsa\b|\bag\b/.test(t);
+  }, [orgData]);
   const [choice, setChoice] = useState<string>("");
   const [pickerType, setPickerType] = useState<string[] | undefined>(undefined);
   const [choiceHint, setChoiceHint] = useState<string>("");
@@ -1451,33 +1464,6 @@ export function CategorizeSheet({
     }
   }, [transaction]);
 
-  // Load the org's accounts (also triggers the built-in category sync) and
-  // whether it's an incorporated company, so the quick choices can resolve to
-  // the right account behind the scenes.
-  useEffect(() => {
-    if (!transaction || !orgId) return;
-    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.accounts) setAccounts(data.accounts); })
-      .catch(() => {});
-    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        const o = data?.organization ?? data ?? {};
-        const t = `${o.legalEntityType ?? ""} ${o.businessType ?? ""}`.toLowerCase();
-        setIsCompany(/ltd|limited|corp|\binc\b|company|gmbh|\bab\b|plc|llc|\boy\b|\bbv\b|sarl|srl|\bsa\b|\bag\b/.test(t));
-      })
-      .catch(() => {});
-  }, [transaction, orgId]);
-
-  useEffect(() => {
-    if (!transaction || !orgId || taxRates.length > 0) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
-      .catch(() => {});
-  }, [transaction, orgId, taxRates.length]);
-
   // As in Xero, choosing an account brings in its default tax rate; balance-
   // sheet movements (loans, drawings, capital, tax payments) carry no tax.
   function pickAccount(id: string) {
@@ -1488,20 +1474,32 @@ export function CategorizeSheet({
     else if (a.type === "asset" || a.type === "liability" || a.type === "equity") setTaxRateId("none");
   }
 
-  const ownerLoanAccount = useMemo(() => resolveSpecialAccount("owner_director_loan", accounts), [accounts]);
+  // Picking a contact with bookkeeping defaults (Contacts > Bookkeeping) brings
+  // in their income account (money in) or spending account (money out) and
+  // their default tax rate, unless an account is already chosen.
+  const { data: pickedContact } = useApi<{ contact?: { id: string; defaultRevenueAccountId: string | null; defaultExpenseAccountId: string | null; defaultTaxRateId: string | null; isTaxExempt: boolean } }>(
+    open && contactId && !accountId ? `/api/v1/contacts/${contactId}` : null
+  );
   useEffect(() => {
-    if (!transaction || !orgId || !ownerLoanAccount) return;
-    let live = true;
-    fetch(`/api/v1/accounts/${ownerLoanAccount.id}?limit=1`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => {
-        if (live && data.account) {
-          setLoanBalance({ accountId: ownerLoanAccount.id, balance: Number(data.account.balance) || 0, type: data.account.type });
-        }
-      })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [transaction, orgId, ownerLoanAccount]);
+    const c = pickedContact?.contact;
+    if (!c || c.id !== contactId || accountId) return;
+    const def = isCredit ? c.defaultRevenueAccountId : c.defaultExpenseAccountId;
+    if (!def || !accounts.some((x) => x.id === def)) return;
+    pickAccount(def);
+    if (isCredit && c.isTaxExempt) setTaxRateId("none");
+    else if (c.defaultTaxRateId && taxRates.some((t) => t.id === c.defaultTaxRateId)) setTaxRateId(c.defaultTaxRateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickedContact, contactId, accounts]);
+
+  const ownerLoanAccount = useMemo(() => resolveSpecialAccount("owner_director_loan", accounts), [accounts]);
+  // Running balance of the director's / owner's loan, so the user can see where
+  // it stands before and after this line (null = not loaded / no such account).
+  const { data: loanData } = useApi<{ account?: { balance: string | number; type: string } }>(
+    open && ownerLoanAccount ? `/api/v1/accounts/${ownerLoanAccount.id}?limit=1` : null
+  );
+  const loanBalance = ownerLoanAccount && loanData?.account
+    ? { accountId: ownerLoanAccount.id, balance: Number(loanData.account.balance) || 0, type: loanData.account.type }
+    : null;
 
   const selectedTax = taxRates.find((t) => t.id === taxRateId) || null;
   const taxPreview = useMemo(
@@ -2268,8 +2266,6 @@ export function TransferSheet({
 }) {
   const [targetId, setTargetId] = useState("");
   const [counterTx, setCounterTx] = useState<string | null>(null);
-  const [counterCandidates, setCounterCandidates] = useState<Transaction[]>([]);
-  const [loadingCounters, setLoadingCounters] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const isCredit = (transaction?.amount ?? 0) > 0;
@@ -2283,28 +2279,18 @@ export function TransferSheet({
     if (transaction) {
       setTargetId("");
       setCounterTx(null);
-      setCounterCandidates([]);
     }
   }, [transaction]);
 
   // When a target account is chosen, look for an unreconciled statement line in
   // it with the opposite sign + equal magnitude to suggest as the counter line.
-  useEffect(() => {
-    if (!targetId || !orgId || !transaction) { setCounterCandidates([]); setCounterTx(null); return; }
-    setLoadingCounters(true);
-    setCounterTx(null);
-    fetch(`/api/v1/bank-accounts/${targetId}/transactions?status=unreconciled&limit=100`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const want = -transaction.amount;
-        const candidates = (data.data ?? []).filter((t: Transaction) => t.amount === want);
-        setCounterCandidates(candidates);
-      })
-      .catch(() => setCounterCandidates([]))
-      .finally(() => setLoadingCounters(false));
-  }, [targetId, orgId, transaction]);
+  const counterUrl = targetId && orgId && transaction ? `/api/v1/bank-accounts/${targetId}/transactions?status=unreconciled&limit=100` : null;
+  const { data: counterData, loading: loadingCounters } = useApi<{ data?: Transaction[] }>(counterUrl);
+  const counterCandidates = useMemo(() => {
+    if (!counterUrl || !transaction) return [];
+    const want = -transaction.amount;
+    return (counterData?.data ?? []).filter((t: Transaction) => t.amount === want);
+  }, [counterUrl, counterData, transaction]);
 
   async function handleTransfer() {
     if (!orgId || !transaction || !targetId) return;
@@ -2354,7 +2340,7 @@ export function TransferSheet({
 
           <div className="space-y-1.5">
             <Label className="text-xs">{isCredit ? "Transferred from" : "Transferred to"}</Label>
-            <Select value={targetId} onValueChange={setTargetId}>
+            <Select value={targetId} onValueChange={(v) => { setTargetId(v); setCounterTx(null); }}>
               <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Choose another bank account…" /></SelectTrigger>
               <SelectContent>
                 {targets.length === 0 ? (
@@ -2466,7 +2452,7 @@ export function SplitAccountSheet({
   onSplit: () => void;
 }) {
   const [rows, setRows] = useState<SplitAllocationDraft[]>([]);
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const taxRates = useTaxRates(!!transaction && !!orgId);
   const [saving, setSaving] = useState(false);
 
   const isCredit = (transaction?.amount ?? 0) > 0;
@@ -2478,14 +2464,6 @@ export function SplitAccountSheet({
       setRows([newSplitRow(centsToDecimal(Math.abs(transaction.amount))), newSplitRow()]);
     }
   }, [transaction]);
-
-  useEffect(() => {
-    if (!transaction || !orgId || taxRates.length > 0) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
-      .catch(() => {});
-  }, [transaction, orgId, taxRates.length]);
 
   const allocatedCents = useMemo(
     () => rows.reduce((sum, r) => sum + (Math.round(parseFloat(r.amount) * 100) || 0), 0),
@@ -2675,16 +2653,9 @@ export function CashCodingGrid({
   );
 
   const [rows, setRows] = useState<Record<string, CashCodingRow>>({});
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
+  const taxRates = useTaxRates(!!orgId);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!orgId || taxRates.length > 0) return;
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.taxRates) setTaxRates(data.taxRates); })
-      .catch(() => {});
-  }, [orgId, taxRates.length]);
 
   function rowFor(id: string): CashCodingRow {
     return rows[id] || { account: "", taxRateId: "none", contact: "", memo: "" };
@@ -2876,6 +2847,12 @@ export function ReconciliationReport({
 
   const diff = data.difference;
   const balanced = data.isBalanced;
+  // Lines in the period that aren't in the books yet: categorizing them is the
+  // real fix for most of the difference, so say so before writing anything off.
+  const notInBooks = data.unreconciled.transactions.filter(
+    (t) => !t.journalEntryId && t.status !== "excluded"
+  ).length;
+  const largeDifference = diff != null && Math.abs(diff) >= 10000;
 
   async function postAdjustment() {
     if (!orgId || diff == null || diff === 0) return;
@@ -2997,10 +2974,21 @@ export function ReconciliationReport({
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
                 {diff != null && diff > 0
-                  ? "Recorded as a small bit of miscellaneous income."
-                  : "Recorded as a small miscellaneous expense."}
+                  ? "Recorded as income in Bank Reconciliation Adjustments (Income)."
+                  : "Recorded as an expense in Bank Reconciliation Adjustments (Expense)."}
+                {data.reconciliation?.endDate ? ` Dated ${data.reconciliation.endDate}, the statement's end date.` : ""}
               </p>
             </div>
+            {(notInBooks > 0 || largeDifference) && (
+              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                <Scale className="mt-0.5 size-3.5 shrink-0" />
+                <p>
+                  {notInBooks > 0
+                    ? `${notInBooks} line${notInBooks === 1 ? " in this period isn't" : "s in this period aren't"} in your books yet. Categorize ${notInBooks === 1 ? "it" : "them"} first and the difference will shrink. Only write off what's left after that.`
+                    : "That's a large difference. A missing or doubled entry is more likely than rounding, so check the lines before writing it off."}
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">Description (optional)</Label>
               <Input value={adjustDesc} onChange={(e) => setAdjustDesc(e.target.value)} placeholder="e.g. Bank rounding difference" />

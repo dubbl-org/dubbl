@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   Timer,
   X,
-  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +37,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { useApi, useApiRecords } from "@/lib/query/use-api";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useConfirm } from "@/lib/hooks/use-confirm";
@@ -121,7 +121,7 @@ const PAGE_SIZE = 50;
 
 type View = "timesheets" | "leave";
 type TsFilter = "all" | "draft" | "submitted" | "approved" | "rejected";
-type LeaveFilter = "all" | "pending" | "approved" | "rejected";
+type LeaveFilter = "all" | "pending" | "approved" | "rejected" | "cancelled";
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -142,44 +142,50 @@ export default function TimeLeavePage() {
   const swipeDirRef = useRef(1);
 
   /* ---- timesheet state ---- */
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [tsPage, setTsPage] = useState(1);
-  const [tsTotalCount, setTsTotalCount] = useState(0);
-  const [tsLoadingMore, setTsLoadingMore] = useState(false);
-  const [tsRefetching, setTsRefetching] = useState(false);
-  const [tsInitialLoad, setTsInitialLoad] = useState(true);
-  const [tsFetchKey, setTsFetchKey] = useState(0);
+  // Every timesheet is loaded once; status, search and sort all run in the browser.
+  const { rows: allTimesheets, loading: tsInitialLoad } = useApiRecords<Timesheet>("/api/v1/payroll/timesheets");
+  const tsRefetching = tsInitialLoad;
   const [tsFilter, setTsFilter] = useState<TsFilter>("all");
   const [tsSortBy, setTsSortBy] = useState("period");
   const [tsSortOrder, setTsSortOrder] = useState<"asc" | "desc">("desc");
   const [tsSearch, setTsSearch] = useState("");
   const debouncedTsSearch = useDebounce(tsSearch);
   const pendingTsSearch = tsSearch !== debouncedTsSearch;
-  const [tsSearchKey, setTsSearchKey] = useState(0);
   const tsSentinelRef = useRef<HTMLDivElement>(null);
-  const tsHasMore = timesheets.length < tsTotalCount;
+  const timesheets = useMemo(
+    () => (tsFilter === "all" ? allTimesheets : allTimesheets.filter((t) => t.status === tsFilter)),
+    [allTimesheets, tsFilter],
+  );
+  // How many rows are shown; grows by a page as you scroll and starts over when the status filter changes.
+  const [tsShow, setTsShow] = useState({ filter: tsFilter, count: PAGE_SIZE });
+  const tsShowCount = tsShow.filter === tsFilter ? tsShow.count : PAGE_SIZE;
+  const tsTotalCount = timesheets.length;
+  const tsHasMore = tsShowCount < tsTotalCount;
 
   /* ---- leave state ---- */
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [leavePage, setLeavePage] = useState(1);
-  const [leaveTotalCount, setLeaveTotalCount] = useState(0);
-  const [leaveLoadingMore, setLeaveLoadingMore] = useState(false);
-  const [leaveRefetching, setLeaveRefetching] = useState(false);
-  const [leaveInitialLoad, setLeaveInitialLoad] = useState(true);
-  const [leaveFetchKey, setLeaveFetchKey] = useState(0);
+  const { rows: allLeaveRequests, loading: leaveInitialLoad } = useApiRecords<LeaveRequest>("/api/v1/payroll/leave/requests");
+  const leaveRefetching = leaveInitialLoad;
   const [leaveFilter, setLeaveFilter] = useState<LeaveFilter>("all");
   const [leaveSortBy, setLeaveSortBy] = useState("date");
   const [leaveSortOrder, setLeaveSortOrder] = useState<"asc" | "desc">("desc");
   const [leaveSearch, setLeaveSearch] = useState("");
   const debouncedLeaveSearch = useDebounce(leaveSearch);
   const pendingLeaveSearch = leaveSearch !== debouncedLeaveSearch;
-  const [leaveSearchKey, setLeaveSearchKey] = useState(0);
   const leaveSentinelRef = useRef<HTMLDivElement>(null);
-  const leaveHasMore = leaveRequests.length < leaveTotalCount;
+  const leaveRequests = useMemo(
+    () => (leaveFilter === "all" ? allLeaveRequests : allLeaveRequests.filter((r) => r.status === leaveFilter)),
+    [allLeaveRequests, leaveFilter],
+  );
+  const [leaveShow, setLeaveShow] = useState({ filter: leaveFilter, count: PAGE_SIZE });
+  const leaveShowCount = leaveShow.filter === leaveFilter ? leaveShow.count : PAGE_SIZE;
+  const leaveTotalCount = leaveRequests.length;
+  const leaveHasMore = leaveShowCount < leaveTotalCount;
 
   /* ---- shared data ---- */
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [policies, setPolicies] = useState<Policy[]>([]);
+  const { data: employeesData } = useApi<{ data?: Employee[] }>("/api/v1/payroll/employees");
+  const { data: policiesData } = useApi<{ data?: Policy[] }>("/api/v1/payroll/leave/policies");
+  const employees = useMemo(() => (employeesData?.data ?? []).map((e) => ({ id: e.id, name: e.name })), [employeesData]);
+  const policies = useMemo(() => (policiesData?.data ?? []).map((p) => ({ id: p.id, name: p.name })), [policiesData]);
 
   /* ---- header action ---- */
   useTopbarAction(
@@ -227,165 +233,20 @@ export default function TimeLeavePage() {
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Build params                                                     */
-  /* ---------------------------------------------------------------- */
-
-  const buildTsParams = useCallback(
-    (p: number) => {
-      const params = new URLSearchParams();
-      if (tsFilter !== "all") params.set("status", tsFilter);
-      params.set("page", String(p));
-      params.set("limit", String(PAGE_SIZE));
-      return params;
-    },
-    [tsFilter],
-  );
-
-  const buildLeaveParams = useCallback(
-    (p: number) => {
-      const params = new URLSearchParams();
-      if (leaveFilter !== "all") params.set("status", leaveFilter);
-      params.set("page", String(p));
-      params.set("limit", String(PAGE_SIZE));
-      return params;
-    },
-    [leaveFilter],
-  );
-
-  /* ---------------------------------------------------------------- */
-  /*  Fetch first page - timesheets                                    */
-  /* ---------------------------------------------------------------- */
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    setTsRefetching(true);
-    setTsPage(1);
-
-    fetch(`/api/v1/payroll/timesheets?${buildTsParams(1)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setTimesheets(data.data || []);
-        setTsTotalCount(data.pagination?.total || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setTsInitialLoad(false);
-          setTsRefetching(false);
-          setTsFetchKey((k) => k + 1);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, buildTsParams]);
-
-  /* ---------------------------------------------------------------- */
-  /*  Fetch first page - leave                                         */
-  /* ---------------------------------------------------------------- */
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    setLeaveRefetching(true);
-    setLeavePage(1);
-
-    fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setLeaveRequests(data.data || []);
-        setLeaveTotalCount(data.pagination?.total || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLeaveInitialLoad(false);
-          setLeaveRefetching(false);
-          setLeaveFetchKey((k) => k + 1);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, buildLeaveParams]);
-
-  /* ---------------------------------------------------------------- */
-  /*  Fetch employees + policies (independent of filters)              */
-  /* ---------------------------------------------------------------- */
-
-  useEffect(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    fetch("/api/v1/payroll/employees", { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data)
-          setEmployees(
-            data.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })),
-          );
-      });
-
-    fetch("/api/v1/payroll/leave/policies", { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data)
-          setPolicies(
-            data.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })),
-          );
-      });
-  }, [orgId]);
-
-  /* ---------------------------------------------------------------- */
   /*  Load more - timesheets                                           */
   /* ---------------------------------------------------------------- */
 
   const loadMoreTs = useCallback(() => {
-    if (!orgId || tsLoadingMore) return;
-    const nextPage = tsPage + 1;
-    setTsLoadingMore(true);
-
-    fetch(`/api/v1/payroll/timesheets?${buildTsParams(nextPage)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setTimesheets((prev) => [...prev, ...data.data]);
-          setTsPage(nextPage);
-        }
-      })
-      .finally(() => setTsLoadingMore(false));
-  }, [orgId, tsPage, buildTsParams, tsLoadingMore]);
+    setTsShow({ filter: tsFilter, count: tsShowCount + PAGE_SIZE });
+  }, [tsFilter, tsShowCount]);
 
   /* ---------------------------------------------------------------- */
   /*  Load more - leave                                                */
   /* ---------------------------------------------------------------- */
 
   const loadMoreLeave = useCallback(() => {
-    if (!orgId || leaveLoadingMore) return;
-    const nextPage = leavePage + 1;
-    setLeaveLoadingMore(true);
-
-    fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(nextPage)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setLeaveRequests((prev) => [...prev, ...data.data]);
-          setLeavePage(nextPage);
-        }
-      })
-      .finally(() => setLeaveLoadingMore(false));
-  }, [orgId, leavePage, buildLeaveParams, leaveLoadingMore]);
+    setLeaveShow({ filter: leaveFilter, count: leaveShowCount + PAGE_SIZE });
+  }, [leaveFilter, leaveShowCount]);
 
   /* ---------------------------------------------------------------- */
   /*  IntersectionObserver - timesheets                                */
@@ -422,16 +283,13 @@ export default function TimeLeavePage() {
   }, [loadMoreLeave, leaveRefetching]);
 
   /* ---------------------------------------------------------------- */
-  /*  Search key bumps                                                 */
+  /*  Re-animate on filter / search changes                            */
   /* ---------------------------------------------------------------- */
 
-  useEffect(() => {
-    setTsSearchKey((k) => k + 1);
-  }, [debouncedTsSearch]);
-
-  useEffect(() => {
-    setLeaveSearchKey((k) => k + 1);
-  }, [debouncedLeaveSearch]);
+  const tsFetchKey = tsFilter;
+  const tsSearchKey = debouncedTsSearch;
+  const leaveFetchKey = leaveFilter;
+  const leaveSearchKey = debouncedLeaveSearch;
 
   /* ---------------------------------------------------------------- */
   /*  Client-side search filtering                                     */
@@ -481,8 +339,8 @@ export default function TimeLeavePage() {
         default:
           return dir * a.periodStart.localeCompare(b.periodStart);
       }
-    });
-  }, [filteredTs, tsSortBy, tsSortOrder]);
+    }).slice(0, tsShowCount);
+  }, [filteredTs, tsSortBy, tsSortOrder, tsShowCount]);
 
   const sortedLeave = useMemo(() => {
     const [key, order] = [leaveSortBy, leaveSortOrder];
@@ -502,34 +360,34 @@ export default function TimeLeavePage() {
         default:
           return dir * a.startDate.localeCompare(b.startDate);
       }
-    });
-  }, [filteredLeave, leaveSortBy, leaveSortOrder]);
+    }).slice(0, leaveShowCount);
+  }, [filteredLeave, leaveSortBy, leaveSortOrder, leaveShowCount]);
 
   /* ---------------------------------------------------------------- */
   /*  Derived stats (from both datasets)                               */
   /* ---------------------------------------------------------------- */
 
-  const activeTimesheets = timesheets.filter(
+  const activeTimesheets = allTimesheets.filter(
     (t) => t.status === "draft" || t.status === "submitted",
   ).length;
 
   const pendingApprovals =
-    timesheets.filter((t) => t.status === "submitted").length +
-    leaveRequests.filter((r) => r.status === "pending").length;
+    allTimesheets.filter((t) => t.status === "submitted").length +
+    allLeaveRequests.filter((r) => r.status === "pending").length;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     .toISOString()
     .slice(0, 10);
   const approvedThisMonth =
-    timesheets.filter(
+    allTimesheets.filter(
       (t) => t.status === "approved" && t.periodEnd >= monthStart,
     ).length +
-    leaveRequests.filter(
+    allLeaveRequests.filter(
       (r) => r.status === "approved" && r.endDate >= monthStart,
     ).length;
 
-  const leaveHoursUsed = leaveRequests
+  const leaveHoursUsed = allLeaveRequests
     .filter((r) => r.status === "approved")
     .reduce((sum, r) => sum + r.hours, 0);
 
@@ -591,21 +449,6 @@ export default function TimeLeavePage() {
           hours: "",
           reason: "",
         });
-        // Trigger refetch for leave
-        setLeaveRefetching(true);
-        setLeavePage(1);
-        fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
-          headers: { "x-organization-id": orgId },
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            setLeaveRequests(data.data || []);
-            setLeaveTotalCount(data.pagination?.total || 0);
-          })
-          .finally(() => {
-            setLeaveRefetching(false);
-            setLeaveFetchKey((k) => k + 1);
-          });
       }
     } catch {
       toast.error("Failed to create leave request");
@@ -622,21 +465,9 @@ export default function TimeLeavePage() {
     });
     if (res.ok) {
       toast.success("Request approved");
-      // Refetch leave
-      setLeaveRefetching(true);
-      setLeavePage(1);
-      fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          setLeaveRequests(data.data || []);
-          setLeaveTotalCount(data.pagination?.total || 0);
-        })
-        .finally(() => {
-          setLeaveRefetching(false);
-          setLeaveFetchKey((k) => k + 1);
-        });
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
     }
   }
 
@@ -659,21 +490,37 @@ export default function TimeLeavePage() {
     });
     if (res.ok) {
       toast.success("Request rejected");
-      // Refetch leave
-      setLeaveRefetching(true);
-      setLeavePage(1);
-      fetch(`/api/v1/payroll/leave/requests?${buildLeaveParams(1)}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          setLeaveRequests(data.data || []);
-          setLeaveTotalCount(data.pagination?.total || 0);
-        })
-        .finally(() => {
-          setLeaveRefetching(false);
-          setLeaveFetchKey((k) => k + 1);
-        });
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
+    }
+  }
+
+  async function handleCancelLeave(r: LeaveRequest) {
+    if (!orgId) return;
+    const confirmed = await confirm({
+      title: "Cancel this leave?",
+      description: r.status === "approved"
+        ? `${r.employee?.name || "The employee"} gets the ${r.hours}h back on their leave balance.`
+        : "The request is withdrawn and won't need a decision.",
+      confirmLabel: "Cancel leave",
+      cancelLabel: "Keep it",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const res = await fetch(`/api/v1/payroll/leave/requests/${r.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-organization-id": orgId,
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    if (res.ok) {
+      toast.success("Leave cancelled");
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to cancel");
     }
   }
 
@@ -948,15 +795,12 @@ export default function TimeLeavePage() {
               <>
                 <div className="flex items-center justify-between pt-1">
                   <p className="text-xs text-muted-foreground">
-                    Showing {timesheets.length} of {tsTotalCount} timesheet
+                    Showing {Math.min(tsShowCount, tsTotalCount)} of {tsTotalCount} timesheet
                     {tsTotalCount !== 1 ? "s" : ""}
                   </p>
                 </div>
                 {tsHasMore && (
                   <div ref={tsSentinelRef} className="flex justify-center py-4">
-                    {tsLoadingMore && (
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                    )}
                   </div>
                 )}
               </>
@@ -993,6 +837,7 @@ export default function TimeLeavePage() {
                   <TabsTrigger value="pending" className="whitespace-nowrap">Pending</TabsTrigger>
                   <TabsTrigger value="approved" className="whitespace-nowrap">Approved</TabsTrigger>
                   <TabsTrigger value="rejected" className="whitespace-nowrap">Rejected</TabsTrigger>
+                  <TabsTrigger value="cancelled" className="whitespace-nowrap">Cancelled</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -1085,8 +930,8 @@ export default function TimeLeavePage() {
                       key={r.id}
                       className="flex items-center justify-between gap-3 px-4 py-2.5"
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
+                      <Link href={`/payroll/leave/${r.id}`} className="group min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate group-hover:underline underline-offset-2">
                           {r.employee?.name || "-"}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
@@ -1098,7 +943,7 @@ export default function TimeLeavePage() {
                             {r.reason}
                           </p>
                         )}
-                      </div>
+                      </Link>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Badge
                           variant="outline"
@@ -1129,6 +974,16 @@ export default function TimeLeavePage() {
                             </Button>
                           </>
                         )}
+                        {(r.status === "pending" || r.status === "approved") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => handleCancelLeave(r)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1141,7 +996,7 @@ export default function TimeLeavePage() {
               <>
                 <div className="flex items-center justify-between pt-1">
                   <p className="text-xs text-muted-foreground">
-                    Showing {leaveRequests.length} of {leaveTotalCount} request
+                    Showing {Math.min(leaveShowCount, leaveTotalCount)} of {leaveTotalCount} request
                     {leaveTotalCount !== 1 ? "s" : ""}
                   </p>
                 </div>
@@ -1150,9 +1005,6 @@ export default function TimeLeavePage() {
                     ref={leaveSentinelRef}
                     className="flex justify-center py-4"
                   >
-                    {leaveLoadingMore && (
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                    )}
                   </div>
                 )}
               </>

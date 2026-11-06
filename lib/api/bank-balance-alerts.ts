@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { bankAccount, member, notification } from "@/lib/db/schema";
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 import { sendNotification } from "@/lib/notifications/send";
+import { formatMoney } from "@/lib/money";
 
 export async function checkLowBankBalances(): Promise<{ checked: number; alerted: number }> {
   const today = new Date().toISOString().slice(0, 10);
@@ -51,7 +52,7 @@ export async function checkLowBankBalances(): Promise<{ checked: number; alerted
           userId: admin.userId,
           type: "low_bank_balance",
           title: `Low balance alert: ${account.accountName}`,
-          body: `Balance $${(account.balance / 100).toFixed(2)} is below threshold $${(account.lowBalanceThreshold! / 100).toFixed(2)}`,
+          body: `Balance ${formatMoney(account.balance, account.currencyCode)} is below the alert threshold of ${formatMoney(account.lowBalanceThreshold!, account.currencyCode)}`,
           entityType: "bank_account",
           entityId: account.id,
         });

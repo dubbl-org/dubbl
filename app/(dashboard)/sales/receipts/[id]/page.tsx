@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Banknote, Landmark, CheckCircle2, Ban } from "lucide-react";
+import { ArrowLeft, Banknote, Landmark, CheckCircle2, Ban, Download } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,8 @@ import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import Link from "next/link";
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useApi } from "@/lib/query/use-api";
+import { downloadFile } from "@/components/dashboard/download-link";
 
 interface SalesReceiptDetail {
   id: string;
@@ -50,29 +51,11 @@ const statusLabels: Record<string, string> = {
 
 export default function SalesReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [sr, setSr] = useState<SalesReceiptDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  const { data, loading } = useApi<{ salesReceipt?: SalesReceiptDetail }>(`/api/v1/sales-receipts/${id}`);
+  const sr = data?.salesReceipt ?? null;
 
   const { confirm, dialog } = useConfirm();
   useEntityTitle(sr?.receiptNumber);
-
-  const load = useCallback(() => {
-    if (!orgId) return;
-    return fetch(`/api/v1/sales-receipts/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.salesReceipt) setSr(data.salesReceipt);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
   if (!sr) return <div className="space-y-6"><PageHeader title="Cash sale not found" /></div>;
@@ -90,7 +73,6 @@ export default function SalesReceiptDetailPage() {
             success="Sale recorded in your books"
             run={async () => {
               await postJson(`/api/v1/sales-receipts/${sr.id}/post`);
-              await load();
             }}
           >
             Record sale
@@ -110,12 +92,17 @@ export default function SalesReceiptDetailPage() {
               });
               if (!ok) return false;
               await postJson(`/api/v1/sales-receipts/${sr.id}/void`);
-              await load();
             }}
           >
             Cancel sale
           </ActionButton>
         )}
+        <ActionButton
+          icon={<Download className="size-3.5" />}
+          run={() => downloadFile(`/api/v1/sales-receipts/${sr.id}/pdf?format=pdf`, `receipt-${sr.receiptNumber}.pdf`)}
+        >
+          Download PDF
+        </ActionButton>
         <Button variant="outline" size="sm" asChild>
           <Link href="/sales/receipts"><ArrowLeft className="mr-2 size-4" />Back</Link>
         </Button>

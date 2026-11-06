@@ -3,12 +3,16 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { FileText, Plus, Search, ArrowUpDown, ChevronDown, Send, Play, CheckCircle2, XCircle, ReceiptText, BookOpen } from "lucide-react";
+import { FileText, Plus, Search, ArrowUpDown, ChevronDown, Send, Play, CheckCircle2, XCircle, ReceiptText, BookOpen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Switch } from "@/components/ui/switch";
+import { useApi } from "@/lib/query/use-api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useTopbarAction } from "@/components/dashboard/topbar";
@@ -97,6 +101,8 @@ const typeOf = (r: PayrollRun) => r.runType || "regular";
 const typeLabel = (r: PayrollRun) => RUN_TYPES[typeOf(r)] ?? typeOf(r);
 const people = (r: PayrollRun) => new Set(r.items.map((i) => i.employeeId)).size;
 const withheld = (r: PayrollRun) => r.totalDeductions;
+/** An item's deductions already include its tax; older rows may only carry the tax. */
+const heldBack = (i: PayrollItem) => Math.max(i.deductions, i.taxAmount);
 
 /** "Mar 1 – Mar 31, 2026" */
 function periodLabel(r: PayrollRun) {
@@ -163,45 +169,9 @@ export default function PayrollRunsPage() {
     }
   }
 
-  // Kept as it was: these post the same bodies the page always sent.
-  const handleCreateOffCycleRun = useCallback(async (type: "termination" | "bonus-only" | "correction") => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    const endpoints: Record<string, string> = {
-      termination: "/api/v1/payroll/runs/termination",
-      "bonus-only": "/api/v1/payroll/runs/bonus-only",
-      correction: "/api/v1/payroll/runs/correction",
-    };
-
-    const bodies: Record<string, object> = {
-      termination: { employeeId: "", payPeriodEnd },
-      "bonus-only": { payPeriodStart, payPeriodEnd, items: [] },
-      correction: { parentRunId: "", payPeriodStart, payPeriodEnd },
-    };
-
-    try {
-      const res = await fetch(endpoints[type], {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": orgId,
-        },
-        body: JSON.stringify(bodies[type]),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || `Failed to create ${type} run`);
-      }
-
-      const data = await res.json();
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} run created`);
-      router.push(`/payroll/runs/${data.run.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : `Failed to create ${type} run`);
-    }
-  }, [router, payPeriodStart, payPeriodEnd]);
+  // One-off payments open a dialog that asks for the people and amounts.
+  const [offCycle, setOffCycle] = useState<OffCycleType | null>(null);
+  const handleCreateOffCycleRun = useCallback((type: OffCycleType) => setOffCycle(type), []);
 
   useTopbarAction(
     useMemo(
@@ -378,14 +348,14 @@ export default function PayrollRunsPage() {
                       className="text-red-600 dark:text-red-400"
                       run={() =>
                         confirm({
-                          title: "Reject this payroll run?",
-                          description: "This will send the run back to draft status.",
-                          confirmLabel: "Reject",
+                          title: "Send this payroll back?",
+                          description: "It goes back to not finished so it can be fixed and sent for sign-off again. To add a reason, open the run.",
+                          confirmLabel: "Send back",
                           destructive: true,
                           onConfirm: async () => {
                             try {
                               await postJson(`/api/v1/payroll/runs/${r.id}/reject`);
-                              toast.success("Payroll run rejected");
+                              toast.success("Payroll sent back");
                               helpers.refresh();
                             } catch (err) {
                               toast.error(err instanceof Error ? err.message : "Failed to reject");
@@ -395,7 +365,7 @@ export default function PayrollRunsPage() {
                         })
                       }
                     >
-                      Reject
+                      Send back
                     </ActionButton>
                   </>
                 )}
@@ -416,6 +386,35 @@ export default function PayrollRunsPage() {
                       View payslips
                     </ActionButton>
                   </>
+                )}
+                {(r.status === "draft" || r.status === "pending_approval") && (
+                  <ActionButton
+                    icon={<Trash2 className="size-3.5" />}
+                    run={() =>
+                      confirm({
+                        title: "Delete this payroll run?",
+                        description: "The run and its pay amounts are removed. Nothing has been recorded in your books yet.",
+                        confirmLabel: "Delete run",
+                        destructive: true,
+                        onConfirm: async () => {
+                          const orgId = localStorage.getItem("activeOrgId");
+                          const res = await fetch(`/api/v1/payroll/runs/${r.id}`, {
+                            method: "DELETE",
+                            headers: orgId ? { "x-organization-id": orgId } : {},
+                          });
+                          if (!res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            toast.error(data.error || "Couldn't delete the run");
+                            throw new Error(data.error);
+                          }
+                          toast.success("Payroll run deleted");
+                          helpers.refresh();
+                        },
+                      })
+                    }
+                  >
+                    Delete
+                  </ActionButton>
                 )}
                 {r.journalEntryId && (
                   <ActionButton icon={<BookOpen className="size-3.5" />} run={async () => router.push(`/accounting/${r.journalEntryId}`)}>
@@ -448,7 +447,7 @@ export default function PayrollRunsPage() {
                             {(i.bonusAmount ?? 0) > 0 && <span className="block text-[11.5px] text-muted-foreground">incl. {formatMoney(i.bonusAmount ?? 0)} bonus</span>}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(i.grossAmount)}</td>
-                          <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(i.taxAmount + i.deductions)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(heldBack(i))}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatMoney(i.netAmount)}</td>
                         </tr>
                       ))}
@@ -497,6 +496,14 @@ export default function PayrollRunsPage() {
         setPayPeriodEnd={setPayPeriodEnd}
         onSubmit={handleCreateRun}
         loading={creating}
+      />
+      <OffCycleDialog
+        type={offCycle}
+        onClose={() => setOffCycle(null)}
+        onCreated={(runId) => {
+          setOffCycle(null);
+          router.push(`/payroll/runs/${runId}`);
+        }}
       />
       {confirmDialog}
     </>
@@ -638,6 +645,309 @@ function NewRunDialog({
           </Button>
           <Button onClick={onSubmit} disabled={!payPeriodStart || !payPeriodEnd || loading} className="bg-brand-600 hover:bg-brand-700">
             {loading ? "Creating..." : "Create Run"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type OffCycleType = "termination" | "bonus-only" | "correction";
+
+const OFF_CYCLE_ENDPOINTS: Record<OffCycleType, string> = {
+  termination: "/api/v1/payroll/runs/termination",
+  "bonus-only": "/api/v1/payroll/runs/bonus-only",
+  correction: "/api/v1/payroll/runs/correction",
+};
+
+const OFF_CYCLE_TITLES: Record<OffCycleType, { title: string; description: string; submit: string }> = {
+  termination: {
+    title: "Final pay",
+    description: "Pays someone who is leaving for the days they worked in their last pay period, taxed like a normal payday. They are marked as no longer active, with the period end as their last day.",
+    submit: "Create final pay",
+  },
+  "bonus-only": {
+    title: "Bonus only",
+    description: "Pays one or more bonuses outside the regular payroll. Each bonus is taxed; regular deductions aren't taken.",
+    submit: "Pay bonuses",
+  },
+  correction: {
+    title: "Fix a past payroll",
+    description: "Adds or takes back pay for people in a finished payroll. Tax is adjusted in proportion to that payroll.",
+    submit: "Create correction",
+  },
+};
+
+const BONUS_TYPE_OPTIONS = [
+  { value: "performance", label: "Performance" },
+  { value: "signing", label: "Signing" },
+  { value: "holiday", label: "Holiday" },
+  { value: "referral", label: "Referral" },
+  { value: "spot", label: "Spot" },
+  { value: "retention", label: "Retention" },
+  { value: "other", label: "Other" },
+];
+
+interface EmployeeOption {
+  id: string;
+  name: string;
+  employeeNumber: string;
+  isActive: boolean;
+}
+
+interface Line {
+  employeeId: string;
+  amount: string; // dollars as typed
+  bonusType: string;
+  description: string;
+}
+
+const emptyLine = (): Line => ({ employeeId: "", amount: "", bonusType: "performance", description: "" });
+
+function monthBounds() {
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  return { start: iso(start), end: iso(end) };
+}
+
+/** One-off payments: final pay, bonus only, or fixing a past payroll. */
+function OffCycleDialog({
+  type,
+  onClose,
+  onCreated,
+}: {
+  type: OffCycleType | null;
+  onClose: () => void;
+  onCreated: (runId: string) => void;
+}) {
+  const open = type !== null;
+  const { data: empData } = useApi<{ data?: EmployeeOption[] }>(open ? "/api/v1/payroll/employees?limit=100" : null);
+  const { data: runData } = useApi<{ data?: PayrollRun[] }>(type === "correction" ? "/api/v1/payroll/runs?status=completed&limit=100" : null);
+  const employees = (empData?.data ?? []).filter((e) => e.isActive);
+  const finishedRuns = runData?.data ?? [];
+
+  const [periodStart, setPeriodStart] = useState(() => monthBounds().start);
+  const [periodEnd, setPeriodEnd] = useState(() => monthBounds().end);
+  const [employeeId, setEmployeeId] = useState("");
+  const [includePto, setIncludePto] = useState(true);
+  const [parentRunId, setParentRunId] = useState("");
+  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const parent = finishedRuns.find((r) => r.id === parentRunId);
+  // For a correction, only the people paid in that payroll can be adjusted.
+  const lineEmployees: { id: string; name: string }[] =
+    type === "correction"
+      ? (parent?.items ?? [])
+          .filter((i, idx, all) => all.findIndex((x) => x.employeeId === i.employeeId) === idx)
+          .map((i) => ({ id: i.employeeId, name: i.employee?.name ?? "Employee" }))
+      : employees.map((e) => ({ id: e.id, name: `${e.name} (${e.employeeNumber})` }));
+
+  function reset() {
+    const b = monthBounds();
+    setPeriodStart(b.start);
+    setPeriodEnd(b.end);
+    setEmployeeId("");
+    setIncludePto(true);
+    setParentRunId("");
+    setLines([emptyLine()]);
+    setNotes("");
+  }
+
+  function close() {
+    reset();
+    onClose();
+  }
+
+  const setLine = (idx: number, patch: Partial<Line>) =>
+    setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+
+  const toCents = (v: string) => Math.round((parseFloat(v) || 0) * 100);
+
+  async function submit() {
+    if (!type) return;
+    let body: object;
+    if (type === "termination") {
+      if (!employeeId) return toast.error("Pick who is leaving");
+      body = { employeeId, payPeriodStart: periodStart, payPeriodEnd: periodEnd, includeUnusedPto: includePto, notes: notes || undefined };
+    } else if (type === "bonus-only") {
+      const bonuses = lines
+        .filter((l) => l.employeeId && toCents(l.amount) > 0)
+        .map((l) => ({ employeeId: l.employeeId, bonusType: l.bonusType, amount: toCents(l.amount), description: l.description || undefined }));
+      if (bonuses.length === 0) return toast.error("Add at least one person and amount");
+      body = { payPeriodStart: periodStart, payPeriodEnd: periodEnd, bonuses, notes: notes || undefined };
+    } else {
+      if (!parentRunId) return toast.error("Pick the payroll to fix");
+      const adjustments = lines
+        .filter((l) => l.employeeId && toCents(l.amount) !== 0)
+        .map((l) => ({ employeeId: l.employeeId, grossAdjustment: toCents(l.amount), description: l.description || undefined }));
+      if (adjustments.length === 0) return toast.error("Add at least one person and an amount that isn't zero");
+      body = { parentRunId, adjustments, notes: notes || undefined };
+    }
+
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(OFF_CYCLE_ENDPOINTS[type], {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't create the payment");
+      toast.success(
+        data.run?.needsSignOff
+          ? "Created. Send it for sign-off to finish it"
+          : "Paid and recorded"
+      );
+      reset();
+      onCreated(data.run.id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create the payment");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const copy = type ? OFF_CYCLE_TITLES[type] : null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => (!v ? close() : undefined)}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{copy?.title}</DialogTitle>
+          <DialogDescription>{copy?.description}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {type !== "correction" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{type === "termination" ? "Final period start" : "Pay Period Start"}</Label>
+                <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>{type === "termination" ? "Last day worked" : "Pay Period End"}</Label>
+                <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {type === "termination" && (
+            <>
+              <div className="space-y-2">
+                <Label>Employee</Label>
+                <Select value={employeeId} onValueChange={setEmployeeId}>
+                  <SelectTrigger><SelectValue placeholder="Who is leaving" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name} ({e.employeeNumber})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">Pay out unused time off</p>
+                  <p className="text-xs text-muted-foreground">Adds their remaining vacation and personal leave hours at their hourly rate (yearly salary divided by 2,080 for salaried staff).</p>
+                </div>
+                <Switch checked={includePto} onCheckedChange={setIncludePto} />
+              </div>
+            </>
+          )}
+
+          {type === "correction" && (
+            <div className="space-y-2">
+              <Label>Payroll to fix</Label>
+              <Select
+                value={parentRunId}
+                onValueChange={(v) => {
+                  setParentRunId(v);
+                  setLines([emptyLine()]);
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Pick a finished payroll" /></SelectTrigger>
+                <SelectContent>
+                  {finishedRuns.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {periodLabel(r)} · {RUN_TYPES[typeOf(r)] ?? typeOf(r)} · {formatMoney(r.totalGross)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {type !== "termination" && (type === "bonus-only" || parentRunId) && (
+            <div className="space-y-2">
+              <Label>{type === "bonus-only" ? "Bonuses" : "Changes to pay before deductions"}</Label>
+              {type === "correction" && (
+                <p className="text-xs text-muted-foreground">Enter a negative amount to take pay back.</p>
+              )}
+              {lines.map((l, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_7rem_auto] items-center gap-2">
+                  <Select value={l.employeeId} onValueChange={(v) => setLine(idx, { employeeId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger>
+                    <SelectContent>
+                      {lineEmployees.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {type === "bonus-only" ? (
+                    <CurrencyInput prefix="$" value={l.amount} onChange={(v) => setLine(idx, { amount: v })} />
+                  ) : (
+                    <Input
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={l.amount}
+                      onChange={(e) => setLine(idx, { amount: e.target.value.replace(/[^0-9.-]/g, "") })}
+                    />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    disabled={lines.length === 1}
+                    onClick={() => setLines((ls) => ls.filter((_, i) => i !== idx))}
+                    title="Remove line"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                  {type === "bonus-only" && (
+                    <div className="col-span-3 grid grid-cols-[9rem_1fr] gap-2">
+                      <Select value={l.bonusType} onValueChange={(v) => setLine(idx, { bonusType: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {BONUS_TYPE_OPTIONS.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input placeholder="Description (optional)" value={l.description} onChange={(e) => setLine(idx, { description: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setLines((ls) => [...ls, emptyLine()])}>
+                <Plus className="mr-1.5 size-3.5" />
+                Add person
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={close}>Cancel</Button>
+          <Button onClick={submit} disabled={saving} className="bg-brand-600 hover:bg-brand-700">
+            {saving ? "Working..." : copy?.submit}
           </Button>
         </DialogFooter>
       </DialogContent>

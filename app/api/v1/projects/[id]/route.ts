@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project } from "@/lib/db/schema";
+import { project, runningTimer } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
+import { getProjectAccess, requireProjectAccess } from "@/lib/api/project-access";
+import { syncProjectBilling } from "@/lib/api/project-billing";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { z } from "zod";
@@ -43,6 +44,9 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
+    // Release work from voided/deleted invoices and refresh stored totals first.
+    const totals = await syncProjectBilling(db, ctx.organizationId, [id]);
+
     const found = await db.query.project.findFirst({
       where: and(
         eq(project.id, id),
@@ -53,6 +57,7 @@ export async function GET(
         contact: true,
         timeEntries: {
           with: { user: { columns: { id: true, name: true, email: true, image: true } }, task: true },
+          orderBy: (t, { desc }) => [desc(t.date), desc(t.createdAt)],
         },
         members: {
           with: {
@@ -65,9 +70,9 @@ export async function GET(
           with: {
             assignee: { with: { user: { columns: { id: true, name: true, email: true, image: true } } } },
             team: true,
-            createdBy: true,
+            createdBy: { columns: { id: true, name: true, email: true, image: true } },
             checklist: true,
-            comments: { with: { author: true } },
+            comments: { with: { author: { columns: { id: true, name: true, email: true, image: true } } } },
           },
         },
         labels: true,
@@ -80,16 +85,30 @@ export async function GET(
         },
         milestones: true,
         notes: {
-          with: { author: true },
+          with: { author: { columns: { id: true, name: true, email: true, image: true } } },
+          orderBy: (n, { desc }) => [desc(n.createdAt)],
         },
+        // Timers are personal: only the caller's own running timer.
         runningTimers: {
+          where: eq(runningTimer.userId, ctx.userId),
           with: { task: true },
         },
       },
     });
 
     if (!found) return notFound("Project");
-    return NextResponse.json({ project: found });
+    const access = await getProjectAccess(ctx, id);
+    return NextResponse.json({
+      project: {
+        ...found,
+        // Cents on draft / awaiting-approval invoices (not yet in totalBilled).
+        unissuedBilled: totals.get(id)?.unissuedBilled ?? 0,
+        // What the caller may do here: "view" | "contribute" | "manage".
+        access,
+        // The caller's user id, so the UI knows which time entries and notes are theirs.
+        viewerUserId: ctx.userId,
+      },
+    });
   } catch (err) {
     return handleError(err);
   }
@@ -102,24 +121,19 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
-    const existing = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
+    const { project: existing } = await requireProjectAccess(ctx, id, "manage");
 
-    if (!existing) return notFound("Project");
+    const updates = { ...parsed };
+    // Milestone-billed projects are invoiced from their milestones.
+    if (parsed.billingType === "milestone") updates.enableMilestones = true;
 
     const [updated] = await db
       .update(project)
-      .set({ ...parsed, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(project.id, id))
       .returning();
 
@@ -138,18 +152,9 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
+    const { project: existing } = await requireProjectAccess(ctx, id, "manage");
 
-    const existing = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!existing) return notFound("Project");
-
+    // Soft delete: the project moves to Trash and can be restored from there.
     await db
       .update(project)
       .set(softDelete())

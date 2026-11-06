@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useApi } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -90,30 +91,11 @@ const ACCOUNT_TYPE_ICONS: Record<BankAccountType, React.ElementType> = {
 export default function BankingPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ bankAccounts?: BankAccount[] }>("/api/v1/bank-accounts");
+  const accounts = useMemo(() => data?.bankAccounts || [], [data]);
   const [showBalances, setShowBalances] = useState(true);
 
   useDocumentTitle("Accounting \u00B7 Bank Accounts");
-
-  function fetchAccounts() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/bank-accounts", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setAccounts(data.bankAccounts || []))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    fetchAccounts();
-    const handler = () => fetchAccounts();
-    window.addEventListener("bank-accounts-changed", handler);
-    return () => window.removeEventListener("bank-accounts-changed", handler);
-  }, []);
 
   const totals = useMemo(() => {
     const active = accounts.filter((a) => a.isActive).length;

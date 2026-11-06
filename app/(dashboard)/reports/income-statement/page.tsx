@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { useApi } from "@/lib/query/use-api";
 import { BackToReports, ReportHelp } from "../_components";
 import {
   Table,
@@ -31,44 +32,19 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = [0, 1, 2, 3, 4].map((n) => CURRENT_YEAR - n);
 
 export default function IncomeStatementPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<IncomeData | null>(null);
   const [year, setYear] = useState(CURRENT_YEAR);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+  // Always request a concrete year range so the figures are "for the year",
+  // not a lifetime running total.
+  const from = `${year}-01-01`;
+  const to =
+    year === CURRENT_YEAR
+      ? new Date().toISOString().slice(0, 10)
+      : `${year}-12-31`;
+  const { data: report, loading } = useApi<IncomeData>(`/api/v1/reports/income-statement?from=${from}&to=${to}`, { keepPrevious: true });
+  const data = report?.revenue ? report : null;
 
-    // Always request a concrete year range so the figures are "for the year",
-    // not a lifetime running total.
-    const from = `${year}-01-01`;
-    const to =
-      year === CURRENT_YEAR
-        ? new Date().toISOString().slice(0, 10)
-        : `${year}-12-31`;
-
-    fetch(`/api/v1/reports/income-statement?from=${from}&to=${to}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.revenue) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [year]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -95,9 +71,7 @@ export default function IncomeStatementPage() {
         costs, and what&apos;s left as profit. Also called an income statement.
       </ReportHelp>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !data ? (
+      {!data ? (
         <p className="text-muted-foreground">No data available.</p>
       ) : (
         <ContentReveal>

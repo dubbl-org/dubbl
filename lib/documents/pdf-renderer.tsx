@@ -9,7 +9,11 @@ import {
   Svg,
   Path,
   Link,
+  Image,
 } from "@react-pdf/renderer";
+import { loadLogoImage, type LogoImage } from "./logo";
+import { formatMoney } from "@/lib/money";
+import { paymentTermsText, replacePlaceholders, safeAccentColor, templateBlockText } from "./template-text";
 
 export interface OrgInfo {
   name: string;
@@ -55,11 +59,13 @@ export interface PdfInvoiceData {
 
 export interface PdfTemplateSettings {
   accentColor?: string | null;
+  logoUrl?: string | null;
   showTaxBreakdown?: boolean;
   showPaymentTerms?: boolean;
   notes?: string | null;
   bankDetails?: string | null;
   paymentInstructions?: string | null;
+  headerHtml?: string | null;
   footerHtml?: string | null;
 }
 
@@ -84,17 +90,9 @@ function getInvoiceTitle(countryCode?: string | null, hasTaxId?: boolean): strin
   return "Invoice";
 }
 
-function fmtMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-}
-
-function replacePlaceholders(text: string, vars: Record<string, string>): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => vars[key] ?? match);
+// Scales by the currency's own minor units (JPY 0, USD 2, KWD 3).
+function fmtMoney(minorUnits: number, currency: string): string {
+  return formatMoney(minorUnits, currency);
 }
 
 // Colors
@@ -148,7 +146,58 @@ const s = StyleSheet.create({
   // Footer
   footer: { position: "absolute", bottom: 20, left: 40, right: 40, borderTopWidth: 0.5, borderTopColor: lightGray, paddingTop: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   footerText: { fontSize: 8, color: gray },
+  // Template branding
+  logo: { maxHeight: 48, maxWidth: 160, objectFit: "contain", objectPositionX: 0, marginBottom: 14 },
+  headerText: { fontSize: 9, color: gray, lineHeight: 1.4, marginBottom: 16 },
+  footerNote: { position: "absolute", left: 40, right: 40, fontSize: 8, color: gray, lineHeight: 1.4 },
+  // Payslip sections
+  sectionTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", color: dark, marginTop: 18, marginBottom: 4 },
+  payTable: { width: "100%" },
 });
+
+// Gap between the template's footer text and the fixed footer bar, per line.
+const FOOTER_LINE_HEIGHT = 11;
+
+/** The template's logo (if any) and header text, printed above the title. */
+function TemplateHeader({ logo, headerText }: { logo: LogoImage | null; headerText: string | null }) {
+  return (
+    <>
+      {/* react-pdf Image, not an HTML <img>: it has no alt prop. */}
+      {/* eslint-disable-next-line jsx-a11y/alt-text */}
+      {logo && <Image src={logo} style={s.logo} />}
+      {headerText && <Text style={s.headerText}>{headerText}</Text>}
+    </>
+  );
+}
+
+/** Template footer text, fixed just above the footer bar on every page. */
+function TemplateFooterNote({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <Text style={[s.footerNote, { bottom: 40 }]} fixed>
+      {text}
+    </Text>
+  );
+}
+
+// Extra bottom padding so page content never runs under the footer text.
+function pagePaddingBottom(footerText: string | null): number {
+  return footerText ? 50 + footerText.split("\n").length * FOOTER_LINE_HEIGHT + 6 : 50;
+}
+
+function DubblMark() {
+  return (
+    <Link src="https://dubbl.dev" style={{ textDecoration: "none" }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+        <Svg viewBox="0 0 40 32" width={10} height={8}>
+          <Path d="M18 4v.19a11.5 11.5 0 0 1 5.5 9.81v4a11.5 11.5 0 0 1-5.5 9.81V28h8a10 10 0 0 0 10-10v-4A10 10 0 0 0 26 4h-8z" fill="#c4c4c0" />
+          <Path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#c4c4c0" />
+        </Svg>
+        <Text style={{ fontSize: 7, color: "#d1d5db", letterSpacing: 0.5 }}>dubbl</Text>
+      </View>
+    </Link>
+  );
+}
 
 export interface PdfDocumentLabels {
   title?: string;
@@ -158,6 +207,10 @@ export interface PdfDocumentLabels {
   // Label for the second-date metadata row. Defaults to "Date due" (invoice).
   // Pass null to hide the row entirely (e.g. credit/debit notes have no due date).
   dateLabel?: string | null;
+  // Whether the document has payment terms the template's Show Payment Terms
+  // switch controls (due date row, "due {date}" summary and the Payment terms
+  // line). Defaults to true only for the invoice-shaped default labels.
+  paymentTerms?: boolean;
   // The connecting word in the headline/footer summary "{amount} {noun} {date}".
   // Defaults to "due" (invoice). Pass null to show just the amount with no date
   // (e.g. a credit note or purchase order isn't "due" on a date).
@@ -170,10 +223,11 @@ interface InvoiceDocProps {
   contact: ContactInfo;
   template: PdfTemplateSettings;
   labels?: PdfDocumentLabels;
+  logo: LogoImage | null;
 }
 
-function InvoiceDocument({ invoice: inv, org, contact, template, labels }: InvoiceDocProps) {
-  const accent = template.accentColor || "#10b981";
+function InvoiceDocument({ invoice: inv, org, contact, template, labels, logo }: InvoiceDocProps) {
+  const accent = safeAccentColor(template.accentColor);
   const taxLabel = getTaxIdLabel(org.countryCode);
   const title = labels?.title ?? getInvoiceTitle(org.countryCode, !!org.taxId);
   const amountDue = inv.amountDue ?? inv.total;
@@ -184,9 +238,12 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
   // default ("Date due" / "{amount} due {date}"). Other document types override
   // the wording or suppress them: dateLabel === null hides the date row, and
   // summaryNoun === null shows just the amount with no "due {date}".
-  const showDateRow = labels?.dateLabel !== null;
+  // Show Payment Terms off hides everything about when an invoice is due.
+  const hasPaymentTerms = labels?.paymentTerms ?? (labels?.dateLabel === undefined && labels?.summaryNoun === undefined);
+  const hideTerms = hasPaymentTerms && template.showPaymentTerms === false;
+  const showDateRow = labels?.dateLabel !== null && !hideTerms;
   const dateRowLabel = labels?.dateLabel ?? "Date due";
-  const summaryNoun = labels?.summaryNoun === undefined ? "due" : labels.summaryNoun;
+  const summaryNoun = hideTerms ? null : labels?.summaryNoun === undefined ? "due" : labels.summaryNoun;
   const summaryText = summaryNoun
     ? `${fmtMoney(amountDue, inv.currencyCode)} ${summaryNoun} ${inv.dueDate}`
     : fmtMoney(amountDue, inv.currencyCode);
@@ -199,20 +256,23 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
     contactTaxNumber: contact.taxNumber || "", reference: inv.reference || "",
     subtotal: fmtMoney(inv.subtotal, inv.currencyCode), taxTotal: fmtMoney(inv.taxTotal, inv.currencyCode),
     total: fmtMoney(inv.total, inv.currencyCode), currency: inv.currencyCode,
+    documentNumber: inv.invoiceNumber,
   };
 
   const bankDetailsText = template.bankDetails ? replacePlaceholders(template.bankDetails, vars) : null;
   const paymentInstructionsText = template.paymentInstructions ? replacePlaceholders(template.paymentInstructions, vars) : null;
   const notesText = (template.notes || inv.notes) ? replacePlaceholders(template.notes || inv.notes || "", vars) : null;
-  const footerText = template.footerHtml
-    ? replacePlaceholders(template.footerHtml, vars).replace(/<[^>]*>/g, "")
-    : null;
+  const headerText = templateBlockText(template.headerHtml, vars);
+  const footerText = templateBlockText(template.footerHtml, vars);
+  const termsText = hasPaymentTerms && !hideTerms ? paymentTermsText(inv.issueDate, inv.dueDate) : null;
 
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={[s.page, { paddingBottom: pagePaddingBottom(footerText) }]}>
         {/* Thin accent bar at top */}
         <View style={[s.accentBar, { backgroundColor: accent }]} />
+
+        <TemplateHeader logo={logo} headerText={headerText} />
 
         {/* Invoice title */}
         <Text style={s.title}>{title}</Text>
@@ -317,6 +377,14 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
           </View>
         </View>
 
+        {/* Payment terms */}
+        {termsText && (
+          <View style={s.infoSection}>
+            <Text style={s.infoTitle}>Payment terms</Text>
+            <Text style={s.infoText}>{termsText}</Text>
+          </View>
+        )}
+
         {/* Bank Details */}
         {bankDetailsText && (
           <View style={s.infoSection}>
@@ -340,22 +408,14 @@ function InvoiceDocument({ invoice: inv, org, contact, template, labels }: Invoi
           </View>
         )}
 
-        {/* Footer */}
+        {/* Template footer text + footer bar */}
+        <TemplateFooterNote text={footerText} />
         <View style={s.footer} fixed>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={s.footerText}>{inv.invoiceNumber}</Text>
             <Text style={s.footerText}>{summaryText}</Text>
-            {footerText && <Text style={s.footerText}>{footerText}</Text>}
           </View>
-          <Link src="https://dubbl.dev" style={{ textDecoration: "none" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              <Svg viewBox="0 0 40 32" width={10} height={8}>
-                <Path d="M18 4v.19a11.5 11.5 0 0 1 5.5 9.81v4a11.5 11.5 0 0 1-5.5 9.81V28h8a10 10 0 0 0 10-10v-4A10 10 0 0 0 26 4h-8z" fill="#c4c4c0" />
-                <Path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z" fill="#c4c4c0" />
-              </Svg>
-              <Text style={{ fontSize: 7, color: "#d1d5db", letterSpacing: 0.5 }}>dubbl</Text>
-            </View>
-          </Link>
+          <DubblMark />
         </View>
       </Page>
     </Document>
@@ -369,8 +429,201 @@ export async function renderInvoicePdf(
   template: PdfTemplateSettings,
   labels?: PdfDocumentLabels
 ): Promise<ArrayBuffer> {
+  const logo = await loadLogoImage(template.logoUrl);
   const buffer = await renderToBuffer(
-    <InvoiceDocument invoice={invoice} org={org} contact={contact} template={template} labels={labels} />
+    <InvoiceDocument invoice={invoice} org={org} contact={contact} template={template} labels={labels} logo={logo} />
   );
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+}
+
+// ---------------------------------------------------------------- Payslips
+
+export interface PdfPayslipLine {
+  description: string;
+  amount: number; // cents
+}
+
+export interface PdfPayslipData {
+  employeeName: string;
+  employeeNumber?: string | null;
+  position?: string | null;
+  department?: string | null;
+  employeeEmail?: string | null;
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  payDate?: string | null;
+  currencyCode: string;
+  earnings: PdfPayslipLine[];
+  grossAmount: number;
+  taxAmount: number;
+  // Per-tax split (income tax, social security, ...). Shown instead of a single
+  // "Tax withheld" line when the template's Show Tax Breakdown is on.
+  taxLines?: PdfPayslipLine[];
+  deductions: PdfPayslipLine[];
+  netAmount: number;
+  ytdGross: number;
+  ytdTax: number;
+  ytdNet: number;
+}
+
+interface PayslipDocProps {
+  slip: PdfPayslipData;
+  org: OrgInfo;
+  template: PdfTemplateSettings;
+  logo: LogoImage | null;
+}
+
+function MoneyRow({ label, amount, currency, bold }: { label: string; amount: number; currency: string; bold?: boolean }) {
+  return (
+    <View style={s.totalRow}>
+      <Text style={bold ? s.amountDueLabel : [s.totalLabel, { color: dark }]}>{label}</Text>
+      <Text style={bold ? s.amountDueValue : s.totalValue}>{fmtMoney(amount, currency)}</Text>
+    </View>
+  );
+}
+
+function PayslipDocument({ slip, org, template, logo }: PayslipDocProps) {
+  const accent = safeAccentColor(template.accentColor);
+  const cur = slip.currencyCode;
+  const period = `${slip.payPeriodStart} to ${slip.payPeriodEnd}`;
+  const totalDeductions = slip.grossAmount - slip.netAmount;
+  const taxLines =
+    template.showTaxBreakdown !== false && slip.taxLines && slip.taxLines.length > 0
+      ? slip.taxLines
+      : [{ description: "Tax withheld", amount: slip.taxAmount }];
+
+  const vars: Record<string, string> = {
+    orgName: org.name, orgAddress: org.address || "", orgTaxId: org.taxId || "",
+    orgPhone: org.phone || "", orgEmail: org.email || "", orgRegistrationNumber: org.registrationNumber || "",
+    employeeName: slip.employeeName, employeeNumber: slip.employeeNumber || "",
+    payPeriodStart: slip.payPeriodStart, payPeriodEnd: slip.payPeriodEnd, payDate: slip.payDate || "",
+    issueDate: slip.payDate || slip.payPeriodEnd,
+    grossPay: fmtMoney(slip.grossAmount, cur), netPay: fmtMoney(slip.netAmount, cur),
+    total: fmtMoney(slip.netAmount, cur), currency: cur,
+  };
+
+  const headerText = templateBlockText(template.headerHtml, vars);
+  const footerText = templateBlockText(template.footerHtml, vars);
+  const bankDetailsText = template.bankDetails ? replacePlaceholders(template.bankDetails, vars) : null;
+  const paymentInstructionsText = template.paymentInstructions ? replacePlaceholders(template.paymentInstructions, vars) : null;
+  const notesText = template.notes ? replacePlaceholders(template.notes, vars) : null;
+
+  return (
+    <Document>
+      <Page size="A4" style={[s.page, { paddingBottom: pagePaddingBottom(footerText) }]}>
+        <View style={[s.accentBar, { backgroundColor: accent }]} />
+
+        <TemplateHeader logo={logo} headerText={headerText} />
+
+        <Text style={s.title}>Payslip</Text>
+
+        <View style={s.metaBlock}>
+          <View style={s.metaRow}>
+            <Text style={[s.metaLabel, { fontFamily: "Helvetica-Bold" }]}>Pay period</Text>
+            <Text style={s.metaValue}>{period}</Text>
+          </View>
+          {slip.payDate && (
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Pay date</Text>
+              <Text style={{ fontSize: 9 }}>{slip.payDate}</Text>
+            </View>
+          )}
+          {slip.employeeNumber && (
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Employee no.</Text>
+              <Text style={{ fontSize: 9 }}>{slip.employeeNumber}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={s.partiesRow}>
+          <View style={s.sellerCol}>
+            <Text style={s.partyName}>{org.name}</Text>
+            {org.address && <Text style={s.partyDetail}>{org.address}</Text>}
+            {org.email && <Text style={s.partyDetail}>{org.email}</Text>}
+            {org.phone && <Text style={s.partyDetail}>{org.phone}</Text>}
+            {org.registrationNumber && <Text style={s.partyDetail}>Reg: {org.registrationNumber}</Text>}
+          </View>
+          <View style={s.buyerCol}>
+            <Text style={s.billToLabel}>Employee</Text>
+            <Text style={s.partyDetail}>{slip.employeeName}</Text>
+            {slip.position && <Text style={s.partyDetail}>{slip.position}</Text>}
+            {slip.department && <Text style={s.partyDetail}>{slip.department}</Text>}
+            {slip.employeeEmail && <Text style={s.partyDetail}>{slip.employeeEmail}</Text>}
+          </View>
+        </View>
+
+        <Text style={s.dueSummary}>{fmtMoney(slip.netAmount, cur)} take-home pay</Text>
+
+        <Text style={[s.sectionTitle, { marginTop: 0 }]}>Earnings</Text>
+        <View style={s.payTable}>
+          {slip.earnings.map((l, i) => (
+            <MoneyRow key={i} label={l.description} amount={l.amount} currency={cur} />
+          ))}
+          <MoneyRow label="Gross pay" amount={slip.grossAmount} currency={cur} bold />
+        </View>
+
+        <Text style={s.sectionTitle}>Taxes and deductions</Text>
+        <View style={s.payTable}>
+          {taxLines.map((l, i) => (
+            <MoneyRow key={`t${i}`} label={l.description} amount={l.amount} currency={cur} />
+          ))}
+          {slip.deductions.map((l, i) => (
+            <MoneyRow key={`d${i}`} label={l.description} amount={l.amount} currency={cur} />
+          ))}
+          <MoneyRow label="Total deductions" amount={totalDeductions} currency={cur} bold />
+        </View>
+
+        <View style={[s.payTable, { marginTop: 14 }]}>
+          <MoneyRow label="Net pay" amount={slip.netAmount} currency={cur} bold />
+        </View>
+
+        <Text style={s.sectionTitle}>Year to date</Text>
+        <View style={s.payTable}>
+          <MoneyRow label="Gross pay" amount={slip.ytdGross} currency={cur} />
+          <MoneyRow label="Tax" amount={slip.ytdTax} currency={cur} />
+          <MoneyRow label="Net pay" amount={slip.ytdNet} currency={cur} />
+        </View>
+
+        {bankDetailsText && (
+          <View style={s.infoSection}>
+            <Text style={s.infoTitle}>Bank details</Text>
+            <Text style={s.infoText}>{bankDetailsText}</Text>
+          </View>
+        )}
+
+        {paymentInstructionsText && (
+          <View style={s.infoSection}>
+            <Text style={s.infoTitle}>Payment instructions</Text>
+            <Text style={s.infoText}>{paymentInstructionsText}</Text>
+          </View>
+        )}
+
+        {notesText && (
+          <View style={s.infoSection}>
+            <Text style={s.infoText}>{notesText}</Text>
+          </View>
+        )}
+
+        <TemplateFooterNote text={footerText} />
+        <View style={s.footer} fixed>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={s.footerText}>{slip.employeeName}</Text>
+            <Text style={s.footerText}>Pay period {period}</Text>
+          </View>
+          <DubblMark />
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+export async function renderPayslipPdf(
+  slip: PdfPayslipData,
+  org: OrgInfo,
+  template: PdfTemplateSettings
+): Promise<ArrayBuffer> {
+  const logo = await loadLogoImage(template.logoUrl);
+  const buffer = await renderToBuffer(<PayslipDocument slip={slip} org={org} template={template} logo={logo} />);
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { timesheetEntry, timesheet } from "@/lib/db/schema";
+import { timesheetEntry, timesheet, project } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const createSchema = z.object({
   date: z.string().min(1),
-  hours: z.number().min(0),
+  hours: z.number().positive().max(24),
   shiftType: z.enum(["regular", "overtime", "night", "weekend", "holiday"]).optional(),
   description: z.string().optional(),
   projectId: z.string().uuid().optional(),
@@ -63,10 +63,22 @@ export async function POST(
     });
 
     if (!ts) return notFound("Timesheet");
-    if (ts.status !== "draft") return validationError("Can only add entries to draft timesheets");
+    if (ts.status !== "draft" && ts.status !== "rejected") {
+      return validationError("Entries can only be added while a timesheet is a draft or was sent back");
+    }
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    if (parsed.date < ts.periodStart || parsed.date > ts.periodEnd) {
+      return validationError(`The date must be within the timesheet period (${ts.periodStart} to ${ts.periodEnd})`);
+    }
+    if (parsed.projectId) {
+      const proj = await db.query.project.findFirst({
+        where: and(eq(project.id, parsed.projectId), eq(project.organizationId, ctx.organizationId)),
+        columns: { id: true },
+      });
+      if (!proj) return notFound("Project");
+    }
 
     const [entry] = await db
       .insert(timesheetEntry)
@@ -102,7 +114,7 @@ export async function DELETE(
     if (!entryId) return validationError("entryId required");
 
     const entry = await db.query.timesheetEntry.findFirst({
-      where: eq(timesheetEntry.id, entryId),
+      where: and(eq(timesheetEntry.id, entryId), eq(timesheetEntry.timesheetId, id)),
     });
     if (!entry) return notFound("Entry");
 
@@ -114,6 +126,9 @@ export async function DELETE(
       ),
     });
     if (!ts) return notFound("Entry");
+    if (ts.status !== "draft" && ts.status !== "rejected") {
+      return validationError("Entries can only be removed while a timesheet is a draft or was sent back");
+    }
 
     await db.delete(timesheetEntry).where(eq(timesheetEntry.id, entryId));
 
@@ -124,7 +139,7 @@ export async function DELETE(
         totalHours: sql`greatest(${timesheet.totalHours} - ${entry.hours}, 0)`,
         updatedAt: new Date(),
       })
-      .where(eq(timesheet.id, id));
+      .where(eq(timesheet.id, ts.id));
 
     return ok({ success: true });
   } catch (err) {

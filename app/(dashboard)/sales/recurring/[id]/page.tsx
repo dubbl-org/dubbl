@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Pause, Play, Trash2 } from "lucide-react";
@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import Link from "next/link";
 
 interface RecurringLine {
@@ -64,8 +65,10 @@ export default function RecurringDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [template, setTemplate] = useState<RecurringTemplate | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/recurring/${id}`;
+  const { data, loading } = useApi<{ template?: RecurringTemplate }>(url);
+  const template = data?.template ?? null;
+  const cache = useApiCache();
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -76,18 +79,6 @@ export default function RecurringDetailPage() {
 
   useDocumentTitle("Sales · Recurring Template");
   useEntityTitle(template?.name);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/recurring/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.template) setTemplate(data.template);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
 
   async function handleToggleStatus() {
     if (!orgId || !template) return;
@@ -104,8 +95,8 @@ export default function RecurringDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setTemplate((prev) =>
-          prev ? { ...prev, ...data.template } : prev
+        cache.update<{ template?: RecurringTemplate }>(url, (d) =>
+          d.template ? { ...d, template: { ...d.template, ...data.template } } : d
         );
         toast.success(
           newStatus === "paused"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import {
   Calendar,
   Plus,
@@ -34,6 +34,13 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApis } from "@/lib/query/use-api";
+import { BankAccountSelect } from "@/components/dashboard/bank-account-select";
+import {
+  SCHEDULED_PAYMENT_GROUP_ORDER,
+  scheduledPaymentGroup,
+  type ScheduledPaymentGroup,
+} from "@/lib/scheduled-payment-groups";
 
 interface ScheduledPaymentItem {
   id: string;
@@ -46,6 +53,7 @@ interface ScheduledPaymentItem {
   processedAt: string | null;
   notes: string | null;
   createdAt: string;
+  bankAccount: { id: string; accountName: string; currencyCode: string } | null;
   bill: {
     id: string;
     billNumber: string;
@@ -77,36 +85,23 @@ const STATUS_CONFIG: Record<
   cancelled: { label: "Cancelled", variant: "outline", icon: XCircle },
 };
 
-function getWeekLabel(dateStr: string): string {
-  const date = new Date(dateStr + "T00:00:00");
+function localToday(): string {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.floor(
-    (date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (diff < 0) return "Overdue";
-  if (diff === 0) return "Today";
-  if (diff <= 7) return "This Week";
-  if (diff <= 14) return "Next Week";
-  if (diff <= 30) return "This Month";
-  return "Later";
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 export default function ScheduledPaymentsPage() {
-  const [items, setItems] = useState<ScheduledPaymentItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showDialog, setShowDialog] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Dialog form state
-  const [bills, setBills] = useState<BillOption[]>([]);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [amount, setAmount] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [bankAccountId, setBankAccountId] = useState("");
 
   const orgId =
     typeof window !== "undefined"
@@ -115,48 +110,35 @@ export default function ScheduledPaymentsPage() {
 
   useDocumentTitle("Accounting \u00B7 Scheduled Payments");
 
-  const fetchItems = useCallback(() => {
-    if (!orgId) return;
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-
-    fetch(`/api/v1/scheduled-payments?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setItems(data.data || []))
-      .finally(() => setLoading(false));
-  }, [orgId, statusFilter]);
-
-  const fetchBills = useCallback(() => {
-    if (!orgId) return;
-    fetch("/api/v1/bills?status=received&limit=100", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((res) => res.json())
-      .then((data) => setBills(data.data || []));
-  }, [orgId]);
-
   // Due payments are no longer paid just by opening this page: paying posts
   // payments and journal entries, so it waits for an explicit "Pay now".
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  const { data: itemData, loading } = useApi<{ data?: ScheduledPaymentItem[] }>(
+    statusFilter !== "all" ? `/api/v1/scheduled-payments?status=${encodeURIComponent(statusFilter)}` : "/api/v1/scheduled-payments",
+    { keepPrevious: true }
+  );
+  const items = useMemo(() => itemData?.data || [], [itemData]);
 
-  // Group by week
+  // Every bill that still has money owing: approved, part paid or overdue.
+  const { data: billData } = useApis<{ data?: BillOption[] }>(
+    showDialog ? ["received", "partial", "overdue"].map((s) => `/api/v1/bills?status=${s}&limit=100`) : []
+  );
+  const bills = billData.flatMap((d) => d?.data ?? []);
+
+  // Group by status first: payments still to go out by date (overdue, today,
+  // this week, ...), finished ones under Paid / Failed / Cancelled.
   const grouped = useMemo(() => {
-    const groups: Record<string, ScheduledPaymentItem[]> = {};
-    const order = ["Overdue", "Today", "This Week", "Next Week", "This Month", "Later"];
+    const today = localToday();
+    const groups: Partial<Record<ScheduledPaymentGroup, ScheduledPaymentItem[]>> = {};
 
     for (const item of items) {
-      const label = getWeekLabel(item.scheduledDate);
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(item);
+      const label = scheduledPaymentGroup(item.status, item.scheduledDate.slice(0, 10), today);
+      (groups[label] ??= []).push(item);
     }
 
-    return order
-      .filter((label) => groups[label])
-      .map((label) => ({ label, items: groups[label] }));
+    return SCHEDULED_PAYMENT_GROUP_ORDER.filter((label) => groups[label]).map((label) => ({
+      label,
+      items: groups[label]!,
+    }));
   }, [items]);
 
   async function handleSchedule() {
@@ -179,6 +161,7 @@ export default function ScheduledPaymentsPage() {
           amount: parseMoney(amount),
           scheduledDate,
           notes: notes || null,
+          bankAccountId: bankAccountId || null,
         }),
       });
 
@@ -191,7 +174,6 @@ export default function ScheduledPaymentsPage() {
       toast.success("Payment scheduled");
       setShowDialog(false);
       resetForm();
-      fetchItems();
     } catch {
       toast.error("Failed to schedule payment");
     } finally {
@@ -217,7 +199,6 @@ export default function ScheduledPaymentsPage() {
       }
 
       toast.success("Scheduled payment cancelled");
-      fetchItems();
     } catch {
       toast.error("Failed to cancel payment");
     }
@@ -232,12 +213,20 @@ export default function ScheduledPaymentsPage() {
         headers: { "x-organization-id": orgId },
       });
       const data = await res.json();
-      if (data.processed > 0) {
+      if (!res.ok) {
+        toast.error(data.error || "Failed to process payments");
+        return;
+      }
+      const failures: { error: string }[] = data.failures ?? [];
+      if (failures.length > 0) {
+        toast.warning(
+          `Processed ${data.processed} of ${data.total} payment(s). ${failures.length} failed: ${failures[0].error}`
+        );
+      } else if (data.processed > 0) {
         toast.success(`Processed ${data.processed} payment(s)`);
       } else {
         toast.info("No payments due for processing");
       }
-      fetchItems();
     } catch {
       toast.error("Failed to process payments");
     } finally {
@@ -250,11 +239,11 @@ export default function ScheduledPaymentsPage() {
     setAmount("");
     setScheduledDate("");
     setNotes("");
+    setBankAccountId("");
   }
 
   function openScheduleDialog() {
     resetForm();
-    fetchBills();
     setShowDialog(true);
   }
 
@@ -359,7 +348,7 @@ export default function ScheduledPaymentsPage() {
             <p
               className={cn(
                 "text-xs font-medium uppercase tracking-wider",
-                group.label === "Overdue"
+                group.label === "Overdue" || group.label === "Failed"
                   ? "text-red-600 dark:text-red-400"
                   : "text-muted-foreground"
               )}
@@ -422,6 +411,12 @@ export default function ScheduledPaymentsPage() {
                           item.scheduledDate + "T00:00:00"
                         ).toLocaleDateString()}
                       </span>
+                      {item.bankAccount && (
+                        <>
+                          <span className="text-border">{"\u00B7"}</span>
+                          <span className="truncate">From {item.bankAccount.accountName}</span>
+                        </>
+                      )}
                       {item.notes && (
                         <>
                           <span className="text-border">{"\u00B7"}</span>
@@ -499,6 +494,12 @@ export default function ScheduledPaymentsPage() {
                 onChange={(e) => setScheduledDate(e.target.value)}
               />
             </div>
+            <BankAccountSelect
+              value={bankAccountId}
+              onChange={setBankAccountId}
+              labelClassName="text-xs"
+              hint="The bank account the money will leave on the scheduled date."
+            />
             <div className="space-y-2">
               <Label className="text-xs">Notes (optional)</Label>
               <Input

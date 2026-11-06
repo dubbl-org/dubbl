@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  revenueSchedule,
-  revenueEntry,
-} from "@/lib/db/schema";
+import { revenueSchedule } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError } from "@/lib/api/response";
+import { error, handleError } from "@/lib/api/response";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
+import { createRevenueSchedule, RevenueScheduleError } from "@/lib/api/revenue-schedules";
 import { z } from "zod";
 
 const createSchema = z.object({
-  invoiceId: z.string().min(1),
-  invoiceLineId: z.string().optional(),
-  totalAmount: z.number().positive(),
+  invoiceId: z.string().uuid(),
+  invoiceLineId: z.string().uuid().optional().nullable(),
+  // Integer cents in the invoice's currency (e.g. 120000 = 1,200.00).
+  totalAmount: z.number().int().positive(),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
   method: z
@@ -32,13 +31,22 @@ export async function GET(request: Request) {
       eq(revenueSchedule.organizationId, ctx.organizationId),
     ];
 
-    const schedules = await db.query.revenueSchedule.findMany({
+    const rows = await db.query.revenueSchedule.findMany({
       where: and(...conditions),
       orderBy: desc(revenueSchedule.createdAt),
       limit,
       offset,
-      with: { entries: true },
+      with: {
+        entries: true,
+        invoice: { columns: { invoiceNumber: true, currencyCode: true }, with: { contact: { columns: { name: true } } } },
+      },
     });
+    const schedules = rows.map(({ invoice: inv, ...s }) => ({
+      ...s,
+      invoiceNumber: inv?.invoiceNumber ?? null,
+      currencyCode: inv?.currencyCode ?? null,
+      contactName: inv?.contact?.name ?? null,
+    }));
 
     const [countResult] = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -53,6 +61,12 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * Create a schedule for a sent invoice. Moves totalAmount (integer cents) of
+ * the invoice's income into deferred revenue and generates the periods that
+ * count it back. Pass invoiceLineId when the invoice's lines use different
+ * income accounts.
+ */
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
@@ -61,57 +75,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const totalAmountCents = Math.round(parsed.totalAmount * 100);
+    const schedule = await createRevenueSchedule(
+      { organizationId: ctx.organizationId, userId: ctx.userId, auth: ctx },
+      parsed
+    );
 
-    // Calculate months between start and end for straight_line
-    const start = new Date(parsed.startDate);
-    const end = new Date(parsed.endDate);
-    const months =
-      (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth()) +
-      1;
-
-    const periods = Math.max(1, months);
-    const perPeriod = Math.floor(totalAmountCents / periods);
-    const remainder = totalAmountCents - perPeriod * (periods - 1);
-
-    const [schedule] = await db
-      .insert(revenueSchedule)
-      .values({
-        organizationId: ctx.organizationId,
-        invoiceId: parsed.invoiceId,
-        invoiceLineId: parsed.invoiceLineId || null,
-        totalAmount: totalAmountCents,
-        startDate: parsed.startDate,
-        endDate: parsed.endDate,
-        method: parsed.method,
-        createdBy: ctx.userId,
-      })
-      .returning();
-
-    // Generate entries
-    const entries = [];
-    for (let i = 0; i < periods; i++) {
-      const periodDate = new Date(start);
-      periodDate.setMonth(periodDate.getMonth() + i);
-      const amount = i === periods - 1 ? remainder : perPeriod;
-      entries.push({
-        scheduleId: schedule.id,
-        periodDate: periodDate.toISOString().split("T")[0],
-        amount,
-        sortOrder: i,
-      });
-    }
-
-    await db.insert(revenueEntry).values(entries);
-
-    const result = await db.query.revenueSchedule.findFirst({
-      where: eq(revenueSchedule.id, schedule.id),
-      with: { entries: true },
-    });
-
-    return NextResponse.json({ schedule: result }, { status: 201 });
+    return NextResponse.json({ schedule }, { status: 201 });
   } catch (err) {
+    if (err instanceof RevenueScheduleError) return error(err.message, err.status);
     return handleError(err);
   }
 }

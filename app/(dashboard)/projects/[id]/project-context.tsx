@@ -1,13 +1,19 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useApi } from "@/lib/query/use-api";
+import { accessAtLeast, type ProjectAccess } from "@/lib/projects/rules";
+
+export { localISODate, isPastDue, localWeekDates, summarizeTimeEntries, timeEntryAmount } from "@/lib/projects/rules";
 
 // ── Types ──────────────────────────────────────────────────
 export interface ProjectMemberData {
   id: string;
   role: string;
   hourlyRate: number | null;
+  costRate: number | null;
+  teamAssignmentId: string | null;
   member: {
     id: string;
     role: string;
@@ -92,7 +98,7 @@ export interface NoteData {
   content: string;
   isPinned: boolean;
   createdAt: string;
-  author: { name: string | null; email: string };
+  author: { id: string; name: string | null; email: string };
 }
 
 export interface TimeEntryData {
@@ -156,7 +162,14 @@ export interface ProjectDetail {
   timeEntries: TimeEntryData[];
   teams: TeamData[];
   labels: LabelData[];
+  // Only the signed-in user's own running timer (timers are personal).
   runningTimers: RunningTimerData[];
+  // Cents on draft / awaiting-approval invoices (not counted in totalBilled yet).
+  unissuedBilled: number;
+  // What the signed-in user may do on this project.
+  access: ProjectAccess;
+  // The signed-in user's id (to tell their own time entries and notes apart).
+  viewerUserId: string;
 }
 
 interface ProjectContextValue {
@@ -165,6 +178,10 @@ interface ProjectContextValue {
   orgId: string | null;
   projectId: string;
   refresh: () => void;
+  /** Can create tasks, log time and add notes. */
+  canContribute: boolean;
+  /** Can change settings, members, milestones and invoice the project. */
+  canManage: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -177,30 +194,29 @@ export function useProject() {
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ project?: ProjectDetail }>(`/api/v1/projects/${id}`);
+  const project = data?.project ?? null;
   const [orgId] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null
   );
 
+  // Mutations refresh the cache on their own; this is for callers that want it now.
   const refresh = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/projects/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.project) setProject(data.project);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+    void refetch();
+  }, [refetch]);
 
   return (
-    <ProjectContext.Provider value={{ project, loading, orgId, projectId: id, refresh }}>
+    <ProjectContext.Provider
+      value={{
+        project,
+        loading,
+        orgId,
+        projectId: id,
+        refresh,
+        canContribute: !!project && accessAtLeast(project.access ?? "view", "contribute"),
+        canManage: !!project && accessAtLeast(project.access ?? "view", "manage"),
+      }}
+    >
       {children}
     </ProjectContext.Provider>
   );
@@ -264,3 +280,31 @@ export const PROJECT_COLORS = [
   "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
   "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
 ];
+
+/**
+ * Call a project API route. Resolves with the JSON body; throws an Error carrying
+ * the API's own message (e.g. "Only project managers can do this") on failure.
+ */
+export async function projectFetch<T = Record<string, unknown>>(
+  orgId: string | null,
+  url: string,
+  init: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  if (!orgId) throw new Error("No organization selected");
+  const res = await fetch(url, {
+    method: init.method ?? "GET",
+    headers: {
+      "x-organization-id": orgId,
+      ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error || "Request failed");
+  return data as T;
+}
+
+/** Error message for a toast. */
+export function errorText(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}

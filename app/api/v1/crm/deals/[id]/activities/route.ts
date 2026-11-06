@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import { dealActivity, deal } from "@/lib/db/schema";
 import { eq, and, desc, asc, ilike, count } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
+import { notDeleted } from "@/lib/db/soft-delete";
+import { CRM_PERMISSION } from "@/lib/api/crm-deals";
 import { ok, created, notFound, handleError } from "@/lib/api/response";
 import { z } from "zod";
 
@@ -15,7 +18,7 @@ export async function GET(
 
     // Verify deal belongs to org
     const d = await db.query.deal.findFirst({
-      where: and(eq(deal.id, id), eq(deal.organizationId, ctx.organizationId)),
+      where: and(eq(deal.id, id), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)),
     });
     if (!d) return notFound("Deal");
 
@@ -88,7 +91,12 @@ export async function GET(
 const createSchema = z.object({
   type: z.enum(["note", "email", "call", "meeting", "task"]),
   content: z.string().nullable().optional(),
-  scheduledAt: z.string().nullable().optional(),
+  // ISO date-time it is planned for. Leave out for something that already happened.
+  scheduledAt: z
+    .string()
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), "scheduledAt must be a date-time")
+    .nullable()
+    .optional(),
 });
 
 export async function POST(
@@ -98,11 +106,12 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, CRM_PERMISSION);
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
     const d = await db.query.deal.findFirst({
-      where: and(eq(deal.id, id), eq(deal.organizationId, ctx.organizationId)),
+      where: and(eq(deal.id, id), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)),
     });
     if (!d) return notFound("Deal");
 

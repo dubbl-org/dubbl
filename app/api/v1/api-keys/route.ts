@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { apiKey } from "@/lib/db/schema";
-import { subscription } from "@/lib/db/schema/billing";
-import { eq, count } from "drizzle-orm";
+import { apiKey, member, users } from "@/lib/db/schema";
+import { eq, count, inArray } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { nanoid } from "nanoid";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { logAudit } from "@/lib/api/audit";
+import { getOrgPlanLimits } from "@/lib/api/check-limit";
 
 const MAX_API_KEYS = 20;
 
@@ -18,12 +18,8 @@ const createSchema = z.object({
 });
 
 async function checkApiAccess(orgId: string): Promise<boolean> {
-  const sub = await db.query.subscription.findFirst({
-    where: eq(subscription.organizationId, orgId),
-  });
-  const plan = sub?.plan ?? "free";
-  // Only pro gets API access
-  return plan === "pro";
+  const { limits } = await getOrgPlanLimits(orgId);
+  return limits.apiAccess;
 }
 
 export async function GET(request: Request) {
@@ -38,6 +34,22 @@ export async function GET(request: Request) {
       orderBy: apiKey.createdAt,
     });
 
+    // A key acts as its creator, so it stops working once they leave the org
+    const [members, creators] = await Promise.all([
+      db.query.member.findMany({
+        where: eq(member.organizationId, ctx.organizationId),
+        columns: { userId: true },
+      }),
+      keys.length
+        ? db.query.users.findMany({
+            where: inArray(users.id, [...new Set(keys.map((k) => k.createdBy))]),
+            columns: { id: true, name: true, email: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const memberIds = new Set(members.map((m) => m.userId));
+    const creatorById = new Map(creators.map((u) => [u.id, u]));
+
     return NextResponse.json({
       keys: keys.map((k) => ({
         id: k.id,
@@ -46,6 +58,9 @@ export async function GET(request: Request) {
         lastUsedAt: k.lastUsedAt?.toISOString() || null,
         expiresAt: k.expiresAt?.toISOString() || null,
         createdAt: k.createdAt.toISOString(),
+        createdByName:
+          creatorById.get(k.createdBy)?.name || creatorById.get(k.createdBy)?.email || null,
+        disabled: !memberIds.has(k.createdBy),
       })),
       apiAccess: hasAccess,
       maxKeys: MAX_API_KEYS,
@@ -67,7 +82,7 @@ export async function POST(request: Request) {
     const hasAccess = await checkApiAccess(ctx.organizationId);
     if (!hasAccess) {
       return NextResponse.json(
-        { error: "API keys require a Pro plan" },
+        { error: "Your plan doesn't include API access" },
         { status: 403 }
       );
     }

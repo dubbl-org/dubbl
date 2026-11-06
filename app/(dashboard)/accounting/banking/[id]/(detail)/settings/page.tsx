@@ -8,6 +8,8 @@ import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/money";
 import {
   Select,
   SelectContent,
@@ -25,12 +27,16 @@ export default function BankSettingsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const { account, setAccount, refetch } = useBankAccountContext();
+  const { account, setAccount } = useBankAccountContext();
   const [saving, setSaving] = useState(false);
   const [bankCurrency, setBankCurrency] = useState(account?.currencyCode || "USD");
   // Which ledger account this bank account is recorded under. Defaults to the
   // one connected automatically; the picker lets the user point it elsewhere.
   const [chartAccountId, setChartAccountId] = useState(account?.chartAccountId ?? "");
+  // Low balance alert, as typed (empty = off); saved as minor units of the account's currency
+  const [lowBalance, setLowBalance] = useState(
+    account?.lowBalanceThreshold != null ? minorUnitsToDecimal(account.lowBalanceThreshold, account.currencyCode) : ""
+  );
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
@@ -56,13 +62,13 @@ export default function BankSettingsPage() {
           // Only send a connection when one is chosen — never actively unlink
           // (an empty value just falls back to the automatic connection).
           ...(chartAccountId ? { chartAccountId } : {}),
+          lowBalanceThreshold: lowBalance.trim() === "" ? null : decimalToMinorUnits(lowBalance, bankCurrency),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
       setAccount(() => data.bankAccount);
       toast.success("Account updated");
-      refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update account");
     } finally {
@@ -167,6 +173,31 @@ export default function BankSettingsPage() {
             />
             <p className="text-[11px] text-muted-foreground">
               Changing this only affects transactions recorded from now on.
+            </p>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-10">
+          <div className="shrink-0">
+            <p className="text-sm font-medium">Low balance alert</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Get a notification when the balance drops below this amount.
+            </p>
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="lowBalanceThreshold" className="text-xs">Alert below</Label>
+            <CurrencyInput
+              id="lowBalanceThreshold"
+              value={lowBalance}
+              onChange={setLowBalance}
+              prefix={bankCurrency}
+              placeholder="Off"
+              className="sm:max-w-[220px]"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Owners and admins are notified once a day while the balance stays below it. Leave empty to turn the alert off.
             </p>
           </div>
         </div>

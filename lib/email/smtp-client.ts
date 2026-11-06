@@ -47,9 +47,11 @@ function createTransporter(config: SmtpConfig) {
   return nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
+    // Port 465 is TLS from the start; on other ports "Encrypted connection"
+    // insists on STARTTLS. The server's certificate is always verified.
     secure: config.smtpPort === 465,
+    requireTLS: config.useTls && config.smtpPort !== 465,
     auth: { user: config.smtpUsername, pass: password },
-    tls: config.useTls ? { rejectUnauthorized: false } : undefined,
   });
 }
 

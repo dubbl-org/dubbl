@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CheckCircle2, CircleAlert, Loader2, Mail, Send, Trash2 } from "lucide-react";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface EmailConfig {
   smtpHost: string;
@@ -34,31 +35,34 @@ function headers(json = false): Record<string, string> {
   return { ...(orgId ? { "x-organization-id": orgId } : {}), ...(json ? { "content-type": "application/json" } : {}) };
 }
 
+const EMAIL_CONFIG_URL = "/api/v1/email-config";
+
+function toForm(c: EmailConfig | null): typeof EMPTY {
+  return c
+    ? { smtpHost: c.smtpHost, smtpPort: String(c.smtpPort), smtpUsername: c.smtpUsername, smtpPassword: "", fromEmail: c.fromEmail, fromName: c.fromName ?? "", replyTo: c.replyTo ?? "", useTls: c.useTls }
+    : EMPTY;
+}
+
 export default function EmailSettingsPage() {
   useDocumentTitle("Settings · Email sending");
   const { confirm, dialog } = useConfirm();
-  const [config, setConfig] = useState<EmailConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(EMPTY);
+  const { data, loading, error } = useApi<{ emailConfig?: EmailConfig | null; platformFrom?: string }>(EMAIL_CONFIG_URL);
+  const cache = useApiCache();
+  const config = data?.emailConfig ?? null;
+  const [draft, setDraft] = useState<typeof EMPTY | null>(null);
+  const form = draft ?? toForm(config);
+  const setForm = (fn: (f: typeof EMPTY) => typeof EMPTY) => setDraft((d) => fn(d ?? form));
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const fill = useCallback((c: EmailConfig | null) => {
-    setConfig(c);
-    setForm(
-      c
-        ? { smtpHost: c.smtpHost, smtpPort: String(c.smtpPort), smtpUsername: c.smtpUsername, smtpPassword: "", fromEmail: c.fromEmail, fromName: c.fromName ?? "", replyTo: c.replyTo ?? "", useTls: c.useTls }
-        : EMPTY
-    );
-  }, []);
+  const fill = (c: EmailConfig | null) => {
+    cache.set(EMAIL_CONFIG_URL, { ...data, emailConfig: c });
+    setDraft(null);
+  };
 
   useEffect(() => {
-    fetch("/api/v1/email-config", { headers: headers() })
-      .then((r) => r.json())
-      .then((d) => fill(d.emailConfig ?? null))
-      .catch(() => toast.error("Couldn't load your email settings"))
-      .finally(() => setLoading(false));
-  }, [fill]);
+    if (error && !data) toast.error("Couldn't load your email settings");
+  }, [error, data]);
 
   const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -99,7 +103,7 @@ export default function EmailSettingsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "The test email didn't send");
       toast.success(data.message ?? "Test email sent");
-      if (config && !config.isVerified) setConfig({ ...config, isVerified: true });
+      if (config && !config.isVerified) cache.set(EMAIL_CONFIG_URL, { ...data, emailConfig: { ...config, isVerified: true } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "The test email didn't send");
     } finally {
@@ -130,7 +134,7 @@ export default function EmailSettingsPage() {
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Email sending</h1>
         <p className="mt-1 text-[13.5px] text-muted-foreground">
-          Choose the address your invoices, quotes, credit notes and purchase orders are emailed from.
+          Choose the address your invoices, quotes, credit notes, purchase orders and payment reminders are emailed from.
         </p>
       </div>
 
@@ -144,7 +148,7 @@ export default function EmailSettingsPage() {
               ? `Sending from ${config!.fromName ? `${config!.fromName} <${config!.fromEmail}>` : config!.fromEmail}`
               : config
                 ? "Your mail server isn't verified yet, so emails still go out from dubbl"
-                : "Sending from dubbl <invoices@dubbl.dev>"}
+                : `Sending from ${data?.platformFrom ?? "dubbl <invoices@dubbl.dev>"}`}
           </p>
           <p className="mt-0.5 text-muted-foreground">
             {usingOwn

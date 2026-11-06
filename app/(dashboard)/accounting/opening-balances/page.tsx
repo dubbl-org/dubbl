@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Scale, Plus } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
+import { useApi } from "@/lib/query/use-api";
 
 interface OpeningBalanceLine {
   id: string;
@@ -24,29 +24,16 @@ interface OpeningBalanceEntry {
 
 export default function OpeningBalancesPage() {
   const { open: openDrawer } = useCreateDrawer();
-  const [entry, setEntry] = useState<OpeningBalanceEntry | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/opening-balances`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.entry) setEntry(data.entry);
-      })
-      .finally(() => setLoading(false));
-  }, [orgId]);
+  const { data, loading } = useApi<{ entry?: OpeningBalanceEntry | null }>(`/api/v1/opening-balances`);
+  const entry = data?.entry ?? null;
+  const { data: orgData } = useApi<{ organization?: { defaultCurrency?: string } }>("/api/v1/organization");
 
   if (loading) return <div className="space-y-6"><PageHeader title="Loading..." /></div>;
 
   const totalDebit = entry?.lines.reduce((sum, l) => sum + l.debitAmount, 0) ?? 0;
   const totalCredit = entry?.lines.reduce((sum, l) => sum + l.creditAmount, 0) ?? 0;
   // Opening balances always use the org's home currency.
-  const currencyCode = "USD";
+  const currencyCode = orgData?.organization?.defaultCurrency || "USD";
 
   return (
     <div className="space-y-6">
@@ -65,7 +52,7 @@ export default function OpeningBalancesPage() {
           <Scale className="size-4 mt-0.5 text-muted-foreground shrink-0" />
           <p className="text-sm text-muted-foreground">
             Opening balances are how much was in each account on the day you started
-            using the app — for example money in the bank, unpaid customer invoices,
+            using the app, for example money in the bank, unpaid customer invoices,
             or amounts you still owed. Set them once so your reports start from the
             right numbers.
           </p>

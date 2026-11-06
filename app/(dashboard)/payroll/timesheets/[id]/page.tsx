@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface TimesheetDetail {
   id: string;
@@ -65,8 +66,8 @@ const anim = (delay: number) => ({
 export default function TimesheetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [ts, setTs] = useState<TimesheetDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ timesheet?: TimesheetDetail }>(`/api/v1/payroll/timesheets/${id}`);
+  const ts = data?.timesheet ?? null;
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Reject dialog
@@ -83,18 +84,8 @@ export default function TimesheetDetailPage() {
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Timesheet Details");
-
-  function fetchTimesheet() {
-    if (!orgId) return;
-    fetch(`/api/v1/payroll/timesheets/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.timesheet) setTs(data.timesheet); })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => { fetchTimesheet(); }, [id, orgId]);
+  // Drafts and sent-back (rejected) timesheets can still be edited and submitted
+  const editable = ts?.status === "draft" || ts?.status === "rejected";
 
   async function handleAddEntry() {
     if (!orgId || !newDate || !newHours) return;
@@ -111,9 +102,9 @@ export default function TimesheetDetailPage() {
     if (res.ok) {
       toast.success("Entry added");
       setNewDate(""); setNewHours(""); setNewDesc("");
-      fetchTimesheet();
     } else {
-      toast.error("Failed to add entry");
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to add entry");
     }
   }
 
@@ -126,11 +117,14 @@ export default function TimesheetDetailPage() {
       destructive: true,
     });
     if (!confirmed) return;
-    await fetch(`/api/v1/payroll/timesheets/${id}/entries?entryId=${entryId}`, {
+    const res = await fetch(`/api/v1/payroll/timesheets/${id}/entries?entryId=${entryId}`, {
       method: "DELETE",
       headers: { "x-organization-id": orgId },
     });
-    fetchTimesheet();
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Failed to delete entry");
+    }
   }
 
   async function handleSubmit() {
@@ -140,10 +134,9 @@ export default function TimesheetDetailPage() {
       headers: { "x-organization-id": orgId },
     });
     if (res.ok) {
-      toast.success("Timesheet submitted");
-      fetchTimesheet();
+      toast.success(ts?.status === "rejected" ? "Timesheet resubmitted" : "Timesheet submitted");
     } else {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       toast.error(typeof data.error === "string" ? data.error : "Failed to submit");
     }
   }
@@ -158,7 +151,6 @@ export default function TimesheetDetailPage() {
       });
       if (res.ok) {
         toast.success("Timesheet approved");
-        fetchTimesheet();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
@@ -181,7 +173,6 @@ export default function TimesheetDetailPage() {
         toast.success("Timesheet rejected");
         setRejectOpen(false);
         setRejectReason("");
-        fetchTimesheet();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
@@ -225,9 +216,9 @@ export default function TimesheetDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {ts.status === "draft" && (
+          {editable && (
             <Button size="sm" onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
-              <Send className="mr-1.5 size-3.5" /> Submit
+              <Send className="mr-1.5 size-3.5" /> {ts.status === "rejected" ? "Resubmit" : "Submit"}
             </Button>
           )}
           {ts.status === "submitted" && (
@@ -243,9 +234,12 @@ export default function TimesheetDetailPage() {
         </div>
       </div>
 
-      {ts.rejectionReason && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 px-4 py-3">
-          <p className="text-sm text-red-600 dark:text-red-400">Rejected: {ts.rejectionReason}</p>
+      {ts.status === "rejected" && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 px-4 py-3 space-y-0.5">
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+            {ts.rejectionReason ? `Sent back: ${ts.rejectionReason}` : "Sent back for changes"}
+          </p>
+          <p className="text-xs text-muted-foreground">Fix the entries below, then resubmit.</p>
         </div>
       )}
 
@@ -253,7 +247,7 @@ export default function TimesheetDetailPage() {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Time Entries ({ts.entries?.length || 0})</h3>
 
-        {ts.status === "draft" && (
+        {editable && (
           <motion.div {...anim(0)} className="rounded-lg border p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="space-y-1">
@@ -303,7 +297,7 @@ export default function TimesheetDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-mono tabular-nums">{entry.hours}h</span>
-                  {ts.status === "draft" && (
+                  {editable && (
                     <Button size="icon" variant="ghost" className="size-7" onClick={() => handleDeleteEntry(entry.id)}>
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>

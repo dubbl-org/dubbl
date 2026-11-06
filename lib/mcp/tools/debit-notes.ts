@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { debitNote, debitNoteLine, bill } from "@/lib/db/schema";
+import { debitNote, debitNoteLine } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
@@ -10,6 +10,8 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { applyDebitNote, voidDebitNote } from "@/lib/api/debit-notes";
 
 /**
  * MCP tools for supplier debit notes (AP credit notes). A debit note records a
@@ -157,6 +159,7 @@ export function registerDebitNoteTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:debit-notes");
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
         await assertNotLocked(ctx.organizationId, params.issueDate);
 
         const debitNoteNumber = await getNextNumber(
@@ -232,7 +235,7 @@ export function registerDebitNoteTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "apply_debit_note",
-    "Apply a supplier debit note's credit against a bill, reducing what you owe. amount is in integer cents and must not exceed the debit note's remaining balance or the bill's outstanding amount due. The debit note must be 'sent' or 'applied' (not draft). The bill must belong to the same supplier and currency, and not be draft/void. Increments the debit note's amountApplied (marking it 'applied' when fully used), and updates the bill's amountPaid/amountDue and status ('paid' or 'partial'). Returns the updated debit note and bill.",
+    "Apply a supplier debit note's credit against a bill, reducing what you owe. amount is in integer cents and must not exceed the debit note's remaining balance or the bill's outstanding amount due. The debit note must be 'sent' or 'applied' (not draft). The bill must belong to the same supplier and currency and be in the books and open (status received, partial or overdue). No journal entry is posted (Accounts Payable was relieved when the debit note was sent); it records a zero-cash carrier payment with a debit_note and a bill allocation, increments the debit note's amountApplied (marking it 'applied' when fully used), and updates the bill's amountPaid/amountDue and status ('paid' or 'partial'). Returns the updated debit note and bill.",
     {
       debitNoteId: z.string().describe("The UUID of the debit note to apply"),
       billId: z.string().describe("The UUID of the bill to apply the credit to"),
@@ -245,121 +248,27 @@ export function registerDebitNoteTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:debit-notes");
-
-        const found = await db.query.debitNote.findFirst({
-          where: and(
-            eq(debitNote.id, params.debitNoteId),
-            eq(debitNote.organizationId, ctx.organizationId),
-            notDeleted(debitNote.deletedAt)
-          ),
-        });
-        if (!found) throw new Error("Debit note not found");
-        if (found.status !== "sent" && found.status !== "applied") {
-          throw new Error("Debit note must be sent before it can be applied");
-        }
-        if (params.amount > found.amountRemaining) {
-          throw new Error("Amount exceeds remaining debit note balance");
-        }
-
-        const foundBill = await db.query.bill.findFirst({
-          where: and(
-            eq(bill.id, params.billId),
-            eq(bill.organizationId, ctx.organizationId),
-            notDeleted(bill.deletedAt)
-          ),
-        });
-        if (!foundBill) throw new Error("Bill not found");
-        if (foundBill.status === "draft" || foundBill.status === "void") {
-          throw new Error("Cannot apply a credit to this bill status");
-        }
-        // The debit note belongs to one supplier — applying it to another
-        // supplier's bill would corrupt both suppliers' balances.
-        if (foundBill.contactId !== found.contactId) {
-          throw new Error(
-            "This supplier credit belongs to a different supplier than the bill."
-          );
-        }
-        // Amounts offset 1:1, so a currency mismatch would reduce the bill by
-        // the wrong figure and break the tie between AP and the GL.
-        if (foundBill.currencyCode !== found.currencyCode) {
-          throw new Error("The supplier credit and bill are in different currencies.");
-        }
-        if (params.amount > foundBill.amountDue) {
-          throw new Error("Amount exceeds the bill's outstanding balance");
-        }
-
-        const newAmountApplied = found.amountApplied + params.amount;
-        const newAmountRemaining = found.amountRemaining - params.amount;
-        const dnStatus = newAmountRemaining <= 0 ? "applied" : "sent";
-
-        // Settle against the bill's outstanding balance (amountDue), and do
-        // both updates atomically so they can't drift apart on a failure.
-        const newBillAmountPaid = foundBill.amountPaid + params.amount;
-        const newBillAmountDue = foundBill.amountDue - params.amount;
-        const billStatus = newBillAmountDue <= 0 ? "paid" : "partial";
-
-        const { updatedDebitNote, updatedBill } = await db.transaction(async (tx) => {
-          const [updatedDebitNote] = await tx
-            .update(debitNote)
-            .set({
-              amountApplied: newAmountApplied,
-              amountRemaining: Math.max(0, newAmountRemaining),
-              status: dnStatus as (typeof debitNote.status.enumValues)[number],
-              updatedAt: new Date(),
-            })
-            .where(eq(debitNote.id, params.debitNoteId))
-            .returning();
-
-          const [updatedBill] = await tx
-            .update(bill)
-            .set({
-              amountPaid: newBillAmountPaid,
-              amountDue: Math.max(0, newBillAmountDue),
-              status: billStatus as (typeof bill.status.enumValues)[number],
-              paidAt: billStatus === "paid" ? new Date() : null,
-              updatedAt: new Date(),
-            })
-            .where(eq(bill.id, params.billId))
-            .returning();
-
-          return { updatedDebitNote, updatedBill };
-        });
-
-        return { debitNote: updatedDebitNote, bill: updatedBill };
+        const result = await applyDebitNote(
+          ctx,
+          params.debitNoteId,
+          params.billId,
+          params.amount
+        );
+        return { debitNote: result.debitNote, bill: result.bill };
       })
   );
 
   server.tool(
     "void_debit_note",
-    "Void a supplier debit note. Marks its status 'void' and stamps voidedAt. Fails if it is already voided. Returns the updated debit note.",
+    "Void (cancel) a supplier debit note and undo its effects. Fails if it is already voided. If it was sent (posted to the GL), posts a reversing journal entry (CR Accounts Payable / DR the line accounts / DR input tax) dated the debit note's issue date, and requires that period to be open. Every amount it applied to bills is given back: each bill's amountPaid/amountDue/status is restored and the carrier payment(s) recording the applications are removed. The debit note ends with status 'void', amountApplied 0 and amountRemaining 0. Returns the updated debit note.",
     {
       debitNoteId: z.string().describe("The UUID of the debit note to void"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:debit-notes");
-
-        const found = await db.query.debitNote.findFirst({
-          where: and(
-            eq(debitNote.id, params.debitNoteId),
-            eq(debitNote.organizationId, ctx.organizationId),
-            notDeleted(debitNote.deletedAt)
-          ),
-        });
-        if (!found) throw new Error("Debit note not found");
-        if (found.status === "void") throw new Error("Already voided");
-
-        const [updated] = await db
-          .update(debitNote)
-          .set({
-            status: "void",
-            voidedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(debitNote.id, params.debitNoteId))
-          .returning();
-
-        return { debitNote: updated };
+        const result = await voidDebitNote(ctx, params.debitNoteId);
+        return { debitNote: result.debitNote };
       })
   );
 }

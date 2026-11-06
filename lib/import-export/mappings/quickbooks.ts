@@ -31,6 +31,10 @@ export const quickbooksInvoices: ColumnAlias[] = [
   { targetField: "lineUnitPrice", aliases: ["Rate", "Unit Price", "Price", "ItemRate"] },
   { targetField: "lineAmount", aliases: ["Amount", "Line Total", "Total", "Line Amount", "ItemAmount"] },
   { targetField: "lineAccountCode", aliases: ["Account", "Income Account"] },
+  { targetField: "contactEmail", aliases: ["Email", "Customer Email", "BillEmail"] },
+  { targetField: "reference", aliases: ["P.O. Number", "PO Number", "Reference"] },
+  { targetField: "currencyCode", aliases: ["Currency", "Currency Code"] },
+  { targetField: "lineTaxRate", aliases: ["Tax Rate", "Sales Tax Code", "Tax Code", "ItemTaxCode"] },
 ];
 
 export const quickbooksBills: ColumnAlias[] = [

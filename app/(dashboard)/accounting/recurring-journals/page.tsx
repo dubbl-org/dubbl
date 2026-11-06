@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Pause, Play, ArrowUpRight, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { DateCell, DueCell, MutedCell, StatusPill, daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerHelpers, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApi } from "@/lib/query/use-api";
 
 interface JournalLine {
   id: string;
@@ -75,19 +76,11 @@ const sortedLines = (t: RecurringJournal) => [...(t.lines ?? [])].sort((a, b) =>
 
 /** Chart account names, so templates can be searched and filtered by account. */
 function useAccountNames() {
-  const [names, setNames] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        const list = (json?.accounts ?? []) as { id: string; code: string; name: string }[];
-        setNames(Object.fromEntries(list.map((a) => [a.id, a.code ? `${a.code} · ${a.name}` : a.name])));
-      })
-      .catch(() => {});
-  }, []);
-  return names;
+  const { data } = useApi<{ accounts?: { id: string; code: string; name: string }[] }>("/api/v1/accounts");
+  return useMemo<Record<string, string>>(() => {
+    const list = data?.accounts ?? [];
+    return Object.fromEntries(list.map((a) => [a.id, a.code ? `${a.code} · ${a.name}` : a.name]));
+  }, [data]);
 }
 
 async function toggle(list: RecurringJournal[], to: "paused" | "active", helpers: ExplorerHelpers) {
@@ -112,7 +105,6 @@ export default function RecurringJournalsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const accounts = useAccountNames();
-  const [version, setVersion] = useState(0);
   const [running, setRunning] = useState(false);
 
   useDocumentTitle("Accounting · Recurring Journals");
@@ -126,7 +118,6 @@ export default function RecurringJournalsPage() {
           const data = await postJson<{ posted?: number }>("/api/v1/recurring-journals/run");
           const posted = data.posted ?? 0;
           toast.success(posted > 0 ? `Posted ${posted} entr${posted === 1 ? "y" : "ies"} that were due` : "Nothing was due to post right now");
-          if (posted > 0) setVersion((v) => v + 1);
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Couldn't post the entries");
         } finally {
@@ -348,7 +339,7 @@ export default function RecurringJournalsPage() {
     };
   }, [accounts, openDrawer, router]);
 
-  return <Explorer key={version} config={config} />;
+  return <Explorer config={config} />;
 }
 
 function RecurringEmpty({ onCreate }: { onCreate: () => void }) {

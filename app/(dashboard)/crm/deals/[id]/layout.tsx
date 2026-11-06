@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,19 +10,29 @@ import {
   Settings2,
   Trophy,
   XCircle,
-  Check,
   User,
-  DollarSign,
   Target,
   Briefcase,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { WON_STAGE, LOST_STAGE } from "@/lib/crm/rules";
 import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney } from "@/lib/money";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -45,13 +55,19 @@ export interface DealDetail {
   createdAt: string;
   contact: { id: string; name: string; email: string | null } | null;
   assignedUser: { id: string; name: string | null } | null;
+  pipelineId: string;
+  assignedTo: string | null;
+  contactId: string | null;
   pipeline: { name: string; stages: { id: string; name: string; color: string }[] } | null;
+  // Newest first.
   activities: {
     id: string;
     type: string;
     content: string | null;
     createdAt: string;
-    user: { name: string | null } | null;
+    scheduledAt: string | null;
+    completedAt: string | null;
+    user: { name: string | null; email?: string } | null;
   }[];
 }
 
@@ -66,6 +82,22 @@ export const SOURCE_LABELS: Record<string, string> = {
 export function getHeaders() {
   const orgId = localStorage.getItem("activeOrgId") || "";
   return { "x-organization-id": orgId, "Content-Type": "application/json" };
+}
+
+/** Call a CRM API route; throws the API's own error message when it fails. */
+export async function crmFetch<T = Record<string, unknown>>(url: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const res = await fetch(url, {
+    method: init.method ?? "GET",
+    headers: getHeaders(),
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error || "Request failed");
+  return data as T;
+}
+
+export function errorText(err: unknown, fallback: string) {
+  return err instanceof Error && err.message ? err.message : fallback;
 }
 
 export function timeAgo(dateStr: string) {
@@ -106,11 +138,15 @@ export interface DealContextValue {
   changeStage: (stageId: string) => Promise<void>;
   markWon: () => Promise<void>;
   markLost: () => Promise<void>;
+  reopen: () => Promise<void>;
   addActivity: () => Promise<void>;
   activityType: string;
   setActivityType: (v: string) => void;
   activityContent: string;
   setActivityContent: (v: string) => void;
+  /** Local date-time ("YYYY-MM-DDTHH:mm") the activity is planned for, or "" for something already done. */
+  activityScheduledAt: string;
+  setActivityScheduledAt: (v: string) => void;
   submitting: boolean;
   saving: boolean;
   setSaving: (v: boolean) => void;
@@ -134,84 +170,113 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const [deal, setDeal] = useState<DealDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const dealUrl = `/api/v1/crm/deals/${id}`;
+  const { data, loading, refetch } = useApi<{ deal?: DealDetail }>(dealUrl);
+  const deal = data?.deal ?? null;
+  const cache = useApiCache();
   const [stageChanging, setStageChanging] = useState(false);
   const [activityType, setActivityType] = useState("note");
   const [activityContent, setActivityContent] = useState("");
+  const [activityScheduledAt, setActivityScheduledAt] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // "Mark lost" asks why (optional); the reason shows up in CRM analytics.
+  const [lostOpen, setLostOpen] = useState(false);
+  const [lostReason, setLostReason] = useState("");
+  const [lostSaving, setLostSaving] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEntityTitle(deal?.title ?? undefined);
 
+  // Waits for the fresh deal (the cache refreshes on its own after any change)
   const fetchDeal = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/v1/crm/deals/${id}`, { headers: getHeaders() });
-      const data = await res.json();
-      if (data.deal) setDeal(data.deal);
-    } catch {
-      toast.error("Failed to load deal");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => {
-    fetchDeal();
-  }, [fetchDeal]);
+  // Edit the cached deal in place
+  const setDeal = useCallback<React.Dispatch<React.SetStateAction<DealDetail | null>>>(
+    (action) =>
+      cache.update<{ deal?: DealDetail }>(dealUrl, (d) => {
+        const next = typeof action === "function" ? action(d.deal ?? null) : action;
+        return { ...d, deal: next ?? undefined };
+      }),
+    [cache, dealUrl]
+  );
 
+  // Moving to the Won or Lost stage closes the deal; Lost asks for a reason first.
   async function changeStage(stageId: string) {
+    if (stageId === LOST_STAGE) {
+      await markLost();
+      return;
+    }
     setStageChanging(true);
     try {
-      await fetch(`/api/v1/crm/deals/${id}/stage`, {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify({ stageId }),
-      });
+      await crmFetch(`/api/v1/crm/deals/${id}/stage`, { method: "PATCH", body: { stageId } });
       await fetchDeal();
-      toast.success("Stage updated");
-    } catch {
-      toast.error("Failed to update stage");
+      toast.success(stageId === WON_STAGE ? "Deal marked as won" : "Stage updated");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to update stage"));
     } finally {
       setStageChanging(false);
     }
   }
 
   async function markWon() {
-    await fetch(`/api/v1/crm/deals/${id}/won`, { method: "POST", headers: getHeaders() });
-    await fetchDeal();
-    toast.success("Deal marked as won");
+    setStageChanging(true);
+    try {
+      await crmFetch(`/api/v1/crm/deals/${id}/won`, { method: "POST" });
+      await fetchDeal();
+      toast.success("Deal marked as won");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to mark the deal as won"));
+    } finally {
+      setStageChanging(false);
+    }
   }
 
   async function markLost() {
-    await confirm({
-      title: "Mark deal as lost?",
-      description: "This deal will be moved to the closed lost stage.",
-      confirmLabel: "Mark Lost",
-      destructive: true,
-      onConfirm: async () => {
-        await fetch(`/api/v1/crm/deals/${id}/lost`, {
-          method: "POST",
-          headers: getHeaders(),
-          body: JSON.stringify({ reason: null }),
-        });
-        await fetchDeal();
-        toast.success("Deal marked as lost");
-      },
-    });
+    setLostReason("");
+    setLostOpen(true);
+  }
+
+  async function submitLost() {
+    setLostSaving(true);
+    try {
+      await crmFetch(`/api/v1/crm/deals/${id}/lost`, { method: "POST", body: { reason: lostReason.trim() || null } });
+      await fetchDeal();
+      setLostOpen(false);
+      toast.success("Deal marked as lost");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to mark the deal as lost"));
+    } finally {
+      setLostSaving(false);
+    }
+  }
+
+  // Back to the first open stage of its pipeline.
+  async function reopen() {
+    const first = (deal?.pipeline?.stages ?? []).find((s) => s.id !== WON_STAGE && s.id !== LOST_STAGE);
+    if (!first) return;
+    await changeStage(first.id);
   }
 
   async function addActivity() {
     if (!activityContent.trim()) return;
     setSubmitting(true);
     try {
-      await fetch(`/api/v1/crm/deals/${id}/activities`, {
+      await crmFetch(`/api/v1/crm/deals/${id}/activities`, {
         method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ type: activityType, content: activityContent }),
+        body: {
+          type: activityType,
+          content: activityContent,
+          // datetime-local is local time; send it as an ISO instant.
+          scheduledAt: activityScheduledAt ? new Date(activityScheduledAt).toISOString() : null,
+        },
       });
       setActivityContent("");
-      toast.success("Activity added");
+      setActivityScheduledAt("");
+      toast.success(activityScheduledAt ? "Activity scheduled" : "Activity added");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to add activity"));
     } finally {
       setSubmitting(false);
     }
@@ -252,11 +317,14 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
         changeStage,
         markWon,
         markLost,
+        reopen,
         addActivity,
         activityType,
         setActivityType,
         activityContent,
         setActivityContent,
+        activityScheduledAt,
+        setActivityScheduledAt,
         submitting,
         saving,
         setSaving,
@@ -313,13 +381,19 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
             </div>
           </div>
 
-          {!isClosed && (
+          {!isClosed ? (
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={markLost}>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={markLost} disabled={stageChanging}>
                 <XCircle className="size-3" /> Mark Lost
               </Button>
-              <Button size="sm" className="h-8 text-xs gap-1.5 bg-brand-600 hover:bg-brand-700" onClick={markWon}>
+              <Button size="sm" className="h-8 text-xs gap-1.5 bg-brand-600 hover:bg-brand-700" onClick={markWon} disabled={stageChanging}>
                 <Trophy className="size-3" /> Mark Won
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={reopen} disabled={stageChanging}>
+                <RotateCcw className="size-3" /> Reopen
               </Button>
             </div>
           )}
@@ -420,6 +494,28 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
         </ContentReveal>
 
         {confirmDialog}
+
+        <Dialog open={lostOpen} onOpenChange={(v) => { if (!lostSaving) setLostOpen(v); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base">Mark &ldquo;{deal.title}&rdquo; as lost?</DialogTitle>
+              <DialogDescription>
+                Saying why is optional, but it shows up in your analytics so you can spot patterns.
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              autoFocus
+              value={lostReason}
+              onChange={(e) => setLostReason(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submitLost(); }}
+              placeholder="e.g. Went with a cheaper supplier"
+            />
+            <DialogFooter className="gap-3">
+              <Button variant="outline" disabled={lostSaving} onClick={() => setLostOpen(false)}>Keep it open</Button>
+              <Button variant="destructive" loading={lostSaving} onClick={submitLost}>Mark lost</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DealContext.Provider>
   );

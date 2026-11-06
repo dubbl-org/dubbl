@@ -149,6 +149,13 @@ function flattenOperating(cf: CashFlowStatement) {
     accountCode: "",
     amount: op.workingCapitalChanges.inventory,
   });
+  if (op.workingCapitalChanges.other !== 0) {
+    lines.push({
+      accountName: "Change in other current items",
+      accountCode: "",
+      amount: op.workingCapitalChanges.other,
+    });
+  }
   return lines;
 }
 

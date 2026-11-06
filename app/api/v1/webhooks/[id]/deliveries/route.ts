@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { webhook, webhookDelivery } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
@@ -14,6 +15,7 @@ export async function GET(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:webhooks");
     const url = new URL(request.url);
     const { page, limit, offset } = parsePagination(url);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRightLeft, Banknote, FileText, Landmark } from "lucide-react";
@@ -10,6 +10,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
 import { ActionButton } from "@/components/dashboard/explorer/action-button";
@@ -230,36 +231,9 @@ export default function PaymentsPage() {
 
 /** Where the money landed and which invoices it paid, resolved from the payment and invoice APIs. */
 function PaymentDetails({ payment }: { payment: Payment }) {
-  const [state, setState] = useState<{ id: string; bank: string | null; numbers: Record<string, string> } | null>(null);
-  const loading = state?.id !== payment.id;
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const headers = { "x-organization-id": orgId };
-    const get = (url: string) => fetch(url, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const allocations = payment.allocations ?? [];
-    Promise.all([
-      get(`/api/v1/payments/${payment.id}`),
-      ...allocations.map((a) =>
-        a.documentType === "invoice"
-          ? get(`/api/v1/invoices/${a.documentId}`).then((j) => [a.documentId, j?.invoice?.invoiceNumber as string | undefined] as const)
-          : a.documentType === "credit_note"
-            ? get(`/api/v1/credit-notes/${a.documentId}`).then((j) => [a.documentId, j?.creditNote?.creditNoteNumber as string | undefined] as const)
-            : Promise.resolve([a.documentId, undefined] as const)
-      ),
-    ]).then(([detail, ...pairs]) => {
-      if (cancelled) return;
-      const bank = (detail as { payment?: { bankAccount?: { accountName: string; bankName: string | null } | null } } | null)?.payment?.bankAccount;
-      const numbers: Record<string, string> = {};
-      for (const pair of pairs as (readonly [string, string | undefined])[]) if (pair[1]) numbers[pair[0]] = pair[1];
-      setState({ id: payment.id, bank: bank ? [bank.accountName, bank.bankName].filter(Boolean).join(" · ") : null, numbers });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [payment.id, payment.allocations]);
+  const { data: detail, loading } = useApi<{ payment?: { bankAccount?: { accountName: string; bankName: string | null } | null } }>(`/api/v1/payments/${payment.id}`);
+  const bankAccount = detail?.payment?.bankAccount;
+  const bank = bankAccount ? [bankAccount.accountName, bankAccount.bankName].filter(Boolean).join(" · ") : null;
 
   const money = (c: number) => formatMoney(c, payment.currencyCode);
   const allocations = payment.allocations ?? [];
@@ -273,38 +247,16 @@ function PaymentDetails({ payment }: { payment: Payment }) {
           <span className="flex size-7 items-center justify-center rounded-lg bg-foreground/[0.05] text-foreground/70">
             <Landmark className="size-3.5" />
           </span>
-          {loading ? <Skeleton className="h-4 w-40" /> : <span className="min-w-0 flex-1 truncate font-medium">{state?.bank ?? "No bank account chosen"}</span>}
+          {loading ? <Skeleton className="h-4 w-40" /> : <span className="min-w-0 flex-1 truncate font-medium">{bank ?? "No bank account chosen"}</span>}
         </div>
       </div>
 
       <div className="mt-6">
         <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">What it paid</p>
         <div className="divide-y divide-border/60 rounded-xl border border-border/80">
-          {allocations.map((a) => {
-            const isInvoice = a.documentType === "invoice";
-            const href = isInvoice ? `/sales/${a.documentId}` : a.documentType === "credit_note" ? `/sales/credit-notes/${a.documentId}` : null;
-            const label = state?.numbers[a.documentId] ?? (isInvoice ? "Invoice" : a.documentType === "credit_note" ? "Credit note" : a.documentType);
-            const row = (
-              <>
-                <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                  <FileText className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  {loading ? <Skeleton className="h-4 w-24" /> : <span className="block truncate font-mono text-[12.5px] font-medium">{label}</span>}
-                </span>
-                <span className="font-medium tabular-nums">{money(a.amount)}</span>
-              </>
-            );
-            return href ? (
-              <Link key={a.id} href={href} className="flex items-center gap-3 px-3 py-2.5 text-[13px] transition-colors hover:bg-foreground/[0.025]">
-                {row}
-              </Link>
-            ) : (
-              <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
-                {row}
-              </div>
-            );
-          })}
+          {allocations.map((a) => (
+            <AllocationRow key={a.id} allocation={a} money={money} />
+          ))}
           {rest > 0 && (
             <div className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
               <span className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
@@ -324,6 +276,38 @@ function PaymentDetails({ payment }: { payment: Payment }) {
         </div>
       )}
     </>
+  );
+}
+
+/** One invoice or credit note a payment went toward, with its number resolved from the document API. */
+function AllocationRow({ allocation: a, money }: { allocation: Allocation; money: (c: number) => string }) {
+  const isInvoice = a.documentType === "invoice";
+  const isCreditNote = a.documentType === "credit_note";
+  const { data, loading } = useApi<{ invoice?: { invoiceNumber?: string }; creditNote?: { creditNoteNumber?: string } }>(
+    isInvoice ? `/api/v1/invoices/${a.documentId}` : isCreditNote ? `/api/v1/credit-notes/${a.documentId}` : null
+  );
+  const number = isInvoice ? data?.invoice?.invoiceNumber : isCreditNote ? data?.creditNote?.creditNoteNumber : undefined;
+  const href = isInvoice ? `/sales/${a.documentId}` : isCreditNote ? `/sales/credit-notes/${a.documentId}` : null;
+  const label = number || (isInvoice ? "Invoice" : isCreditNote ? "Credit note" : a.documentType);
+  const row = (
+    <>
+      <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+        <FileText className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        {loading ? <Skeleton className="h-4 w-24" /> : <span className="block truncate font-mono text-[12.5px] font-medium">{label}</span>}
+      </span>
+      <span className="font-medium tabular-nums">{money(a.amount)}</span>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="flex items-center gap-3 px-3 py-2.5 text-[13px] transition-colors hover:bg-foreground/[0.025]">
+      {row}
+    </Link>
+  ) : (
+    <div className="flex items-center gap-3 px-3 py-2.5 text-[13px]">
+      {row}
+    </div>
   );
 }
 

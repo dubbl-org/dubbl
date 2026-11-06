@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { decimalToCents } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 import { useContactContext, getOrgId } from "../layout";
 import type { Account, TaxRate, ContactDetail } from "../layout";
 
@@ -24,7 +24,6 @@ export default function ContactBookkeepingPage() {
     contact,
     setContact,
     formType,
-    setFormType,
     formRevenueAccountId,
     setFormRevenueAccountId,
     formExpenseAccountId,
@@ -38,35 +37,10 @@ export default function ContactBookkeepingPage() {
     setSaving,
   } = useContactContext();
 
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-
-  const fetchReferenceData = useCallback(() => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    fetch("/api/v1/accounts", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.accounts) setAccounts(data.accounts);
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/tax-rates", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.taxRates) setTaxRates(data.taxRates);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetchReferenceData();
-  }, [fetchReferenceData]);
+  const { data: accountsData } = useApi<{ accounts?: Account[] }>("/api/v1/accounts");
+  const { data: taxRatesData } = useApi<{ taxRates?: TaxRate[] }>("/api/v1/tax-rates");
+  const accounts = accountsData?.accounts ?? [];
+  const taxRates = taxRatesData?.taxRates ?? [];
 
   const revenueAccounts = accounts.filter((a) => a.type === "revenue");
   const expenseAccounts = accounts.filter((a) => a.type === "expense");
@@ -107,10 +81,6 @@ export default function ContactBookkeepingPage() {
       const data = await res.json();
       const c = data.contact as ContactDetail;
       setContact(c);
-      setFormType(c.type);
-      setFormRevenueAccountId(c.defaultRevenueAccountId || "none");
-      setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
-      setFormTaxRateId(c.defaultTaxRateId || "none");
       toast.success("Contact updated");
     } catch {
       toast.error("Failed to update contact");

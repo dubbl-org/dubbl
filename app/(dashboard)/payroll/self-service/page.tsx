@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { User, Send, Save } from "lucide-react";
+import { User, Send, Save, Download } from "lucide-react";
 import { Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
+import { ApiError } from "@/lib/query/api";
+import { downloadFile } from "@/components/dashboard/download-link";
 
 interface Profile {
   id: string;
@@ -58,47 +61,39 @@ const anim = (delay: number) => ({
 });
 
 export default function SelfServicePage() {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [payslips, setPayslips] = useState<Payslip[]>([]);
-  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The profile decides everything else: when the login isn't linked to an
+  // employee there is nothing more to load.
+  const { data: profileData, loading: profileLoading, error: profileError, refetch: refetchProfile } = useApi<{ employee?: Profile }>("/api/v1/payroll/self-service/profile");
+  const profile = profileData?.employee ?? null;
+  const { data: payslipData, loading: payslipsLoading, error: payslipsError } = useApi<{ data?: Payslip[] }>(profile && "/api/v1/payroll/self-service/payslips");
+  const { data: leaveData, loading: leaveLoading, error: leaveError } = useApi<{ data?: LeaveBalance[] }>(profile && "/api/v1/payroll/self-service/leave-balance");
+  const { data: tsData, loading: tsLoading, error: tsError } = useApi<{ data?: Timesheet[] }>(profile && "/api/v1/payroll/self-service/timesheets");
+  const payslips = payslipData?.data ?? [];
+  const leaveBalances = leaveData?.data ?? [];
+  const timesheets = tsData?.data ?? [];
+  // Paid time off = vacation + personal balances, freshly recalculated by the leave-balance route
+  // (the profile's stored figure can lag until balances are next synced).
+  const ptoBalance = leaveBalances.length > 0
+    ? Math.round(leaveBalances.filter((lb) => lb.policy?.leaveType === "vacation" || lb.policy?.leaveType === "personal").reduce((s, lb) => s + lb.balance, 0) * 100) / 100
+    : profile?.ptoBalanceHours ?? 0;
+  const loading = profileLoading || payslipsLoading || leaveLoading || tsLoading;
   const [saving, setSaving] = useState(false);
+
+  // A route answering with an error just means there's nothing to show; only a failed request is worth a toast.
+  const loadFailed = [profileError, payslipsError, leaveError, tsError].some((e) => e && !(e instanceof ApiError));
+  useEffect(() => {
+    if (loadFailed) toast.error("Couldn't load your details");
+  }, [loadFailed]);
 
   const [leaveForm, setLeaveForm] = useState({ policyId: "", startDate: "", endDate: "", hours: "", reason: "" });
   const [requesting, setRequesting] = useState(false);
-  const [email, setEmail] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
+  const [emailDraft, setEmail] = useState<string | null>(null);
+  const [bankAccountDraft, setBankAccount] = useState<string | null>(null);
+  const email = emailDraft ?? (profile?.email || "");
+  const bankAccount = bankAccountDraft ?? (profile?.bankAccountNumber || "");
   useDocumentTitle("Payroll · Self Service");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    // The profile decides everything else: when the login isn't linked to an
-    // employee there is nothing more to load.
-    fetch("/api/v1/payroll/self-service/profile", { headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then(async (profileData) => {
-        if (!profileData?.employee) return;
-        const emp = profileData.employee;
-        setProfile(emp);
-        setEmail(emp.email || "");
-        setBankAccount(emp.bankAccountNumber || "");
-        const [payslipData, leaveData, tsData] = await Promise.all([
-          fetch("/api/v1/payroll/self-service/payslips", { headers }).then((r) => r.json()),
-          fetch("/api/v1/payroll/self-service/leave-balance", { headers }).then((r) => r.json()),
-          fetch("/api/v1/payroll/self-service/timesheets", { headers }).then((r) => r.json()),
-        ]);
-        if (payslipData.data) setPayslips(payslipData.data);
-        if (leaveData.data) setLeaveBalances(leaveData.data);
-        if (tsData.data) setTimesheets(tsData.data);
-      })
-      .catch(() => toast.error("Couldn't load your details"))
-      .finally(() => setLoading(false));
-  }, [orgId]);
 
   async function handleSaveProfile() {
     if (!orgId) return;
@@ -112,7 +107,12 @@ export default function SelfServicePage() {
           bankAccountNumber: bankAccount || undefined,
         }),
       });
-      if (res.ok) toast.success("Profile updated");
+      if (res.ok) {
+        toast.success("Profile updated");
+        await refetchProfile();
+        setEmail(null);
+        setBankAccount(null);
+      }
     } finally {
       setSaving(false);
     }
@@ -187,7 +187,7 @@ export default function SelfServicePage() {
         </motion.div>
         <motion.div {...anim(0.1)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">PTO Balance</p>
-          <p className="mt-1 text-lg font-bold font-mono tabular-nums">{profile.ptoBalanceHours}h</p>
+          <p className="mt-1 text-lg font-bold font-mono tabular-nums">{ptoBalance}h</p>
         </motion.div>
         <motion.div {...anim(0.15)} className="rounded-xl border bg-card p-4">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Payslips</p>
@@ -229,9 +229,24 @@ export default function SelfServicePage() {
                     <p className="text-sm">{ps.payrollRun?.payPeriodStart} to {ps.payrollRun?.payPeriodEnd}</p>
                     <p className="text-xs text-muted-foreground">{new Date(ps.generatedAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(ps.grossAmount)}</p>
-                    <p className="text-xs text-muted-foreground font-mono">Net: {formatMoney(ps.netAmount)}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-mono tabular-nums">{formatMoney(ps.grossAmount)}</p>
+                      <p className="text-xs text-muted-foreground font-mono">Net: {formatMoney(ps.netAmount)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="size-7 p-0"
+                      aria-label="Download payslip PDF"
+                      onClick={() =>
+                        downloadFile(`/api/v1/payroll/payslips/${ps.id}/pdf?format=pdf`, "payslip.pdf").catch((err) =>
+                          toast.error(err instanceof Error ? err.message : "Couldn't download the payslip")
+                        )
+                      }
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -244,14 +259,14 @@ export default function SelfServicePage() {
         {/* Leave Balances */}
         <Section title="Leave Balances" description="Your current PTO and leave balances.">
           {leaveBalances.length === 0 ? (
-            <p className="py-4 text-center text-[13px] text-muted-foreground">No leave policies assigned to you yet. Once payroll assigns one, you can request time off here.</p>
+            <p className="py-4 text-center text-[13px] text-muted-foreground">No leave policies are set up yet. Once payroll adds one in Payroll settings, you can request time off here.</p>
           ) : (
             <div className="rounded-lg border divide-y">
               {leaveBalances.map((lb) => (
                 <div key={lb.id} className="flex items-center justify-between px-4 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{lb.policy?.name || "-"}</p>
-                    <p className="text-xs text-muted-foreground">{lb.policy?.leaveType}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{lb.policy?.leaveType}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-mono tabular-nums">{lb.balance}h available</p>

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { formatDay } from "@/components/dashboard/explorer/cells";
+import { useApi } from "@/lib/query/use-api";
 
 interface Activity {
   id: string;
@@ -26,25 +26,8 @@ const ACTIVITY: Record<Activity["type"], { label: string; href: (id: string) => 
 
 /** The latest invoices, bills, quotes and payments with a contact. */
 export function RecentActivity({ contactId, limit = 8, title = "Recent activity" }: { contactId: string; limit?: number; title?: string }) {
-  const [state, setState] = useState<{ id: string; items: Activity[] } | null>(null);
-  const items = state && state.id === contactId ? state.items : null;
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch(`/api/v1/contacts/${contactId}/activity?limit=${limit}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : { activity: [] }))
-      .then((json: { activity?: Activity[] }) => {
-        if (!cancelled) setState({ id: contactId, items: json.activity ?? [] });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ id: contactId, items: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [contactId, limit]);
+  const { data, error } = useApi<{ activity?: Activity[] }>(`/api/v1/contacts/${contactId}/activity?limit=${limit}`);
+  const items = data ? data.activity ?? [] : error ? [] : null;
 
   return (
     <div className="mt-6">

@@ -24,6 +24,7 @@ export async function GET(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:webhooks");
 
     const found = await db.query.webhook.findFirst({
       where: and(

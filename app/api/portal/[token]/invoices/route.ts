@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { portalAccessToken, invoice, portalActivityLog } from "@/lib/db/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, notInArray } from "drizzle-orm";
+import { PORTAL_HIDDEN_INVOICE_STATUSES } from "@/lib/api/portal-access";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, notFound, error, handleError } from "@/lib/api/response";
 
@@ -34,6 +35,8 @@ export async function GET(
       where: and(
         eq(invoice.organizationId, access.organizationId),
         eq(invoice.contactId, access.contactId),
+        // Drafts and invoices awaiting approval are internal; never show them to the customer.
+        notInArray(invoice.status, [...PORTAL_HIDDEN_INVOICE_STATUSES]),
         notDeleted(invoice.deletedAt)
       ),
       orderBy: desc(invoice.createdAt),

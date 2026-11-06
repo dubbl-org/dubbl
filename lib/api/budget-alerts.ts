@@ -1,15 +1,15 @@
 import { db } from "@/lib/db";
 import {
   budget,
-  budgetLine,
-  budgetPeriod,
   journalLine,
   journalEntry,
   member,
   notification,
+  organization,
 } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, inArray, isNull } from "drizzle-orm";
 import { sendNotification } from "@/lib/notifications/send";
+import { formatMoney } from "@/lib/money";
 
 export async function checkBudgetVariances(): Promise<{ checked: number; alerted: number }> {
   const today = new Date().toISOString().slice(0, 10);
@@ -24,6 +24,7 @@ export async function checkBudgetVariances(): Promise<{ checked: number; alerted
       lines: {
         with: {
           periods: true,
+          account: { columns: { code: true, name: true } },
         },
       },
     },
@@ -34,6 +35,11 @@ export async function checkBudgetVariances(): Promise<{ checked: number; alerted
 
   for (const b of activeBudgets) {
     const thresholdPct = b.varianceThresholdPct ?? 100;
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, b.organizationId),
+      columns: { defaultCurrency: true },
+    });
+    const currency = org?.defaultCurrency ?? "USD";
 
     for (const line of b.lines) {
       for (const period of line.periods) {
@@ -66,13 +72,18 @@ export async function checkBudgetVariances(): Promise<{ checked: number; alerted
         const thresholdAmount = Math.round((period.amount * thresholdPct) / 100);
 
         if (actualAmount >= thresholdAmount) {
-          // Deduplicate: check if we already sent a notification for this budget period
+          // Deduplicate: once per budget, period and threshold. Keyed on the
+          // budget and the title (not the period row, which is recreated when
+          // the budget's lines are edited).
+          const accountLabel = line.account ? `${line.account.code} ${line.account.name}` : "an account";
+          const title = `Budget "${b.name}" reached ${thresholdPct}% for ${accountLabel} in ${period.label}`;
           const existingAlert = await db.query.notification.findFirst({
             where: and(
               eq(notification.organizationId, b.organizationId),
               eq(notification.type, "budget_exceeded"),
-              eq(notification.entityType, "budget_period"),
-              eq(notification.entityId, period.id)
+              eq(notification.entityType, "budget"),
+              eq(notification.entityId, b.id),
+              eq(notification.title, title)
             ),
           });
 
@@ -92,10 +103,10 @@ export async function checkBudgetVariances(): Promise<{ checked: number; alerted
                 orgId: b.organizationId,
                 userId: admin.userId,
                 type: "budget_exceeded",
-                title: `Budget "${b.name}" exceeded threshold`,
-                body: `Period ${period.label}: actual $${(actualAmount / 100).toFixed(2)} vs budget $${(period.amount / 100).toFixed(2)} (${thresholdPct}% threshold)`,
-                entityType: "budget_period",
-                entityId: period.id,
+                title,
+                body: `Spent ${formatMoney(actualAmount, currency)} of ${formatMoney(period.amount, currency)} budgeted (alert at ${thresholdPct}%).`,
+                entityType: "budget",
+                entityId: b.id,
               });
               alerted++;
             } catch {

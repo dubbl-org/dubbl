@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { notification, notificationPreference, notificationDigestQueue, users } from "@/lib/db/schema";
+import { notification, notificationPreference, notificationDigestQueue, users, organization } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { render } from "@react-email/render";
 import { createElement } from "react";
@@ -20,8 +20,13 @@ interface SendNotificationParams {
   entityId?: string;
 }
 
+// entity_id is a uuid column; outside ids (e.g. Stripe's "in_...") can't be stored there
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function sendNotification(params: SendNotificationParams) {
-  // 1. Always create in-app notification
+  const entityId = params.entityId && UUID.test(params.entityId) ? params.entityId : null;
+
+  // 1. Always create the notification; the inbox hides types the user muted for in-app
   const [created] = await db
     .insert(notification)
     .values({
@@ -30,8 +35,8 @@ export async function sendNotification(params: SendNotificationParams) {
       type: params.type,
       title: params.title,
       body: params.body || null,
-      entityType: params.entityType || null,
-      entityId: params.entityId || null,
+      entityType: entityId ? params.entityType || null : null,
+      entityId,
       channel: "in_app",
     })
     .returning();
@@ -65,11 +70,15 @@ export async function sendNotification(params: SendNotificationParams) {
       const user = await db.query.users.findFirst({
         where: eq(users.id, params.userId),
       });
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, params.orgId),
+        columns: { name: true },
+      });
 
       if (user?.email) {
         const element = createElement(NotificationDigestEmail, {
           userName: user.name || "there",
-          orgName: "dubbl",
+          orgName: org?.name || "dubbl",
           notifications: [
             {
               type: params.type,

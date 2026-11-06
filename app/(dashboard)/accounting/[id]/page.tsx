@@ -39,6 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { AccountPicker } from "@/components/dashboard/account-picker";
+import { TagPicker } from "@/components/dashboard/tag-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney, decimalToCents } from "@/lib/money";
@@ -48,6 +49,8 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import Link from "next/link";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApprovalPanel, approvalStatusUrl, type ApprovalStatus } from "@/components/dashboard/approval-panel";
 
 interface Line {
   id: string;
@@ -124,33 +127,24 @@ export default function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [entry, setEntry] = useState<Entry | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/entries/${id}`;
+  const { data: entryData, loading } = useApi<{ entry?: Entry }>(url);
+  const cache = useApiCache();
+  const entry = entryData?.entry ?? null;
+  const setEntry = (next: Entry) => cache.update<{ entry?: Entry }>(url, (d) => ({ ...d, entry: next }));
   const [voidReason, setVoidReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  // An approval workflow can hold back finalizing a draft until it's approved.
+  const { data: approval } = useApi<ApprovalStatus>(
+    entry?.status === "draft" ? approvalStatusUrl("journal_entry", id) : null
+  );
+  const approvalBlocked = !!approval?.blocked;
 
   useDocumentTitle("Accounting \u00B7 Entry Details");
   useEntityTitle(entry ? `JE-${entry.entryNumber}` : undefined);
-
-  function loadEntry() {
-    if (!orgId) return;
-    fetch(`/api/v1/entries/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.entry) setEntry(data.entry);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    loadEntry();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, orgId]);
 
   async function postEntry() {
     if (!orgId) return;
@@ -283,6 +277,7 @@ export default function EntryDetailPage() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {entry.description}
               </p>
+              <TagPicker entityType="journal_entry" entityId={entry.id} className="mt-1.5" />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -301,9 +296,13 @@ export default function EntryDetailPage() {
                 <Button
                   size="sm"
                   onClick={postEntry}
-                  disabled={actionLoading}
+                  disabled={actionLoading || approvalBlocked}
                   className="bg-brand-600 hover:bg-brand-700"
-                  title="Locks this entry and adds it to your books"
+                  title={
+                    approvalBlocked
+                      ? "This entry needs approval before it can be finalized"
+                      : "Locks this entry and adds it to your books"
+                  }
                 >
                   <Check className="mr-2 size-4" />
                   Finalize
@@ -359,6 +358,9 @@ export default function EntryDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Approval workflow: submit / approve / reject, and who's next */}
+        {entry.status === "draft" && <ApprovalPanel entityType="journal_entry" entityId={id} />}
 
         {/* Void reason alert */}
         {entry.voidReason && (
@@ -602,7 +604,7 @@ export default function EntryDetailPage() {
             onClose={() => setEditOpen(false)}
             entry={entry}
             orgId={orgId}
-            onSaved={() => { setEditOpen(false); loadEntry(); }}
+            onSaved={() => setEditOpen(false)}
           />
         )}
 

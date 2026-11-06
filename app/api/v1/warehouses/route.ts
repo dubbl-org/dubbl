@@ -8,12 +8,14 @@ import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { createWarehouse } from "@/lib/api/warehouses";
 
 const createSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1),
   address: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -42,13 +44,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const [created] = await db
-      .insert(warehouse)
-      .values({
-        organizationId: ctx.organizationId,
-        ...parsed,
-      })
-      .returning();
+    // Only one default location: making this one the default clears the others.
+    const created = await createWarehouse(ctx.organizationId, parsed);
 
     logAudit({ ctx, action: "create", entityType: "warehouse", entityId: created.id, request });
 

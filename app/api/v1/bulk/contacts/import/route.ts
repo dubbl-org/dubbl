@@ -7,7 +7,9 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { preProcessContacts } from "@/lib/import-export/pre-process";
+import { validateImportRows } from "@/lib/import-export/validate-rows";
 import { z } from "zod";
+import { emitContactCreated } from "@/lib/webhooks/events";
 
 const rowSchema = z.object({
   name: z.string().min(1),
@@ -35,29 +37,31 @@ export async function POST(request: Request) {
     const body = await request.json();
     const rawParsed = importSchema.parse(body);
     const transformedRows = preProcessContacts(rawParsed.rows);
+    // Validate row by row: bad rows are reported, the rest still import.
+    const checked = validateImportRows(transformedRows, rowSchema);
     const parsed = {
       fileName: rawParsed.fileName,
-      rows: transformedRows.map(r => rowSchema.parse(r)),
+      rows: checked.rows,
     };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
       type: "contacts",
       fileName: parsed.fileName,
-      totalRows: parsed.rows.length,
+      totalRows: transformedRows.length,
       status: "processing",
       createdBy: ctx.userId,
     }).returning();
 
     let processedRows = 0;
-    let errorRows = 0;
-    const errorDetails: Array<{ row: number; error: string }> = [];
+    let errorRows = checked.invalid.length;
+    const errorDetails: Array<{ row: number; error: string }> = [...checked.invalid];
 
     for (let i = 0; i < parsed.rows.length; i++) {
       try {
         const row = parsed.rows[i];
         const hasAddress = row.billingLine1 || row.billingCity || row.billingState || row.billingPostalCode || row.billingCountry;
-        await db.insert(contact).values({
+        const [created] = await db.insert(contact).values({
           organizationId: ctx.organizationId,
           name: row.name,
           email: row.email || null,
@@ -73,11 +77,12 @@ export async function POST(request: Request) {
               country: row.billingCountry || undefined,
             },
           } : undefined,
-        });
+        }).returning({ id: contact.id });
+        emitContactCreated(ctx.organizationId, [created.id]);
         processedRows++;
       } catch (err) {
         errorRows++;
-        errorDetails.push({ row: i + 1, error: err instanceof Error ? err.message : "Unknown error" });
+        errorDetails.push({ row: checked.rowNumbers[i], error: err instanceof Error ? err.message : "Unknown error" });
       }
     }
 
@@ -85,7 +90,7 @@ export async function POST(request: Request) {
       processedRows,
       errorRows,
       errorDetails: errorDetails.length > 0 ? errorDetails : null,
-      status: errorRows === parsed.rows.length ? "failed" : "completed",
+      status: processedRows === 0 ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id)).returning();
 

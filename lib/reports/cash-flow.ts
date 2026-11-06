@@ -12,14 +12,13 @@
  *  - INDIRECT (default): start from net income for the period, add back non-cash
  *    expenses (depreciation, identified via `journalEntry.sourceType =
  *    'depreciation'`), then adjust for working-capital movements (AR / AP /
- *    inventory deltas). Investing = fixed-asset deltas; financing = loan
- *    movements (`sourceType = 'loan_payment'`) + equity deltas.
+ *    inventory / other current items). Investing = fixed-asset deltas less
+ *    depreciation; financing = loan balance movements + equity deltas. Accounts
+ *    are classified by {@link classifyCashFlowAccount}.
  *
- *  - DIRECT: classify the *cash* side of every cash-touching entry. We look at
- *    the movement on bank/cash accounts in the period and split it into
- *    operating / investing / financing using the contra (non-cash) account on
- *    the same entry. This is a pragmatic direct variant that reuses the same GL
- *    aggregation.
+ *  - DIRECT: operating cash is the income statement on the cash basis (money
+ *    received from customers less money paid for costs); investing and
+ *    financing are classified as for the indirect method.
  *
  * Cross-check: regardless of method, the computed net change in cash is
  * reconciled against the movement on the cash/bank accounts themselves
@@ -29,7 +28,8 @@
  * All amounts are integer minor units (cents).
  */
 import { db } from "@/lib/db";
-import { journalEntry, journalLine } from "@/lib/db/schema";
+import { chartAccount, journalEntry, journalLine } from "@/lib/db/schema";
+import { matchesCode } from "@/lib/api/account-roles";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import {
   aggregateAsAt,
@@ -42,22 +42,68 @@ import {
 /** Cash-flow presentation method. */
 export type CashFlowMethod = "indirect" | "direct";
 
-/**
- * chartAccount.subType values treated as cash/bank for cash-flow purposes.
- * (The gl-query cash *basis* only treats `bank` as cash; cash-flow additionally
- * recognises an explicit `cash` subType for the on-hand cash account.)
- */
-const CASH_SUBTYPES = ["cash", "bank"] as const;
-const AR_SUBTYPES = ["accounts_receivable"] as const;
-const AP_SUBTYPES = ["accounts_payable", "current_liability"] as const;
-const INVENTORY_SUBTYPES = ["inventory"] as const;
-const FIXED_ASSET_SUBTYPES = ["fixed_asset", "property_plant_equipment"] as const;
+/** What an account is for the cash-flow statement. */
+export type CashFlowClass =
+  | "cash"
+  | "receivables"
+  | "payables"
+  | "inventory"
+  | "fixed"
+  | "loan"
+  | "workingCapital"
+  | "equity"
+  | "profitAndLoss";
 
-function inSubTypes(
-  agg: Pick<AccountAggregate, "subType">,
-  subTypes: readonly string[]
-): boolean {
-  return agg.subType != null && subTypes.includes(agg.subType);
+/**
+ * Classify an account for the cash-flow statement.
+ *
+ * The standard charts mark most balance-sheet accounts with the generic
+ * subTypes `current` / `fixed` / `non_current` / `bank`, so the specific
+ * accounts are recognised by the canonical role codes they play (an
+ * account's own code in a legacy chart, its `roles` in a role-mapped one):
+ *   cash        bank accounts (subType bank/cash), Cash 1000, Petty Cash 1010,
+ *               Undeposited Funds 1250
+ *   receivables Accounts Receivable 1200
+ *   payables    Accounts Payable 2000 / 2100
+ *   inventory   1300 / 1310 / 1320
+ *   fixed       fixed-asset accounts (subType fixed / non_current), including
+ *               accumulated depreciation
+ *   loan        loans and long-term debt: 2500, 2510, 2700, 2800 and any
+ *               non-current liability
+ * Older explicit subTypes (accounts_receivable, inventory, fixed_asset, ...)
+ * still work. Every other asset or liability is working capital.
+ */
+export function classifyCashFlowAccount(a: {
+  type: AccountAggregate["type"];
+  subType: string | null;
+  code: string;
+  roles?: string[] | null;
+}): CashFlowClass {
+  const plays = (...codes: string[]) => codes.some((c) => matchesCode(a, c));
+  const sub = a.subType ?? "";
+  if (a.type === "revenue" || a.type === "expense") return "profitAndLoss";
+  if (a.type === "equity") return "equity";
+  if (a.type === "asset") {
+    if (sub === "bank" || sub === "cash" || plays("1000", "1010", "1250")) return "cash";
+    if (sub === "accounts_receivable" || plays("1200")) return "receivables";
+    if (sub === "inventory" || plays("1300", "1310", "1320")) return "inventory";
+    if (["fixed", "non_current", "fixed_asset", "property_plant_equipment"].includes(sub)) return "fixed";
+    return "workingCapital";
+  }
+  if (sub === "accounts_payable" || plays("2000", "2100")) return "payables";
+  if (["non_current", "long_term", "long_term_liability"].includes(sub) || plays("2500", "2510", "2700", "2800")) {
+    return "loan";
+  }
+  return "workingCapital";
+}
+
+/** Load each account's canonical roles so classification can be role-aware. */
+async function loadAccountRoles(organizationId: string): Promise<Map<string, string[] | null>> {
+  const rows = await db
+    .select({ id: chartAccount.id, roles: chartAccount.roles })
+    .from(chartAccount)
+    .where(eq(chartAccount.organizationId, organizationId));
+  return new Map(rows.map((r) => [r.id, r.roles ?? null]));
 }
 
 /** Return the calendar day immediately before an ISO YYYY-MM-DD date. */
@@ -86,6 +132,11 @@ export interface OperatingActivities {
     accountsPayable: number;
     /** Cash effect of inventory movement (increase = outflow = negative). */
     inventory: number;
+    /**
+     * Cash effect of every other current asset / liability (prepayments, VAT,
+     * accruals, wages payable, credit cards...).
+     */
+    other: number;
   };
   /** Net cash from operating activities. */
   total: number;
@@ -97,7 +148,7 @@ export interface InvestingActivities {
 }
 
 export interface FinancingActivities {
-  /** Cash effect of loan movements (sourceType=loan_payment); outflow negative. */
+  /** Cash effect of loan balance movements (borrowing positive, repayment negative). */
   loanPayments: number;
   /** Cash effect of equity movements (issuance positive, drawings negative). */
   equityChanges: number;
@@ -147,14 +198,12 @@ async function sumBySourceType(
   organizationId: string,
   range: DateRange,
   sourceType: string,
-  column: "debit" | "credit" | "creditMinusDebit"
+  column: "debit" | "credit"
 ): Promise<number> {
   const expr =
     column === "debit"
       ? sql<number>`coalesce(sum(${journalLine.debitAmount}), 0)`
-      : column === "credit"
-        ? sql<number>`coalesce(sum(${journalLine.creditAmount}), 0)`
-        : sql<number>`coalesce(sum(${journalLine.creditAmount}) - sum(${journalLine.debitAmount}), 0)`;
+      : sql<number>`coalesce(sum(${journalLine.creditAmount}), 0)`;
 
   const [row] = await db
     .select({ total: expr })
@@ -173,18 +222,51 @@ async function sumBySourceType(
   return Number(row?.total ?? 0);
 }
 
+/**
+ * Credits posted to each account by depreciation entries in the period. The
+ * accumulated-depreciation side of a depreciation charge is not an investing
+ * cash flow (the charge is added back in operating instead).
+ */
+async function depreciationCreditsByAccount(
+  organizationId: string,
+  range: DateRange
+): Promise<Map<string, number>> {
+  const rows = await db
+    .select({
+      accountId: journalLine.accountId,
+      total: sql<number>`coalesce(sum(${journalLine.creditAmount}) - sum(${journalLine.debitAmount}), 0)`,
+    })
+    .from(journalLine)
+    .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
+    .where(
+      and(
+        eq(journalEntry.organizationId, organizationId),
+        eq(journalEntry.status, "posted"),
+        isNull(journalEntry.deletedAt),
+        eq(journalEntry.sourceType, "depreciation"),
+        gte(journalEntry.date, range.startDate),
+        lte(journalEntry.date, range.endDate)
+      )
+    )
+    .groupBy(journalLine.accountId);
+  return new Map(rows.map((r) => [r.accountId, Number(r.total)]));
+}
+
+type Classifier = (a: AccountAggregate) => CashFlowClass;
+
 /** Cumulative cash/bank balance as at a date (natural debit-positive). */
 async function cashBalanceAsAt(
   organizationId: string,
   asAt: string,
-  basis: ReportBasis
+  basis: ReportBasis,
+  classify: Classifier
 ): Promise<number> {
   const assets = await aggregateAsAt(organizationId, asAt, {
     basis,
     accountTypes: ["asset"],
   });
   return assets
-    .filter((a) => inSubTypes(a, CASH_SUBTYPES))
+    .filter((a) => classify(a) === "cash")
     .reduce((sum, a) => sum + a.balance, 0);
 }
 
@@ -199,8 +281,11 @@ export async function buildCashFlow(
   const method: CashFlowMethod = opts.method ?? "indirect";
   const basis: ReportBasis = opts.basis ?? "accrual";
 
+  const roles = await loadAccountRoles(organizationId);
+  const classify: Classifier = (a) => classifyCashFlowAccount({ ...a, roles: roles.get(a.accountId) ?? null });
+
   // One aggregation of the period's activity across all account types; we slice
-  // it by type/subType below instead of issuing several queries.
+  // it by classification below instead of issuing several queries.
   const periodAccounts = await aggregateByDateRange(organizationId, range, {
     basis,
   });
@@ -209,9 +294,10 @@ export async function buildCashFlow(
   const openingCash = await cashBalanceAsAt(
     organizationId,
     dayBefore(range.startDate),
-    basis
+    basis,
+    classify
   );
-  const closingCash = await cashBalanceAsAt(organizationId, range.endDate, basis);
+  const closingCash = await cashBalanceAsAt(organizationId, range.endDate, basis, classify);
   const cashAccountMovement = closingCash - openingCash;
 
   let operatingActivities: OperatingActivities;
@@ -220,10 +306,10 @@ export async function buildCashFlow(
 
   if (method === "direct") {
     ({ operatingActivities, investingActivities, financingActivities } =
-      await buildDirect(organizationId, range, basis, periodAccounts));
+      await buildDirect(organizationId, range, periodAccounts, classify));
   } else {
     ({ operatingActivities, investingActivities, financingActivities } =
-      await buildIndirect(organizationId, range, periodAccounts));
+      await buildIndirect(organizationId, range, periodAccounts, classify));
   }
 
   const netCashChange =
@@ -259,19 +345,19 @@ export async function buildCashFlow(
 async function buildIndirect(
   organizationId: string,
   range: DateRange,
-  periodAccounts: AccountAggregate[]
+  periodAccounts: AccountAggregate[],
+  classify: Classifier
 ): Promise<{
   operatingActivities: OperatingActivities;
   investingActivities: InvestingActivities;
   financingActivities: FinancingActivities;
 }> {
+  const of = (cls: CashFlowClass) => periodAccounts.filter((a) => classify(a) === cls);
+  const sum = (accts: AccountAggregate[]) => accts.reduce((s, a) => s + a.balance, 0);
+
   // Net income = revenue balance − expense balance (both natural-signed).
-  const totalRevenue = periodAccounts
-    .filter((a) => a.type === "revenue")
-    .reduce((s, a) => s + a.balance, 0);
-  const totalExpenses = periodAccounts
-    .filter((a) => a.type === "expense")
-    .reduce((s, a) => s + a.balance, 0);
+  const totalRevenue = sum(periodAccounts.filter((a) => a.type === "revenue"));
+  const totalExpenses = sum(periodAccounts.filter((a) => a.type === "expense"));
   const netIncome = totalRevenue - totalExpenses;
 
   // Depreciation add-back: debit posted on depreciation-sourced entries.
@@ -282,16 +368,15 @@ async function buildIndirect(
     "debit"
   );
 
-  // Working-capital deltas (natural-signed period movement).
-  const arDelta = periodAccounts
-    .filter((a) => a.type === "asset" && inSubTypes(a, AR_SUBTYPES))
-    .reduce((s, a) => s + a.balance, 0);
-  const apDelta = periodAccounts
-    .filter((a) => a.type === "liability" && inSubTypes(a, AP_SUBTYPES))
-    .reduce((s, a) => s + a.balance, 0);
-  const inventoryDelta = periodAccounts
-    .filter((a) => a.type === "asset" && inSubTypes(a, INVENTORY_SUBTYPES))
-    .reduce((s, a) => s + a.balance, 0);
+  // Working-capital deltas (natural-signed period movement). An asset going
+  // up ties up cash (outflow); a liability going up keeps cash (inflow).
+  const arDelta = sum(of("receivables"));
+  const apDelta = sum(of("payables"));
+  const inventoryDelta = sum(of("inventory"));
+  const other = of("workingCapital").reduce(
+    (s, a) => s + (a.type === "asset" ? -a.balance : a.balance),
+    0
+  );
 
   const operatingActivities: OperatingActivities = {
     netIncome,
@@ -300,48 +385,51 @@ async function buildIndirect(
       accountsReceivable: -arDelta, // AR up = cash tied up = outflow
       accountsPayable: apDelta, // AP up = cash retained = inflow
       inventory: -inventoryDelta, // inventory up = outflow
+      other,
     },
-    total: netIncome + depreciation - arDelta + apDelta - inventoryDelta,
+    total: netIncome + depreciation - arDelta + apDelta - inventoryDelta + other,
   };
 
-  // Investing: fixed-asset deltas (asset increase = cash outflow).
-  const fixedAssets = periodAccounts.filter(
-    (a) => a.type === "asset" && inSubTypes(a, FIXED_ASSET_SUBTYPES)
-  );
-  const investingActivities: InvestingActivities = {
-    items: fixedAssets.map((a) => ({
+  // Investing: fixed-asset movements (asset increase = cash outflow), leaving
+  // out the depreciation credits (added back in operating already).
+  const depCredits = await depreciationCreditsByAccount(organizationId, range);
+  const fixedItems = of("fixed")
+    .map((a) => ({
       accountId: a.accountId,
       code: a.code,
       name: a.name,
-      amount: -a.balance,
-    })),
-    total: -fixedAssets.reduce((s, a) => s + a.balance, 0),
+      amount: -a.balance - (depCredits.get(a.accountId) ?? 0),
+    }))
+    .filter((i) => i.amount !== 0);
+  const investingActivities: InvestingActivities = {
+    items: fixedItems,
+    total: fixedItems.reduce((s, i) => s + i.amount, 0),
   };
 
-  // Financing: loan movements (sourceType) + equity deltas.
-  const loanPayments = await sumBySourceType(
-    organizationId,
-    range,
-    "loan_payment",
-    "creditMinusDebit"
-  );
-  const equityAccounts = periodAccounts.filter((a) => a.type === "equity");
-  const equityChanges = equityAccounts.reduce((s, a) => s + a.balance, 0);
+  // Financing: loan balances (borrowing = inflow, repayment = outflow) and
+  // equity movements (capital in = inflow, drawings / dividends = outflow).
+  const loans = of("loan");
+  const loanPayments = sum(loans);
+  const equityAccounts = of("equity");
+  const equityChanges = sum(equityAccounts);
 
   const financingActivities: FinancingActivities = {
     loanPayments,
     equityChanges,
     items: [
-      ...(loanPayments !== 0
-        ? [{ name: "Loan movements", amount: loanPayments }]
-        : []),
+      ...loans.map((a) => ({
+        accountId: a.accountId,
+        code: a.code,
+        name: a.name,
+        amount: a.balance,
+      })),
       ...equityAccounts.map((a) => ({
         accountId: a.accountId,
         code: a.code,
         name: a.name,
         amount: a.balance,
       })),
-    ],
+    ].filter((i) => i.amount !== 0),
     total: loanPayments + equityChanges,
   };
 
@@ -355,22 +443,20 @@ async function buildIndirect(
  * expenses paid, adjusted for non-cash depreciation), while investing and
  * financing reuse the same classification as the indirect method. This keeps a
  * direct-style operating section while still tying out via the reconciliation
- * line. The split is intentionally pragmatic — a true line-by-line direct
- * statement would require per-payment cash tracing, which the indirect method
- * already approximates with working-capital deltas.
+ * line.
  */
 async function buildDirect(
   organizationId: string,
   range: DateRange,
-  basis: ReportBasis,
-  periodAccounts: AccountAggregate[]
+  periodAccounts: AccountAggregate[],
+  classify: Classifier
 ): Promise<{
   operatingActivities: OperatingActivities;
   investingActivities: InvestingActivities;
   financingActivities: FinancingActivities;
 }> {
-  // Cash actually realised from revenue/expense on a cash basis: re-aggregate
-  // the income statement on the cash basis so only cash-moving entries count.
+  // Cash actually realised from revenue/expense: re-aggregate the income
+  // statement on the cash basis (invoices and bills count when paid).
   const cashAccounts = await aggregateByDateRange(organizationId, range, {
     basis: "cash",
     accountTypes: ["revenue", "expense"],
@@ -382,30 +468,23 @@ async function buildDirect(
     .filter((a) => a.type === "expense")
     .reduce((s, a) => s + a.balance, 0);
 
-  // Depreciation is non-cash; exclude it from the cash expenses paid.
-  const depreciation = await sumBySourceType(
-    organizationId,
-    range,
-    "depreciation",
-    "debit"
-  );
-  const cashExpensesPaid = cashExpenses - depreciation;
-
   const operatingActivities: OperatingActivities = {
     // Reuse the same field shape; for the direct method netIncome carries the
-    // cash collected from customers and depreciation stays 0 (already excluded).
+    // cash collected from customers and depreciation stays 0 (depreciation is
+    // never a cash entry, so the cash basis already leaves it out).
     netIncome: cashRevenue,
     depreciation: 0,
     workingCapitalChanges: {
       accountsReceivable: 0,
       accountsPayable: 0,
       inventory: 0,
+      other: 0,
     },
-    total: cashRevenue - cashExpensesPaid,
+    total: cashRevenue - cashExpenses,
   };
 
   // Investing / financing: identical classification to the indirect method.
-  const indirect = await buildIndirect(organizationId, range, periodAccounts);
+  const indirect = await buildIndirect(organizationId, range, periodAccounts, classify);
 
   return {
     operatingActivities,

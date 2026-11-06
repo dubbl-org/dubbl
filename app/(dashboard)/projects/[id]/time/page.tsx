@@ -50,18 +50,32 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { useProject, formatHours, formatDateShort, type TimeEntryData, type RunningTimerData } from "../project-context";
+import {
+  useProject,
+  formatHours,
+  formatDateShort,
+  localISODate,
+  localWeekDates,
+  summarizeTimeEntries,
+  timeEntryAmount,
+  projectFetch,
+  errorText,
+  type TimeEntryData,
+  type RunningTimerData,
+} from "../project-context";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 export default function TimePage() {
-  const { project: proj, orgId, projectId, refresh } = useProject();
+  const { project: proj, orgId, projectId, canContribute, canManage } = useProject();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Drawer state: "add" for new, entry object for edit
   const [drawerMode, setDrawerMode] = useState<"add" | "edit" | null>(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntryData | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [entryDate, setEntryDate] = useState(() => localISODate());
   const [entryDesc, setEntryDesc] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
   const [entryHours, setEntryHours] = useState("");
@@ -85,13 +99,15 @@ export default function TimePage() {
   const lastSavedTaskRef = useRef("none");
   const lastSavedBillableRef = useRef(true);
   const stoppingRef = useRef(false);
+  // A timer this page just stopped or reset; the cached project may still list it until it refetches.
+  const discardedTimerIdRef = useRef<string | null>(null);
   useDocumentTitle("Projects · Time Entries");
 
   // Initialize timer from server data
   useEffect(() => {
     if (!proj) return;
     const myTimer = proj.runningTimers?.[0] || null;
-    if (myTimer && !timerData && !stoppingRef.current) {
+    if (myTimer && !timerData && !stoppingRef.current && myTimer.id !== discardedTimerIdRef.current) {
       setTimerData(myTimer);
       setTimerDesc(myTimer.description || "");
       setTimerTaskId(myTimer.taskId || "none");
@@ -162,13 +178,10 @@ export default function TimePage() {
   async function startTimer() {
     if (!orgId) return;
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/timer`, {
+      const data = await projectFetch<{ timer: RunningTimerData }>(orgId, `/api/v1/projects/${projectId}/timer`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ isBillable: true }),
+        body: { isBillable: true },
       });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
       setTimerData(data.timer);
       setTimerSeconds(0);
       setTimerDesc("");
@@ -177,7 +190,7 @@ export default function TimePage() {
       lastSavedDescRef.current = "";
       lastSavedTaskRef.current = "none";
       lastSavedBillableRef.current = true;
-    } catch { toast.error("Failed to start timer"); }
+    } catch (err) { toast.error(errorText(err, "Failed to start timer")); }
   }
 
   async function pauseTimer() {
@@ -218,6 +231,7 @@ export default function TimePage() {
   async function resetTimer() {
     if (!orgId) return;
     if (timerRef.current) clearInterval(timerRef.current);
+    if (timerData) discardedTimerIdRef.current = timerData.id;
     try {
       await fetch(`/api/v1/projects/${projectId}/timer`, {
         method: "DELETE",
@@ -234,23 +248,22 @@ export default function TimePage() {
   async function stopTimer() {
     if (!orgId || !timerData || stoppingRef.current) return;
     stoppingRef.current = true;
+    discardedTimerIdRef.current = timerData.id;
     if (timerRef.current) clearInterval(timerRef.current);
     setTimerData(null);
     const minutes = Math.max(1, Math.round(timerSeconds / 60));
     try {
       // Save the time entry
-      const res = await fetch(`/api/v1/projects/${projectId}/time-entries`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/time-entries`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
-          date: new Date().toISOString().split("T")[0],
+        body: {
+          date: localISODate(),
           description: timerDesc || null,
           minutes,
           isBillable: timerBillable,
           taskId: timerTaskId === "none" ? null : timerTaskId,
-        }),
+        },
       });
-      if (!res.ok) throw new Error("Failed");
 
       // Delete the running timer
       await fetch(`/api/v1/projects/${projectId}/timer`, {
@@ -263,9 +276,8 @@ export default function TimePage() {
       setTimerDesc("");
       setTimerTaskId("none");
       setTimerBillable(true);
-      refresh();
-    } catch {
-      toast.error("Failed to save time entry");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to save time entry"));
     } finally {
       stoppingRef.current = false;
     }
@@ -282,7 +294,7 @@ export default function TimePage() {
   function openAdd() {
     setDrawerMode("add");
     setEditingEntry(null);
-    setEntryDate(new Date().toISOString().split("T")[0]);
+    setEntryDate(localISODate());
     setEntryDesc("");
     setEntryMinutes("");
     setEntryHours("");
@@ -317,12 +329,20 @@ export default function TimePage() {
 
   const entries = proj.timeEntries;
   const tasks = proj.tasks || [];
-  const totalMinutes = entries.reduce((sum, e) => sum + e.minutes, 0);
-  const totalAmount = entries.reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
-  const billableMinutes = entries.filter(e => e.isBillable).reduce((sum, e) => sum + e.minutes, 0);
+  // Only billable time earns money; non-billable time counts toward hours only.
+  const {
+    totalMinutes,
+    billableAmount: totalAmount,
+    billableMinutes,
+    unbilledMinutes,
+    unbilledAmount,
+  } = summarizeTimeEntries(entries);
   const billablePct = totalMinutes > 0 ? Math.round((billableMinutes / totalMinutes) * 100) : 0;
-  const unbilledMinutes = entries.filter(e => e.isBillable && !e.invoiceId).reduce((sum, e) => sum + e.minutes, 0);
-  const unbilledAmount = entries.filter(e => e.isBillable && !e.invoiceId).reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
+  // Invoiced time is locked (only description and task can change); other
+  // people's time is read-only unless you manage the project.
+  const canEditEntry = (e: TimeEntryData) => canManage || (canContribute && e.userId === proj.viewerUserId);
+  const editLocked = drawerMode === "edit" && !!editingEntry?.invoiceId;
+  const readOnly = drawerMode === "edit" && !!editingEntry && !canEditEntry(editingEntry);
 
   // Unique members for filter
   const uniqueMembers = Array.from(
@@ -356,7 +376,7 @@ export default function TimePage() {
   }
 
   // Today's entries
-  const today = new Date().toISOString().split("T")[0];
+  const today = localISODate();
   const todayMinutes = entries.filter(e => e.date === today).reduce((sum, e) => sum + e.minutes, 0);
   const todayEntries = entries.filter(e => e.date === today).length;
 
@@ -386,7 +406,7 @@ export default function TimePage() {
       </div>
     )},
     { key: "duration", header: "Duration", className: "w-20 text-right", render: r => <span className="text-[13px] font-mono tabular-nums font-medium">{formatHours(r.minutes)}</span> },
-    { key: "amount", header: "Amount", className: "w-24 text-right", render: r => <span className="text-[13px] font-mono tabular-nums">{formatMoney(Math.round((r.minutes / 60) * r.hourlyRate))}</span> },
+    { key: "amount", header: "Amount", className: "w-24 text-right", render: r => <span className="text-[13px] font-mono tabular-nums">{r.isBillable ? formatMoney(timeEntryAmount(r.minutes, r.hourlyRate)) : "-"}</span> },
     { key: "status", header: "", className: "w-20", render: r => {
       if (r.invoiceId) return <Badge variant="outline" className="border-brand-200 bg-brand-50 text-brand-700 text-[9px] h-4">Invoiced</Badge>;
       return <Badge variant="outline" className={cn("text-[9px] h-4", r.isBillable ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-gray-50 text-gray-600")}>{r.isBillable ? "Billable" : "Non-bill."}</Badge>;
@@ -399,22 +419,19 @@ export default function TimePage() {
     if (!mins || mins <= 0) { toast.error("Enter a valid duration"); return; }
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/time-entries`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/time-entries`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
+        body: {
           date: entryDate,
           description: entryDesc || null,
           minutes: mins,
           isBillable: entryBillable === "true",
           taskId: entryTaskId === "none" ? null : entryTaskId,
-        }),
+        },
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success("Time entry added");
       closeDrawer();
-      refresh();
-    } catch { toast.error("Failed to add time entry"); }
+    } catch (err) { toast.error(errorText(err, "Failed to add time entry")); }
     finally { setSaving(false); }
   }
 
@@ -424,38 +441,41 @@ export default function TimePage() {
     if (!mins || mins <= 0) { toast.error("Enter a valid duration"); return; }
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, {
+      // Invoiced time: send only what may still change.
+      const body = editingEntry.invoiceId
+        ? { description: entryDesc || null, taskId: entryTaskId === "none" ? null : entryTaskId }
+        : {
+            date: entryDate,
+            description: entryDesc || null,
+            minutes: mins,
+            isBillable: entryBillable === "true",
+            taskId: entryTaskId === "none" ? null : entryTaskId,
+          };
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
-          date: entryDate,
-          description: entryDesc || null,
-          minutes: mins,
-          isBillable: entryBillable === "true",
-          taskId: entryTaskId === "none" ? null : entryTaskId,
-        }),
+        body,
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success("Time entry updated");
       closeDrawer();
-      refresh();
-    } catch { toast.error("Failed to update time entry"); }
+    } catch (err) { toast.error(errorText(err, "Failed to update time entry")); }
     finally { setSaving(false); }
   }
 
   async function handleDelete() {
     if (!orgId || !editingEntry) return;
+    const ok = await confirm({
+      title: "Delete this time entry?",
+      description: `${formatHours(editingEntry.minutes)} on ${formatDateShort(editingEntry.date)} is removed for good.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": orgId },
-      });
-      if (!res.ok) throw new Error("Failed");
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/time-entries/${editingEntry.id}`, { method: "DELETE" });
       toast.success("Time entry deleted");
       closeDrawer();
-      refresh();
-    } catch { toast.error("Failed to delete time entry"); }
+    } catch (err) { toast.error(errorText(err, "Failed to delete time entry")); }
     finally { setDeleting(false); }
   }
 
@@ -574,6 +594,8 @@ export default function TimePage() {
                 size="sm"
                 className="flex-1 h-9 bg-brand-600 hover:bg-brand-700 gap-2 text-sm font-medium"
                 onClick={startTimer}
+                disabled={!canContribute}
+                title={canContribute ? undefined : "You have view-only access to this project"}
               >
                 <Play className="size-3.5 fill-current" />
                 Start Timer
@@ -712,9 +734,11 @@ export default function TimePage() {
               </span>
             )}
           </p>
-          <Button size="sm" className="bg-brand-600 hover:bg-brand-700 h-8" onClick={openAdd}>
-            <Plus className="size-3.5" />Log Time
-          </Button>
+          {canContribute && (
+            <Button size="sm" className="bg-brand-600 hover:bg-brand-700 h-8" onClick={openAdd}>
+              <Plus className="size-3.5" />Log Time
+            </Button>
+          )}
         </div>
 
         {/* Filter row */}
@@ -784,17 +808,26 @@ export default function TimePage() {
                 {drawerMode === "edit" ? <Pencil className="size-5" /> : <Clock className="size-5" />}
               </div>
               <div>
-                <SheetTitle className="text-lg">{drawerMode === "edit" ? "Edit Time Entry" : "Log Time Entry"}</SheetTitle>
-                <SheetDescription>{drawerMode === "edit" ? "Update this time entry." : "Record time spent on this project."}</SheetDescription>
+                <SheetTitle className="text-lg">{readOnly ? "Time Entry" : drawerMode === "edit" ? "Edit Time Entry" : "Log Time Entry"}</SheetTitle>
+                <SheetDescription>
+                  {readOnly
+                    ? "You can only change your own time entries."
+                    : drawerMode === "edit" ? "Update this time entry." : "Record time spent on this project."}
+                </SheetDescription>
               </div>
             </div>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+            {editLocked && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-[12px] text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
+                This time is on an invoice, so only the description and task can change. Void or delete the invoice to release it.
+              </div>
+            )}
             <div className="space-y-4">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">When</p>
               <div className="space-y-2">
                 <Label>Date</Label>
-                <DatePicker value={entryDate} onChange={setEntryDate} placeholder="Select date" />
+                <DatePicker value={entryDate} onChange={setEntryDate} placeholder="Select date" disabled={editLocked || readOnly} />
               </div>
             </div>
 
@@ -804,12 +837,12 @@ export default function TimePage() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Details</p>
               <div className="space-y-2">
                 <Label>Description</Label>
-                <Textarea value={entryDesc} onChange={e => setEntryDesc(e.target.value)} placeholder="What did you work on?" rows={3} />
+                <Textarea value={entryDesc} onChange={e => setEntryDesc(e.target.value)} placeholder="What did you work on?" rows={3} disabled={readOnly} />
               </div>
               {tasks.length > 0 && (
                 <div className="space-y-2">
                   <Label>Related Task</Label>
-                  <Select value={entryTaskId} onValueChange={setEntryTaskId}>
+                  <Select value={entryTaskId} onValueChange={setEntryTaskId} disabled={readOnly}>
                     <SelectTrigger><SelectValue placeholder="No task" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No task</SelectItem>
@@ -829,16 +862,16 @@ export default function TimePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Hours</Label>
-                  <Input type="number" step="0.25" min={0} value={entryHours} onChange={e => { setEntryHours(e.target.value); setEntryMinutes(""); }} placeholder="e.g. 1.5" />
+                  <Input type="number" step="0.25" min={0} value={entryHours} onChange={e => { setEntryHours(e.target.value); setEntryMinutes(""); }} placeholder="e.g. 1.5" disabled={editLocked || readOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label>Or Minutes</Label>
-                  <Input type="number" min={1} value={entryMinutes} onChange={e => { setEntryMinutes(e.target.value); setEntryHours(""); }} placeholder="e.g. 90" />
+                  <Input type="number" min={1} value={entryMinutes} onChange={e => { setEntryMinutes(e.target.value); setEntryHours(""); }} placeholder="e.g. 90" disabled={editLocked || readOnly} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Billable</Label>
-                <Select value={entryBillable} onValueChange={setEntryBillable}>
+                <Select value={entryBillable} onValueChange={setEntryBillable} disabled={editLocked || readOnly}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="true">Yes - Billable</SelectItem>
@@ -849,7 +882,7 @@ export default function TimePage() {
             </div>
           </div>
           <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
-            {drawerMode === "edit" && (
+            {drawerMode === "edit" && !editLocked && !readOnly && (
               <Button
                 type="button"
                 variant="ghost"
@@ -862,15 +895,17 @@ export default function TimePage() {
                 {deleting ? "Deleting..." : "Delete"}
               </Button>
             )}
-            <div className={cn("flex items-center gap-3", drawerMode !== "edit" && "ml-auto")}>
-              <Button type="button" variant="outline" onClick={closeDrawer}>Cancel</Button>
-              <Button
-                onClick={drawerMode === "edit" ? handleUpdate : handleAdd}
-                disabled={saving}
-                className={drawerMode === "edit" ? "bg-blue-600 hover:bg-blue-700" : "bg-brand-600 hover:bg-brand-700"}
-              >
-                {saving ? "Saving..." : drawerMode === "edit" ? "Update Entry" : "Add Entry"}
-              </Button>
+            <div className="flex items-center gap-3 ml-auto">
+              <Button type="button" variant="outline" onClick={closeDrawer}>{readOnly ? "Close" : "Cancel"}</Button>
+              {!readOnly && (
+                <Button
+                  onClick={drawerMode === "edit" ? handleUpdate : handleAdd}
+                  disabled={saving}
+                  className={drawerMode === "edit" ? "bg-blue-600 hover:bg-blue-700" : "bg-brand-600 hover:bg-brand-700"}
+                >
+                  {saving ? "Saving..." : drawerMode === "edit" ? "Update Entry" : "Add Entry"}
+                </Button>
+              )}
             </div>
           </div>
         </SheetContent>
@@ -882,6 +917,7 @@ export default function TimePage() {
         onRowClick={openEdit}
         emptyMessage={hasActiveFilters ? "No entries match your filters." : "No time entries yet. Start the timer or log time manually."}
       />
+      {confirmDialog}
     </div>
   );
 }
@@ -920,21 +956,6 @@ function StatCard({ label, value, sub, icon, accent }: {
 }
 
 function getWeekDays() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
-
-  const days: { date: string; label: string }[] = [];
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    days.push({
-      date: d.toISOString().split("T")[0],
-      label: dayLabels[i],
-    });
-  }
-  return days;
+  return localWeekDates().map((date, i) => ({ date, label: dayLabels[i] }));
 }

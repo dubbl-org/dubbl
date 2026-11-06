@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Pause, Play, Zap, Trash2 } from "lucide-react";
@@ -12,6 +12,7 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface RecurringJournalLine {
   id: string;
@@ -67,26 +68,16 @@ export default function RecurringJournalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [rj, setRj] = useState<RecurringJournalDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/recurring-journals/${id}`;
+  const { data, loading } = useApi<{ template?: RecurringJournalDetail }>(url);
+  const cache = useApiCache();
+  const rj = data?.template ?? null;
   const [toggling, setToggling] = useState(false);
   const [posting, setPosting] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(rj?.name);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/recurring-journals/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.template) setRj(data.template);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
 
   // Pause / resume the schedule.
   async function handleToggle() {
@@ -99,11 +90,13 @@ export default function RecurringJournalDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setRj((prev) => (prev ? { ...prev, ...data.template } : prev));
+        cache.update<{ template?: RecurringJournalDetail }>(url, (prev) => (prev.template ? { ...prev, template: { ...prev.template, ...data.template } } : prev));
         toast.success(
           data.template?.status === "paused"
-            ? "Schedule paused — it won't post until you resume it"
-            : "Schedule resumed — it will post automatically again"
+            ? "Schedule paused. It won't post until you resume it"
+            : data.template?.status === "completed"
+              ? "Schedule finished. Its end date passed while it was paused"
+              : `Schedule resumed. Missed dates are skipped; next run ${data.template?.nextRunDate ?? ""}`
         );
       } else {
         const data = await res.json();
@@ -131,10 +124,6 @@ export default function RecurringJournalDetailPage() {
             ? `Posted ${posted} entr${posted === 1 ? "y" : "ies"} that were due`
             : "Nothing was due to post right now"
         );
-        // Refresh this template to reflect new counts/next date.
-        fetch(`/api/v1/recurring-journals/${id}`, { headers: { "x-organization-id": orgId } })
-          .then((r) => r.json())
-          .then((d) => { if (d.template) setRj(d.template); });
       } else {
         const data = await res.json();
         toast.error(typeof data.error === "string" ? data.error : "Couldn't post the entries");

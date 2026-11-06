@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, validationError, created, ok } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { z } from "zod";
 
 const balanceSchema = z.object({
@@ -79,6 +80,9 @@ export async function POST(request: Request) {
       return validationError("Opening balances must have non-zero amounts");
     }
 
+    // Opening balances post on their date; that date must be open.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
+
     // Check if existing opening balance entry exists, void it if so
     const existingEntry = await db.query.journalEntry.findFirst({
       where: and(
@@ -89,6 +93,9 @@ export async function POST(request: Request) {
     });
 
     if (existingEntry) {
+      // Voiding the old entry changes its period too.
+      await assertNotLocked(ctx.organizationId, existingEntry.date, ctx);
+
       await db
         .update(journalEntry)
         .set({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { motion, MotionConfig } from "motion/react";
 import {
@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/select";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { SearchInput } from "@/components/ui/search-input";
+import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDealContext, getHeaders, timeAgo } from "../layout";
@@ -70,7 +72,16 @@ interface ActivityItem {
   type: string;
   content: string | null;
   createdAt: string;
-  user: { name: string | null } | null;
+  scheduledAt: string | null;
+  completedAt: string | null;
+  user: { name: string | null; email?: string } | null;
+}
+
+interface ActivityPage {
+  activities?: ActivityItem[];
+  pagination?: { page: number; total: number; totalPages: number };
+  typeCounts?: Record<string, number>;
+  totalAll?: number;
 }
 
 export default function DealActivityPage() {
@@ -81,6 +92,8 @@ export default function DealActivityPage() {
     setActivityType,
     activityContent,
     setActivityContent,
+    activityScheduledAt,
+    setActivityScheduledAt,
     submitting,
     addActivity,
   } = useDealContext();
@@ -88,9 +101,7 @@ export default function DealActivityPage() {
   const isWon = !!deal.wonAt;
   const isLost = !!deal.lostAt;
 
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const [fetchKey, setFetchKey] = useState(0);
 
   // Search, filter, sort
@@ -101,13 +112,9 @@ export default function DealActivityPage() {
   const [sortBy, setSortBy] = useState<ActivitySortKey>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  // Pagination: page 1 comes from the cache, later pages are appended as you scroll
+  const [more, setMore] = useState<{ url: string; items: ActivityItem[]; page: number; total: number; hasMore: boolean } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [totalAll, setTotalAll] = useState(0);
-  const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   function buildParams(pg: number) {
@@ -121,42 +128,25 @@ export default function DealActivityPage() {
     return params;
   }
 
-  // Fetch page 1 on filter/search/sort change
-  useEffect(() => {
-    let cancelled = false;
-    const isRefetch = !loading;
+  // Page 1 for the current filter/search/sort
+  const firstUrl = `/api/v1/crm/deals/${dealId}/activities?${buildParams(1)}`;
+  const cache = useApiCache();
+  const { data, loading, error, refetch } = useApi<ActivityPage>(firstUrl, { keepPrevious: true, learn: !debouncedSearch });
+  // Still showing the previous filter's answer while this one loads
+  const refetching = reloading || (data !== undefined && !error && cache.get(firstUrl) === undefined);
 
-    setPage(1);
-    setHasMore(true);
-    if (isRefetch) setRefetching(true);
-
-    const params = buildParams(1);
-
-    fetch(`/api/v1/crm/deals/${dealId}/activities?${params}`, {
-      headers: getHeaders(),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.activities) setActivities(data.activities);
-        if (data.pagination) {
-          setTotal(data.pagination.total);
-          setHasMore(data.pagination.page < data.pagination.totalPages);
-        }
-        if (data.typeCounts) setTypeCounts(data.typeCounts);
-        if (data.totalAll != null) setTotalAll(data.totalAll);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setRefetching(false);
-          setFetchKey((k) => k + 1);
-        }
-      });
-
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealId, debouncedSearch, typeFilter, sortBy, sortOrder]);
+  const extra = more?.url === firstUrl ? more : null;
+  const activities = useMemo(() => {
+    const first = data?.activities ?? [];
+    if (!extra) return first;
+    const seen = new Set(first.map((a) => a.id));
+    return [...first, ...extra.items.filter((a) => !seen.has(a.id))];
+  }, [data, extra]);
+  const page = extra?.page ?? 1;
+  const total = extra?.total ?? data?.pagination?.total ?? 0;
+  const hasMore = extra ? extra.hasMore : data?.pagination ? data.pagination.page < data.pagination.totalPages : true;
+  const typeCounts = data?.typeCounts ?? {};
+  const totalAll = data?.totalAll ?? 0;
 
   // Load more
   const loadMore = useCallback(() => {
@@ -164,6 +154,7 @@ export default function DealActivityPage() {
     const nextPage = page + 1;
     setLoadingMore(true);
 
+    const url = firstUrl;
     const params = buildParams(nextPage);
 
     fetch(`/api/v1/crm/deals/${dealId}/activities?${params}`, {
@@ -171,16 +162,20 @@ export default function DealActivityPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.activities) setActivities((prev) => [...prev, ...data.activities]);
-        if (data.pagination) {
-          setPage(data.pagination.page);
-          setTotal(data.pagination.total);
-          setHasMore(data.pagination.page < data.pagination.totalPages);
-        }
+        setMore((prev) => {
+          const base = prev?.url === url ? prev : null;
+          return {
+            url,
+            items: [...(base?.items ?? []), ...(data.activities ?? [])],
+            page: data.pagination ? data.pagination.page : page,
+            total: data.pagination ? data.pagination.total : total,
+            hasMore: data.pagination ? data.pagination.page < data.pagination.totalPages : hasMore,
+          };
+        });
       })
       .finally(() => setLoadingMore(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingMore, hasMore, page, dealId, debouncedSearch, typeFilter, sortBy, sortOrder]);
+  }, [loadingMore, hasMore, page, total, firstUrl, dealId]);
 
   // IntersectionObserver for infinite scroll
   useEffect(() => {
@@ -197,24 +192,13 @@ export default function DealActivityPage() {
   // Refresh activities after adding one
   async function handleAddActivity() {
     await addActivity();
-    // Refetch page 1
-    setRefetching(true);
-    const params = buildParams(1);
+    // Back to page 1, fresh
+    setReloading(true);
+    setMore(null);
     try {
-      const r = await fetch(`/api/v1/crm/deals/${dealId}/activities?${params}`, {
-        headers: getHeaders(),
-      });
-      const data = await r.json();
-      if (data.activities) setActivities(data.activities);
-      if (data.pagination) {
-        setPage(1);
-        setTotal(data.pagination.total);
-        setHasMore(data.pagination.page < data.pagination.totalPages);
-      }
-      if (data.typeCounts) setTypeCounts(data.typeCounts);
-      if (data.totalAll != null) setTotalAll(data.totalAll);
+      await refetch();
     } finally {
-      setRefetching(false);
+      setReloading(false);
       setFetchKey((k) => k + 1);
     }
   }
@@ -322,6 +306,23 @@ export default function DealActivityPage() {
               }
             }}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-[11px] text-muted-foreground" htmlFor="activity-schedule">Schedule for</label>
+            <Input
+              id="activity-schedule"
+              type="datetime-local"
+              value={activityScheduledAt}
+              onChange={(e) => setActivityScheduledAt(e.target.value)}
+              className="h-8 w-auto text-xs"
+            />
+            {activityScheduledAt ? (
+              <button type="button" onClick={() => setActivityScheduledAt("")} className="text-[11px] text-muted-foreground hover:text-foreground">
+                Clear
+              </button>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Leave empty for something that already happened.</span>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-muted-foreground">
               {typeof navigator !== "undefined" && navigator.platform?.includes("Mac") ? "Cmd" : "Ctrl"}+Enter to submit
@@ -333,7 +334,7 @@ export default function DealActivityPage() {
               disabled={!activityContent.trim() || submitting}
             >
               <Send className="size-3" />
-              {submitting ? "Adding..." : "Add Activity"}
+              {submitting ? "Adding..." : activityScheduledAt ? "Schedule Activity" : "Add Activity"}
             </Button>
           </div>
         </div>
@@ -441,7 +442,7 @@ export default function DealActivityPage() {
         ) : (
           <MotionConfig reducedMotion="never">
             <motion.div
-              key={fetchKey}
+              key={`${firstUrl}:${fetchKey}`}
               initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.5, ease: EASE }}
@@ -497,10 +498,21 @@ export default function DealActivityPage() {
                             <div className="flex-1 min-w-0 flex items-start justify-between gap-3 rounded-lg border bg-card px-3.5 py-2.5 shadow-xs transition-shadow group-hover:shadow-sm">
                               <div className="min-w-0">
                                 <p className="text-[13px] leading-snug">
-                                  <span className="font-medium">{activity.user?.name || "System"}</span>{" "}
-                                  <span className="text-muted-foreground">logged a</span>{" "}
+                                  <span className="font-medium">{activity.user?.name || activity.user?.email || "Someone"}</span>{" "}
+                                  <span className="text-muted-foreground">{activity.scheduledAt && !activity.completedAt ? "planned a" : "logged a"}</span>{" "}
                                   <span className="font-medium capitalize">{activity.type}</span>
                                 </p>
+                                {activity.scheduledAt && (
+                                  <p className={cn(
+                                    "text-[11px] mt-0.5",
+                                    activity.completedAt
+                                      ? "text-muted-foreground"
+                                      : new Date(activity.scheduledAt) < new Date() ? "text-red-600 font-medium" : "text-amber-600"
+                                  )}>
+                                    {activity.completedAt ? "Done" : new Date(activity.scheduledAt) < new Date() ? "Overdue" : "Planned"} for{" "}
+                                    {new Date(activity.scheduledAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                  </p>
+                                )}
                                 {activity.content && (
                                   <p className="text-[13px] text-muted-foreground mt-1.5 whitespace-pre-wrap leading-relaxed">
                                     {activity.content}

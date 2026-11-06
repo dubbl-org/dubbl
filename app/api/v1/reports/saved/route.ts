@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
 import { z } from "zod";
+import { SAVED_REPORT_SOURCE_KEYS } from "@/lib/reports/saved-report-data";
 
 export async function GET(request: Request) {
   try {
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 const configSchema = z.object({
-  dataSource: z.enum(["invoices", "expenses", "transactions", "payroll", "inventory", "contacts"]),
+  dataSource: z.enum(SAVED_REPORT_SOURCE_KEYS),
   filters: z.array(z.object({
     field: z.string(),
     operator: z.string(),

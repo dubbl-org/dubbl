@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Layers, Plus } from "lucide-react";
+import { Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -11,79 +11,138 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { formatMoney } from "@/lib/money";
+import { centsToDecimal, formatMoney } from "@/lib/money";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
+
+interface Variant {
+  id: string;
+  name: string;
+  sku: string | null;
+  /** Cents. */
+  purchasePrice: number | null;
+  /** Cents. */
+  salePrice: number | null;
+  quantityOnHand: number | null;
+  options: Record<string, string> | null;
+  isActive: boolean | null;
+}
+
+/** "Color: Red, Size: Large" <-> { Color: "Red", Size: "Large" } */
+function parseOptions(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of text.split(",")) {
+    const [key, ...rest] = part.split(":");
+    const value = rest.join(":").trim();
+    if (key?.trim() && value) out[key.trim()] = value;
+  }
+  return out;
+}
+
+function formatOptions(options: Record<string, string> | null) {
+  return Object.entries(options ?? {})
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+}
+
+async function send(url: string, method: string, body?: unknown) {
+  const orgId = localStorage.getItem("activeOrgId");
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", ...(orgId ? { "x-organization-id": orgId } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Something went wrong");
+  return data;
+}
 
 export default function InventoryItemVariantsPage() {
   const { id } = useParams<{ id: string }>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [variants, setVariants] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/inventory/${id}/variants`;
+  const { data, loading } = useApi<{ data?: Variant[] }>(url);
+  const variants = data?.data ?? [];
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const [addOpen, setAddOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<Variant | null>(null);
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [options, setOptions] = useState("");
+  const [isActive, setIsActive] = useState(true);
   useDocumentTitle("Inventory · Variants");
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  function openSheet(variant: Variant | null) {
+    setEditing(variant);
+    setName(variant?.name ?? "");
+    setSku(variant?.sku ?? "");
+    setPurchasePrice(variant?.purchasePrice ? centsToDecimal(variant.purchasePrice) : "");
+    setSalePrice(variant?.salePrice ? centsToDecimal(variant.salePrice) : "");
+    setQuantity(variant?.quantityOnHand != null ? String(variant.quantityOnHand) : "");
+    setOptions(formatOptions(variant?.options ?? null));
+    setIsActive(variant?.isActive !== false);
+    setSheetOpen(true);
+  }
 
-    fetch(`/api/v1/inventory/${id}/variants`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.variants) setVariants(data.variants); })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  async function handleAdd() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId || !name.trim()) {
+  async function handleSave() {
+    if (!name.trim()) {
       toast.error("Variant name is required");
       return;
     }
-
+    setSaving(true);
+    const body = {
+      name: name.trim(),
+      sku: sku.trim() || null,
+      purchasePrice: purchasePrice ? Math.round(parseFloat(purchasePrice) * 100) : 0,
+      salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) : 0,
+      quantityOnHand: quantity ? Math.max(0, parseInt(quantity) || 0) : 0,
+      options: parseOptions(options),
+      ...(editing ? { isActive } : {}),
+    };
     try {
-      const res = await fetch(`/api/v1/inventory/${id}/variants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
-          name: name.trim(),
-          sku: sku || undefined,
-          purchasePrice: purchasePrice ? Math.round(parseFloat(purchasePrice) * 100) : undefined,
-          salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
-          quantityOnHand: quantity ? parseInt(quantity) : undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to add variant");
+      if (editing) {
+        await send(`${url}/${editing.id}`, "PATCH", body);
+        toast.success("Variant updated");
+      } else {
+        await send(url, "POST", body);
+        toast.success("Variant added");
       }
-
-      const data = await res.json();
-      setVariants((prev) => [...prev, data.variant]);
-      setAddOpen(false);
-      setName("");
-      setSku("");
-      setPurchasePrice("");
-      setSalePrice("");
-      setQuantity("");
-      toast.success("Variant added");
+      setSheetOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add variant");
+      toast.error(err instanceof Error ? err.message : "Couldn't save the variant");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(variant: Variant) {
+    const ok = await confirm({
+      title: `Delete "${variant.name}"?`,
+      description: "The variant is removed from this item.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await send(`${url}/${variant.id}`, "DELETE");
+      toast.success("Variant deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't delete the variant");
     }
   }
 
@@ -92,8 +151,13 @@ export default function InventoryItemVariantsPage() {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold">Variants</h3>
-        <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+        <div>
+          <h3 className="text-sm font-semibold">Variants</h3>
+          <p className="text-xs text-muted-foreground">
+            Sizes, colors or other versions of this item. Variant counts are for reference and don&apos;t change the item&apos;s stock or your books.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => openSheet(null)}>
           <Plus className="mr-1.5 size-3.5" />
           Add Variant
         </Button>
@@ -106,15 +170,14 @@ export default function InventoryItemVariantsPage() {
           description="Add variants for different sizes, colors, or configurations."
           compact
         >
-          <Button size="sm" onClick={() => setAddOpen(true)} className="bg-brand-600 hover:bg-brand-700">
+          <Button size="sm" onClick={() => openSheet(null)} className="bg-brand-600 hover:bg-brand-700">
             <Plus className="mr-1.5 size-3.5" />
             Add Variant
           </Button>
         </EmptyState>
       ) : (
         <div className="rounded-xl border bg-card divide-y">
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {variants.map((v: any) => (
+          {variants.map((v) => (
             <div key={v.id} className="flex items-center gap-4 p-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -141,22 +204,31 @@ export default function InventoryItemVariantsPage() {
                   {v.quantityOnHand != null && (
                     <span className="text-xs text-muted-foreground">Qty: {v.quantityOnHand}</span>
                   )}
-                  {v.options && Object.entries(v.options).map(([key, val]) => (
+                  {Object.entries(v.options ?? {}).map(([key, val]) => (
                     <Badge key={key} variant="secondary" className="text-[10px]">
                       {key}: {String(val)}
                     </Badge>
                   ))}
                 </div>
               </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => openSheet(v)} aria-label="Edit variant">
+                  <Pencil className="size-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="size-7 p-0 text-destructive" onClick={() => handleDelete(v)} aria-label="Delete variant">
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      <Sheet open={addOpen} onOpenChange={setAddOpen}>
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Add Variant</SheetTitle>
+            <SheetTitle>{editing ? "Edit Variant" : "Add Variant"}</SheetTitle>
+            <SheetDescription>A version of this item, such as a size or color.</SheetDescription>
           </SheetHeader>
           <div className="space-y-4 px-4">
             <div className="space-y-1.5">
@@ -173,6 +245,14 @@ export default function InventoryItemVariantsPage() {
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 placeholder="Optional variant SKU"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Options</Label>
+              <Input
+                value={options}
+                onChange={(e) => setOptions(e.target.value)}
+                placeholder="e.g. Color: Red, Size: Large"
               />
             </div>
             <div className="grid gap-4 grid-cols-2">
@@ -203,15 +283,23 @@ export default function InventoryItemVariantsPage() {
                 placeholder="0"
               />
             </div>
+            {editing && (
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <Label className="text-xs" htmlFor="variant-active">Active</Label>
+                <Switch id="variant-active" checked={isActive} onCheckedChange={setIsActive} />
+              </div>
+            )}
           </div>
           <SheetFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} className="bg-brand-600 hover:bg-brand-700">
-              Add Variant
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-brand-600 hover:bg-brand-700">
+              {editing ? "Save Changes" : "Add Variant"}
             </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {confirmDialog}
     </>
   );
 }

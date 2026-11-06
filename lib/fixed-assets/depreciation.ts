@@ -18,29 +18,25 @@ export type DepreciationConvention =
   | "full_at_purchase";
 
 /**
- * Apply a first-period (or final-period) timing convention to a full-period
- * depreciation amount. Conventions only ever scale the FIRST period (periodIndex
- * 0) or, for proration / disposal handling, the final period — every other
- * period takes its full amount.
+ * Apply a first-period timing convention to a full-period depreciation amount.
+ * Conventions only ever scale the FIRST period (periodIndex 0); every other
+ * period takes its full amount. When the first period is shortened, the rest
+ * is recovered in one extra period after the useful life (see
+ * calculateMonthlyDepreciation).
  *
  * @param amount     the full-period depreciation amount in cents
  * @param convention timing convention
  * @param periodIndex zero-based index of the period being charged
  * @param inServiceDate YYYY-MM-DD the asset was placed in service
- * @param periodDate  YYYY-MM-DD the period being charged (its end date)
- * @param isFinal     true if this is the asset's final depreciation period
  */
 export function applyConvention(
   amount: number,
   convention: DepreciationConvention,
   periodIndex: number,
-  inServiceDate: string | null | undefined,
-  periodDate: string | null | undefined,
-  isFinal: boolean
+  inServiceDate: string | null | undefined
 ): number {
   if (amount <= 0) return 0;
-  // Conventions only modify the opening period (and, for half-year, the final
-  // period). Mid-period months are always full.
+  // Conventions only modify the opening period. Later months are always full.
   const isFirst = periodIndex === 0;
 
   switch (convention) {
@@ -49,10 +45,9 @@ export function applyConvention(
       return amount;
 
     case "full_at_purchase":
-      // Take the entire depreciable base immediately — handled by the caller via
-      // the "in_service" timing, but for a periodic amount the first period gets
-      // the full amount and the rest get nothing. Treated as full_month here for
-      // the per-period amount; full expensing is a method-level concern.
+      // The whole depreciable base goes in the first period. That's resolved by
+      // calculateMonthlyDepreciation (it knows the remaining base); for a bare
+      // periodic amount this behaves like full_month.
       return amount;
 
     case "mid_month":
@@ -61,8 +56,10 @@ export function applyConvention(
 
     case "half_year":
       // Half a year in the first AND last year of life (IRS half-year). For a
-      // monthly schedule we approximate by halving the first and final periods.
-      return isFirst || isFinal ? Math.round(amount / 2) : amount;
+      // monthly schedule we approximate by halving the first period; the other
+      // half is taken in one extra period after the useful life ends (see
+      // calculateMonthlyDepreciation), so the asset still lands on residual.
+      return isFirst ? Math.round(amount / 2) : amount;
 
     case "mid_quarter":
       // Treat the asset as placed in service mid-quarter: roughly half the
@@ -101,6 +98,11 @@ export function applyConvention(
  * @param accumulated       accumulated depreciation so far, in cents
  * @param opts.unitsThisPeriod    units consumed this period (units_of_production)
  * @param opts.totalExpectedUnits total expected lifetime units (units_of_production)
+ * @param opts.annualRateBp       declining-balance yearly rate in basis points
+ *                                (2000 = 20%); when absent, double declining
+ *                                balance (2 / life in years) is used
+ * @param opts.finalPeriodIndex   index of the period that absorbs whatever is
+ *                                left; defaults to usefulLifeMonths - 1
  * @returns the period's depreciation in cents, never taking NBV below residual
  */
 export function calculateDepreciation(
@@ -110,7 +112,12 @@ export function calculateDepreciation(
   usefulLifeMonths: number,
   periodIndex: number,
   accumulated: number = 0,
-  opts?: { unitsThisPeriod?: number; totalExpectedUnits?: number }
+  opts?: {
+    unitsThisPeriod?: number;
+    totalExpectedUnits?: number;
+    annualRateBp?: number | null;
+    finalPeriodIndex?: number;
+  }
 ): number {
   const depreciableBase = purchasePrice - residualValue;
   if (depreciableBase <= 0) return 0;
@@ -129,17 +136,21 @@ export function calculateDepreciation(
   }
 
   if (usefulLifeMonths <= 0) return 0;
+  const finalPeriodIndex = opts?.finalPeriodIndex ?? usefulLifeMonths - 1;
   // Already fully depreciated by period count.
-  if (periodIndex >= usefulLifeMonths) return 0;
+  if (periodIndex > finalPeriodIndex) return 0;
 
   // Final period: charge whatever remains so the schedule lands exactly on the
   // depreciable base (absorbs all accumulated rounding residual).
-  const isFinalPeriod = periodIndex === usefulLifeMonths - 1;
-  if (isFinalPeriod) return remaining;
+  if (periodIndex === finalPeriodIndex) return remaining;
 
   if (method === "declining_balance") {
-    // Double-declining balance method.
-    const annualRate = 2 / (usefulLifeMonths / 12);
+    // A fixed yearly share of the current book value. Uses the given rate, or
+    // double declining balance (twice the straight-line rate) when none is set.
+    const annualRate =
+      opts?.annualRateBp && opts.annualRateBp > 0
+        ? opts.annualRateBp / 10000
+        : 2 / (usefulLifeMonths / 12);
     const monthlyRate = annualRate / 12;
     const currentBookValue = purchasePrice - accumulated;
     if (currentBookValue <= residualValue) return 0;
@@ -155,7 +166,7 @@ export function calculateDepreciation(
     const n = usefulLifeMonths;
     const denominator = (n * (n + 1)) / 2;
     if (denominator <= 0) return 0;
-    const weight = n - periodIndex; // months remaining including this one
+    const weight = Math.max(1, n - periodIndex); // months remaining including this one
     const dep = Math.round((depreciableBase * weight) / denominator);
     return Math.min(dep, remaining);
   }
@@ -163,6 +174,24 @@ export function calculateDepreciation(
   // straight_line (and default fallback): equal monthly amount.
   const dep = Math.round(depreciableBase / usefulLifeMonths);
   return Math.min(dep, remaining);
+}
+
+/**
+ * True when the convention takes less than a full month in the first period,
+ * so the shortfall is recovered in one extra period after the useful life.
+ */
+function shortensFirstPeriod(
+  convention: string,
+  inServiceDate: string | null | undefined
+): boolean {
+  if (convention === "mid_month" || convention === "half_year" || convention === "mid_quarter") {
+    return true;
+  }
+  if (convention === "pro_rata_days" && inServiceDate) {
+    // Day-by-day only shortens the first month when service starts after the 1st.
+    return Number(inServiceDate.slice(8, 10)) > 1;
+  }
+  return false;
 }
 
 /**
@@ -176,6 +205,7 @@ export function calculateDepreciation(
  * @param asset.accumulatedDepreciation accumulated depreciation in cents
  * @param asset.unitsThisPeriod usage reading for units_of_production
  * @param asset.periodDate      YYYY-MM-DD of the period being charged (end date)
+ * @param asset.depreciationRateBp declining-balance yearly rate (basis points)
  * @returns the period charge in cents
  */
 export function calculateMonthlyDepreciation(asset: {
@@ -191,9 +221,40 @@ export function calculateMonthlyDepreciation(asset: {
   totalExpectedUnits?: number | null;
   unitsThisPeriod?: number | null;
   periodDate?: string | null;
+  depreciationRateBp?: number | null;
 }): number {
   const depreciableBase = asset.purchasePrice - asset.residualValue;
   if (depreciableBase <= 0) return 0;
+  const remaining = depreciableBase - asset.accumulatedDepreciation;
+  if (remaining <= 0) return 0;
+
+  // Units-of-production is usage-prorated already; conventions don't apply.
+  if (asset.depreciationMethod === "units_of_production") {
+    return calculateDepreciation(
+      asset.depreciationMethod,
+      asset.purchasePrice,
+      asset.residualValue,
+      asset.usefulLifeMonths,
+      asset.periodIndex,
+      asset.accumulatedDepreciation,
+      {
+        unitsThisPeriod: asset.unitsThisPeriod ?? 0,
+        totalExpectedUnits: asset.totalExpectedUnits ?? 0,
+      }
+    );
+  }
+
+  const convention = (asset.convention ?? "full_month") as DepreciationConvention;
+  const inServiceDate = asset.inServiceDate ?? asset.purchaseDate;
+
+  // Expensed in full when it's placed in service.
+  if (convention === "full_at_purchase") {
+    return asset.periodIndex === 0 ? remaining : 0;
+  }
+
+  // A shortened first period pushes the last charge one period later.
+  const finalPeriodIndex =
+    asset.usefulLifeMonths - 1 + (shortensFirstPeriod(convention, inServiceDate) ? 1 : 0);
 
   const raw = calculateDepreciation(
     asset.depreciationMethod,
@@ -202,31 +263,69 @@ export function calculateMonthlyDepreciation(asset: {
     asset.usefulLifeMonths,
     asset.periodIndex,
     asset.accumulatedDepreciation,
-    {
-      unitsThisPeriod: asset.unitsThisPeriod ?? 0,
-      totalExpectedUnits: asset.totalExpectedUnits ?? 0,
-    }
+    { annualRateBp: asset.depreciationRateBp ?? null, finalPeriodIndex }
   );
   if (raw <= 0) return 0;
 
-  // Units-of-production is usage-prorated already; conventions don't apply.
-  if (asset.depreciationMethod === "units_of_production") return raw;
+  // The final period settles the remainder exactly; no convention applies.
+  if (asset.periodIndex === finalPeriodIndex) return raw;
 
-  const isFinal =
-    asset.usefulLifeMonths > 0 &&
-    asset.periodIndex === asset.usefulLifeMonths - 1;
-
-  const convention = (asset.convention ?? "full_month") as DepreciationConvention;
-  const adjusted = applyConvention(
-    raw,
-    convention,
-    asset.periodIndex,
-    asset.inServiceDate ?? asset.purchaseDate,
-    asset.periodDate ?? null,
-    isFinal
-  );
+  const adjusted = applyConvention(raw, convention, asset.periodIndex, inServiceDate);
 
   // Never let a convention push the charge past the remaining depreciable base.
-  const remaining = depreciableBase - asset.accumulatedDepreciation;
   return Math.max(0, Math.min(adjusted, remaining));
+}
+
+/** The columns of a fixed asset row the charge depends on. */
+export interface DepreciableAsset {
+  purchasePrice: number;
+  residualValue: number;
+  usefulLifeMonths: number;
+  depreciationMethod: string;
+  accumulatedDepreciation: number;
+  purchaseDate: string;
+  convention: string;
+  inServiceDate: string | null;
+  totalExpectedUnits: number | null;
+  depreciationRateBp?: number | null;
+}
+
+/**
+ * The one calculation every depreciation path uses (the Record value drop
+ * button, the Run depreciation button, the nightly job, disposal catch-up and
+ * the MCP tools): the charge for an asset's next period.
+ *
+ * @param periodIndex count of depreciation entries already booked
+ * @param periodDate  YYYY-MM-DD the charge is dated
+ * @param unitsThisPeriod usage reading (units-of-production only)
+ */
+export function nextDepreciationCharge(
+  asset: DepreciableAsset,
+  periodIndex: number,
+  periodDate: string,
+  unitsThisPeriod?: number | null
+): number {
+  return calculateMonthlyDepreciation({
+    purchasePrice: asset.purchasePrice,
+    residualValue: asset.residualValue,
+    usefulLifeMonths: asset.usefulLifeMonths,
+    depreciationMethod: asset.depreciationMethod,
+    accumulatedDepreciation: asset.accumulatedDepreciation,
+    purchaseDate: asset.purchaseDate,
+    periodIndex,
+    convention: asset.convention,
+    inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
+    totalExpectedUnits: asset.totalExpectedUnits,
+    unitsThisPeriod: unitsThisPeriod ?? null,
+    periodDate,
+    depreciationRateBp: asset.depreciationRateBp ?? null,
+  });
+}
+
+/** First and last day (YYYY-MM-DD) of the calendar month containing `date`. */
+export function monthBounds(date: string): { start: string; end: string } {
+  const [y, m] = date.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, "0");
+  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(lastDay).padStart(2, "0")}` };
 }

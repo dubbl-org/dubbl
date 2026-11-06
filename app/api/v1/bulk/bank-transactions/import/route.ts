@@ -19,10 +19,8 @@ import {
   makeTransactionDedupeHash,
   type NormalizedTransaction,
 } from "@/lib/banking/importer";
-import {
-  loadActiveBankRules,
-  applyBankRulesToTransaction,
-} from "@/lib/api/bank-rules";
+import { applyBankRulesToAccount } from "@/lib/api/bank-rules";
+import { validateImportRows } from "@/lib/import-export/validate-rows";
 import { z } from "zod";
 
 const rowSchema = z.object({
@@ -59,33 +57,32 @@ export async function POST(request: Request) {
     const rawParsed = importSchema.parse(body);
     const source = (rawParsed.source || "custom") as SourceSystem;
     const transformedRows = preProcessBankTransactions(rawParsed.rows, source);
+    // Validate row by row: bad rows are reported, the rest still import.
+    const checked = validateImportRows(transformedRows, rowSchema);
     const parsed = {
       fileName: rawParsed.fileName,
-      rows: transformedRows.map(r => rowSchema.parse(r)),
+      rows: checked.rows,
     };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
       type: "bank-transactions",
       fileName: parsed.fileName,
-      totalRows: parsed.rows.length,
+      totalRows: transformedRows.length,
       status: "processing",
       createdBy: ctx.userId,
     }).returning();
 
     let processedRows = 0;
-    let errorRows = 0;
+    let errorRows = checked.invalid.length;
     let duplicateRows = 0;
-    const errorDetails: Array<{ row: number; error: string }> = [];
+    const errorDetails: Array<{ row: number; error: string }> = [...checked.invalid];
 
     // Cache bank account lookups and per-account import history rows.
     const bankAccountCache = new Map<string, string | null>();
     const importIdCache = new Map<string, string>();
     // Track dedupe hashes already seen per bank account (existing + within this file).
     const seenHashesByAccount = new Map<string, Set<string>>();
-
-    // Load the org's active bank rules once for auto-categorization.
-    const activeRules = await loadActiveBankRules(ctx.organizationId);
 
     const contentHash = createHash("sha256")
       .update(JSON.stringify(rawParsed.rows))
@@ -167,9 +164,6 @@ export async function POST(request: Request) {
         seen.add(dedupeHash);
 
         const importId = await getImportId(bankAccountId);
-        const assignment = activeRules.length
-          ? applyBankRulesToTransaction(activeRules, normalized)
-          : null;
 
         await db.insert(bankTransaction).values({
           bankAccountId,
@@ -180,10 +174,7 @@ export async function POST(request: Request) {
           sourceType: "csv_import",
           importId,
           dedupeHash,
-          status: assignment?.reconcile ? "reconciled" : "unreconciled",
-          accountId: assignment?.accountId ?? null,
-          contactId: assignment?.contactId ?? null,
-          taxRateId: assignment?.taxRateId ?? null,
+          status: "unreconciled",
         });
         processedRows++;
         importedCountByAccount.set(
@@ -192,13 +183,19 @@ export async function POST(request: Request) {
         );
       } catch (err) {
         errorRows++;
-        errorDetails.push({ row: i + 1, error: err instanceof Error ? err.message : "Unknown error" });
+        errorDetails.push({ row: checked.rowNumbers[i], error: err instanceof Error ? err.message : "Unknown error" });
       }
     }
 
     // Finalize each per-account import history row with its counts/status.
     for (const [bankAccountId, importId] of importIdCache) {
       const imported = importedCountByAccount.get(bankAccountId) || 0;
+      // Run the org's bank rules over this account's new lines, exactly like a
+      // statement import: matches get a category, and rules that categorize
+      // automatically (or split) post the entry and move the line to Done.
+      if (imported > 0) {
+        await applyBankRulesToAccount(ctx.organizationId, bankAccountId, ctx.userId, { importId });
+      }
       const duplicates = duplicateCountByAccount.get(bankAccountId) || 0;
       await db
         .update(bankStatementImport)
@@ -214,7 +211,7 @@ export async function POST(request: Request) {
       processedRows,
       errorRows,
       errorDetails: errorDetails.length > 0 ? errorDetails : null,
-      status: errorRows === parsed.rows.length && parsed.rows.length > 0 ? "failed" : "completed",
+      status: processedRows === 0 ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id));
 

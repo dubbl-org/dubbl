@@ -1,10 +1,12 @@
 import { schedules } from "@trigger.dev/sdk";
+import { withWebhookEvents } from "@/lib/webhooks/events";
 import { processBackupMaintenance } from "@/lib/api/backup-maintenance";
 import { processBookkeepingMaintenance } from "@/lib/api/bookkeeping-maintenance";
 import { processInvoicingMaintenance } from "@/lib/api/invoicing-maintenance";
 import { processTrashPurgeMaintenance } from "@/lib/api/trash-purge-maintenance";
 import { retryFailedStripeEvents } from "@/lib/integrations/stripe/retry";
 import { processDigests } from "@/lib/notifications/digest-processor";
+import { processNotificationChecks } from "@/lib/notifications/events";
 import { processReportSchedules } from "@/lib/reports/schedule-processor";
 import { processExchangeRateSync } from "@/lib/currency/rate-sync";
 import { processFxRevaluation } from "@/lib/api/fx-revaluation";
@@ -24,6 +26,14 @@ export const notificationDigestTask = schedules.task({
   run: async () => processDigests(),
 });
 
+// Pay runs coming due and items at or below their reorder point
+export const notificationChecksTask = schedules.task({
+  id: "notification-checks",
+  cron: "0 8 * * *",
+  retry,
+  run: async () => processNotificationChecks(),
+});
+
 export const reportSchedulesTask = schedules.task({
   id: "report-schedules",
   cron: "0 * * * *",
@@ -35,21 +45,21 @@ export const stripeRetryTask = schedules.task({
   id: "stripe-retry",
   cron: "0 * * * *",
   retry,
-  run: async () => retryFailedStripeEvents(),
+  run: async () => withWebhookEvents(retryFailedStripeEvents()),
 });
 
 export const invoicingTask = schedules.task({
   id: "invoicing-maintenance",
   cron: "0 1 * * *",
   retry,
-  run: async () => processInvoicingMaintenance(),
+  run: async () => withWebhookEvents(processInvoicingMaintenance()),
 });
 
 export const bookkeepingTask = schedules.task({
   id: "bookkeeping-maintenance",
   cron: "0 2 * * *",
   retry,
-  run: async () => processBookkeepingMaintenance(),
+  run: async () => withWebhookEvents(processBookkeepingMaintenance()),
 });
 
 export const trashPurgeTask = schedules.task({
@@ -86,6 +96,6 @@ export const fxRevaluationTask = schedules.task({
       .toISOString()
       .slice(0, 10);
     const reversalDate = now.toISOString().slice(0, 10);
-    return processFxRevaluation(asOfDate, reversalDate);
+    return withWebhookEvents(processFxRevaluation(asOfDate, reversalDate));
   },
 });

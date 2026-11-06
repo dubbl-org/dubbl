@@ -5,9 +5,10 @@ import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
+import { deleteWarehouse, updateWarehouse } from "@/lib/api/warehouses";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -52,21 +53,8 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
-    const existing = await db.query.warehouse.findFirst({
-      where: and(
-        eq(warehouse.id, id),
-        eq(warehouse.organizationId, ctx.organizationId),
-        notDeleted(warehouse.deletedAt)
-      ),
-    });
-
-    if (!existing) return notFound("Warehouse");
-
-    const [updated] = await db
-      .update(warehouse)
-      .set({ ...parsed, updatedAt: new Date() })
-      .where(eq(warehouse.id, id))
-      .returning();
+    // Only one default location: making this one the default clears the others.
+    const { existing, updated } = await updateWarehouse(ctx.organizationId, id, parsed);
 
     logAudit({ ctx, action: "update", entityType: "warehouse", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 
@@ -85,20 +73,8 @@ export async function DELETE(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:inventory");
 
-    const existing = await db.query.warehouse.findFirst({
-      where: and(
-        eq(warehouse.id, id),
-        eq(warehouse.organizationId, ctx.organizationId),
-        notDeleted(warehouse.deletedAt)
-      ),
-    });
-
-    if (!existing) return notFound("Warehouse");
-
-    await db
-      .update(warehouse)
-      .set(softDelete())
-      .where(eq(warehouse.id, id));
+    // Refuses while the location holds stock or has open transfers.
+    const existing = await deleteWarehouse(ctx.organizationId, id);
 
     logAudit({
       ctx,

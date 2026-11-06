@@ -1,12 +1,33 @@
 import { db } from "@/lib/db";
-import { employeeDeduction } from "@/lib/db/schema";
+import { employeeDeduction, payrollEmployee } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound } from "@/lib/api/response";
-import { softDelete } from "@/lib/db/soft-delete";
+import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+
+/** The deduction, if it belongs to this employee and the employee to the org. */
+async function findDeduction(organizationId: string, employeeId: string, deductionId: string) {
+  const emp = await db.query.payrollEmployee.findFirst({
+    where: and(
+      eq(payrollEmployee.id, employeeId),
+      eq(payrollEmployee.organizationId, organizationId),
+      notDeleted(payrollEmployee.deletedAt)
+    ),
+    columns: { id: true },
+  });
+  if (!emp) return null;
+  return db.query.employeeDeduction.findFirst({
+    where: and(
+      eq(employeeDeduction.id, deductionId),
+      eq(employeeDeduction.employeeId, emp.id),
+      notDeleted(employeeDeduction.deletedAt)
+    ),
+    columns: { id: true },
+  });
+}
 
 const updateSchema = z.object({
   timing: z.enum(["recurring", "one_time"]).optional(),
@@ -22,12 +43,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; deductionId: string }> }
 ) {
   try {
-    const { deductionId } = await params;
+    const { id, deductionId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    if (!(await findDeduction(ctx.organizationId, id, deductionId))) return notFound("Deduction");
 
     const [updated] = await db
       .update(employeeDeduction)
@@ -50,9 +73,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; deductionId: string }> }
 ) {
   try {
-    const { deductionId } = await params;
+    const { id, deductionId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
+
+    if (!(await findDeduction(ctx.organizationId, id, deductionId))) return notFound("Deduction");
 
     const [deleted] = await db
       .update(employeeDeduction)

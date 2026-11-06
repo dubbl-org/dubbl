@@ -6,13 +6,16 @@ import {
   purchaseRequisitionLine,
   purchaseOrder,
   purchaseOrderLine,
+  contact,
   auditLog,
 } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { wrapTool } from "@/lib/mcp/errors";
+import { preloadTaxRates } from "@/lib/api/tax-calculator";
+import { buildRequisitionLines } from "@/lib/api/requisition-lines";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /**
@@ -21,12 +24,13 @@ import type { AuthContext } from "@/lib/api/auth-context";
  * into a purchase order (PO).
  *
  * MONEY/QUANTITY conventions (mirroring the REST routes):
- *  • create_purchase_requisition takes unitPrice as a DECIMAL number (e.g. 12.50
- *    for $12.50) and quantity in WHOLE units (decimals allowed); both are stored
- *    internally as integers (unitPrice x100 = cents, quantity x100). Line amount
- *    is computed as quantity * unitPrice and stored in integer cents.
+ *  • create/update_purchase_requisition take unitPrice as a DECIMAL number (e.g.
+ *    12.50 for $12.50) and quantity in WHOLE units (decimals allowed); both are
+ *    stored internally as integers (unitPrice in cents, quantity x100). Line
+ *    amount is quantity * unitPrice in integer cents; a line with a taxRateId
+ *    gets exclusive tax on top (shared math in lib/api/requisition-lines.ts).
  *  • All amounts in RESULTS are integer cents; stored quantities are x100
- *    (5 units = 500). Requisitions carry NO tax (taxTotal is 0).
+ *    (5 units = 500).
  *  • All tools are org-scoped via the AuthContext and use direct Drizzle access
  *    (no HTTP self-calls).
  */
@@ -94,7 +98,7 @@ export function registerPurchaseRequisitionTools(
   // ─── Get a single purchase requisition ──────────────────────────────
   server.tool(
     "get_purchase_requisition",
-    "Get a single purchase requisition by ID, including its line items and contact. Amounts are integer cents; line quantities are stored x100 (5 units = 500).",
+    "Get a single purchase requisition by ID, including its contact and line items (each with its account and tax rate). Amounts are integer cents; line quantities are stored x100 (5 units = 500).",
     {
       requisitionId: z
         .string()
@@ -108,17 +112,52 @@ export function registerPurchaseRequisitionTools(
             eq(purchaseRequisition.organizationId, ctx.organizationId),
             notDeleted(purchaseRequisition.deletedAt)
           ),
-          with: { contact: true, lines: true },
+          with: {
+            contact: true,
+            lines: {
+              with: { account: true, taxRate: true },
+              orderBy: (l, { asc }) => [asc(l.sortOrder)],
+            },
+          },
         });
         if (!found) throw new Error("Purchase requisition not found");
         return { requisition: found };
       })
   );
 
+  const lineInput = z.object({
+    description: z.string().min(1).describe("Line item description"),
+    quantity: z
+      .number()
+      .optional()
+      .default(1)
+      .describe("Quantity requested, in whole units (decimals allowed)"),
+    unitPrice: z
+      .number()
+      .optional()
+      .default(0)
+      .describe("Estimated unit price as a DECIMAL (e.g. 12.50 for $12.50), NOT cents"),
+    accountId: z
+      .string()
+      .optional()
+      .describe("Expense/asset account UUID for this line"),
+    taxRateId: z
+      .string()
+      .optional()
+      .describe("Tax rate UUID; exclusive tax is added on top of the line amount"),
+  });
+
+  async function assertOrgContact(contactId: string) {
+    const found = await db.query.contact.findFirst({
+      where: and(eq(contact.id, contactId), eq(contact.organizationId, ctx.organizationId)),
+    });
+    if (!found) throw new Error("Supplier contact not found");
+  }
+
   // ─── Create a purchase requisition ──────────────────────────────────
   server.tool(
     "create_purchase_requisition",
-    "Create a draft purchase requisition (an internal request to buy) with line items. unitPrice is a DECIMAL number (e.g. 12.50 for $12.50); quantity is in whole units (decimals allowed). The system computes each line amount (quantity * unitPrice) in integer cents and assigns a requisition number (REQ). A contact (supplier) is optional at this stage but is REQUIRED before the requisition can be converted to a PO. Requisitions carry no tax (taxTotal is 0). The requisition starts in 'draft'. Returns the created requisition.",
+    "Create a draft purchase requisition (an internal request to buy) with line items. unitPrice is a DECIMAL number (e.g. 12.50 for $12.50); quantity is in whole units (decimals allowed). The system computes each line amount (quantity * unitPrice) in integer cents, adds exclusive tax for lines with a taxRateId, and assigns a requisition number (REQ). A contact (supplier) is optional at this stage but is REQUIRED before the requisition can be converted to a PO (set it with update_purchase_requisition or pass it to convert_purchase_requisition). The requisition starts in 'draft'; send it for approval with submit_purchase_requisition. Returns the created requisition (subtotal, taxTotal, total in integer cents).",
     {
       contactId: z
         .string()
@@ -134,32 +173,14 @@ export function registerPurchaseRequisitionTools(
       reference: z.string().optional().describe("Internal/external reference"),
       notes: z.string().optional().describe("Requisition notes"),
       lines: z
-        .array(
-          z.object({
-            description: z.string().min(1).describe("Line item description"),
-            quantity: z
-              .number()
-              .optional()
-              .default(1)
-              .describe("Quantity requested, in whole units (decimals allowed)"),
-            unitPrice: z
-              .number()
-              .optional()
-              .default(0)
-              .describe("Unit price as a decimal (e.g. 12.50 for $12.50)"),
-            accountId: z
-              .string()
-              .optional()
-              .describe("Expense/asset account UUID for this line"),
-            taxRateId: z.string().optional().describe("Tax rate UUID"),
-          })
-        )
+        .array(lineInput)
         .min(1)
         .describe("Purchase requisition line items (at least one)"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:purchases");
+        if (params.contactId) await assertOrgContact(params.contactId);
 
         const requisitionNumber = await getNextNumber(
           ctx.organizationId,
@@ -168,24 +189,17 @@ export function registerPurchaseRequisitionTools(
           "REQ"
         );
 
-        // Mirror the REST route's storage/amount math: amount = quantity *
-        // unitPrice in cents; quantity and unitPrice stored x100. Requisitions
-        // carry no tax (taxAmount/taxTotal are 0).
-        let subtotal = 0;
-        const processedLines = params.lines.map((l, i) => {
-          const amount = Math.round(l.quantity * l.unitPrice * 100);
-          subtotal += amount;
-          return {
-            description: l.description,
-            quantity: Math.round(l.quantity * 100),
-            unitPrice: Math.round(l.unitPrice * 100),
-            accountId: l.accountId || null,
-            taxRateId: l.taxRateId || null,
-            taxAmount: 0,
-            amount,
-            sortOrder: i,
-          };
-        });
+        // Same line/total math as the REST route (new requisitions are USD,
+        // the column default)
+        const ratesMap = await preloadTaxRates(
+          params.lines.map((l) => l.taxRateId).filter(Boolean) as string[]
+        );
+        const {
+          lines: processedLines,
+          subtotal,
+          taxTotal,
+          total,
+        } = buildRequisitionLines(params.lines, "USD", ratesMap);
 
         const [created] = await db
           .insert(purchaseRequisition)
@@ -198,8 +212,8 @@ export function registerPurchaseRequisitionTools(
             reference: params.reference || null,
             notes: params.notes || null,
             subtotal,
-            taxTotal: 0,
-            total: subtotal,
+            taxTotal,
+            total,
             requestedBy: ctx.userId,
           })
           .returning();
@@ -218,10 +232,189 @@ export function registerPurchaseRequisitionTools(
           action: "create",
           entityType: "purchase_requisition",
           entityId: created.id,
-          changes: { requisitionNumber, total: subtotal },
+          changes: { requisitionNumber, total },
         });
 
         return { requisition: created };
+      })
+  );
+
+  // ─── Update a purchase requisition ──────────────────────────────────
+  server.tool(
+    "update_purchase_requisition",
+    "Edit a purchase requisition. A 'draft' or 'rejected' requisition can change any field; passing lines REPLACES all existing lines and recomputes subtotal, taxTotal and total (integer cents). An 'approved' requisition can only change its supplier (contactId), which converting to a PO needs. Submitted or converted requisitions can't be edited. Omitted fields are left unchanged; pass null to clear an optional field. Returns the updated requisition.",
+    {
+      requisitionId: z
+        .string()
+        .describe("The UUID of the purchase requisition to edit"),
+      contactId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Supplier contact UUID, or null to clear it"),
+      requestDate: z
+        .string()
+        .optional()
+        .describe("Request date (YYYY-MM-DD)"),
+      requiredDate: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Date the goods are needed by (YYYY-MM-DD), or null to clear"),
+      reference: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Internal/external reference, or null to clear"),
+      notes: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Requisition notes, or null to clear"),
+      lines: z
+        .array(lineInput)
+        .min(1)
+        .optional()
+        .describe("New full set of line items; replaces every existing line"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:purchases");
+        const { requisitionId, ...fields } = params;
+
+        const existing = await db.query.purchaseRequisition.findFirst({
+          where: and(
+            eq(purchaseRequisition.id, requisitionId),
+            eq(purchaseRequisition.organizationId, ctx.organizationId),
+            notDeleted(purchaseRequisition.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Purchase requisition not found");
+
+        const supplierOnly = Object.entries(fields).every(
+          ([k, v]) => k === "contactId" || v === undefined
+        );
+        if (
+          !["draft", "rejected"].includes(existing.status) &&
+          !(existing.status === "approved" && supplierOnly)
+        ) {
+          throw new Error(
+            existing.status === "approved"
+              ? "Only the supplier of an approved requisition can be changed"
+              : "Only draft or rejected requisitions can be edited"
+          );
+        }
+        if (fields.contactId) await assertOrgContact(fields.contactId);
+
+        const built = fields.lines
+          ? buildRequisitionLines(
+              fields.lines,
+              existing.currencyCode,
+              await preloadTaxRates(
+                fields.lines.map((l) => l.taxRateId).filter(Boolean) as string[]
+              )
+            )
+          : null;
+
+        const updated = await db.transaction(async (tx) => {
+          if (built) {
+            await tx
+              .delete(purchaseRequisitionLine)
+              .where(eq(purchaseRequisitionLine.requisitionId, requisitionId));
+            await tx
+              .insert(purchaseRequisitionLine)
+              .values(built.lines.map((l) => ({ requisitionId, ...l })));
+          }
+          const [row] = await tx
+            .update(purchaseRequisition)
+            .set({
+              ...(fields.contactId !== undefined && {
+                contactId: fields.contactId || null,
+              }),
+              ...(fields.requestDate && { requestDate: fields.requestDate }),
+              ...(fields.requiredDate !== undefined && {
+                requiredDate: fields.requiredDate || null,
+              }),
+              ...(fields.reference !== undefined && {
+                reference: fields.reference || null,
+              }),
+              ...(fields.notes !== undefined && { notes: fields.notes || null }),
+              ...(built && {
+                subtotal: built.subtotal,
+                taxTotal: built.taxTotal,
+                total: built.total,
+              }),
+              updatedAt: new Date(),
+            })
+            .where(eq(purchaseRequisition.id, requisitionId))
+            .returning();
+          return row;
+        });
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "update",
+          entityType: "purchase_requisition",
+          entityId: requisitionId,
+          changes: { fields: Object.keys(fields).filter((k) => fields[k as keyof typeof fields] !== undefined) },
+        });
+
+        return { requisition: updated };
+      })
+  );
+
+  // ─── Submit a purchase requisition for approval ─────────────────────
+  server.tool(
+    "submit_purchase_requisition",
+    "Send a 'draft' requisition for approval, or resubmit a 'rejected' one after revising it (this clears the old rejection reason). Sets status to 'submitted', after which approve_purchase_requisition or reject_purchase_requisition can decide it. Returns the updated requisition.",
+    {
+      requisitionId: z
+        .string()
+        .describe("The UUID of the draft or rejected purchase requisition to submit"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:purchases");
+
+        const existing = await db.query.purchaseRequisition.findFirst({
+          where: and(
+            eq(purchaseRequisition.id, params.requisitionId),
+            eq(purchaseRequisition.organizationId, ctx.organizationId),
+            notDeleted(purchaseRequisition.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Purchase requisition not found");
+
+        const [updated] = await db
+          .update(purchaseRequisition)
+          .set({
+            status: "submitted",
+            rejectedAt: null,
+            rejectionReason: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(purchaseRequisition.id, params.requisitionId),
+              inArray(purchaseRequisition.status, ["draft", "rejected"])
+            )
+          )
+          .returning();
+
+        if (!updated)
+          throw new Error("Only draft or rejected requisitions can be submitted");
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "submit",
+          entityType: "purchase_requisition",
+          entityId: params.requisitionId,
+          changes: { previousStatus: existing.status },
+        });
+
+        return { requisition: updated };
       })
   );
 
@@ -330,11 +523,15 @@ export function registerPurchaseRequisitionTools(
   // ─── Convert an approved requisition to a purchase order ────────────
   server.tool(
     "convert_purchase_requisition",
-    "Convert an APPROVED purchase requisition into a purchase order (PO). Copies the requisition's contact, dates, reference, notes, totals, currency, and every line onto a new PO (assigned a PO number) and sets the requisition status to 'converted', linking the created PO. Only an 'approved' requisition can be converted, and it MUST have a contact (supplier). Amounts are integer cents. Returns the created purchase order.",
+    "Convert an APPROVED purchase requisition into a purchase order (PO). Copies the requisition's contact, dates, reference, notes, totals, currency, and every line onto a new PO (assigned a PO number) and sets the requisition status to 'converted', linking the created PO. Only an 'approved' requisition can be converted, and it MUST have a supplier: either already set on the requisition or passed as contactId here (which also saves it on the requisition). Amounts are integer cents. Returns the created purchase order.",
     {
       requisitionId: z
         .string()
         .describe("The UUID of the approved purchase requisition to convert"),
+      contactId: z
+        .string()
+        .optional()
+        .describe("Supplier contact UUID to order from; required if the requisition has no supplier yet, otherwise overrides it"),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -351,8 +548,12 @@ export function registerPurchaseRequisitionTools(
         });
 
         if (!req) throw new Error("Approved purchase requisition not found");
-        if (!req.contactId) {
-          throw new Error("Requisition must have a contact to convert");
+        if (params.contactId) await assertOrgContact(params.contactId);
+        const supplierId = params.contactId || req.contactId;
+        if (!supplierId) {
+          throw new Error(
+            "Requisition has no supplier: pass contactId or set it with update_purchase_requisition"
+          );
         }
 
         const poNumber = await getNextNumber(
@@ -363,48 +564,58 @@ export function registerPurchaseRequisitionTools(
         );
         const today = new Date().toISOString().split("T")[0];
 
-        const [po] = await db
-          .insert(purchaseOrder)
-          .values({
-            organizationId: ctx.organizationId,
-            contactId: req.contactId,
-            poNumber,
-            issueDate: today,
-            deliveryDate: req.requiredDate,
-            reference: req.reference,
-            notes: req.notes,
-            subtotal: req.subtotal,
-            taxTotal: req.taxTotal,
-            total: req.total,
-            currencyCode: req.currencyCode,
-            createdBy: ctx.userId,
-          })
-          .returning();
+        const po = await db.transaction(async (tx) => {
+          const [po] = await tx
+            .insert(purchaseOrder)
+            .values({
+              organizationId: ctx.organizationId,
+              contactId: supplierId,
+              poNumber,
+              issueDate: today,
+              deliveryDate: req.requiredDate,
+              reference: req.reference,
+              notes: req.notes,
+              subtotal: req.subtotal,
+              taxTotal: req.taxTotal,
+              total: req.total,
+              currencyCode: req.currencyCode,
+              createdBy: ctx.userId,
+            })
+            .returning();
 
-        if (req.lines.length > 0) {
-          await db.insert(purchaseOrderLine).values(
-            req.lines.map((l) => ({
-              purchaseOrderId: po.id,
-              description: l.description,
-              quantity: l.quantity,
-              unitPrice: l.unitPrice,
-              accountId: l.accountId,
-              taxRateId: l.taxRateId,
-              taxAmount: l.taxAmount,
-              amount: l.amount,
-              sortOrder: l.sortOrder,
-            }))
-          );
-        }
+          if (req.lines.length > 0) {
+            await tx.insert(purchaseOrderLine).values(
+              req.lines.map((l) => ({
+                purchaseOrderId: po.id,
+                description: l.description,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                accountId: l.accountId,
+                taxRateId: l.taxRateId,
+                taxAmount: l.taxAmount,
+                amount: l.amount,
+                sortOrder: l.sortOrder,
+              }))
+            );
+          }
 
-        await db
-          .update(purchaseRequisition)
-          .set({
-            status: "converted",
-            convertedPoId: po.id,
-            updatedAt: new Date(),
-          })
-          .where(eq(purchaseRequisition.id, params.requisitionId));
+          await tx
+            .update(purchaseRequisition)
+            .set({
+              status: "converted",
+              contactId: supplierId,
+              convertedPoId: po.id,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(purchaseRequisition.id, params.requisitionId),
+                eq(purchaseRequisition.status, "approved")
+              )
+            );
+
+          return po;
+        });
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,

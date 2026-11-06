@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { applyContactDefaults, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { db } from "@/lib/db";
 import { bill, billLine, organization, taxRate } from "@/lib/db/schema";
 import { eq, and, desc, sql, ne, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -16,6 +18,9 @@ import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
 import { linkBillToPurchaseOrders } from "./_procurement";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { openApprovalRequest } from "@/lib/approvals/entities";
+import { emitBillCreated } from "@/lib/webhooks/events";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -97,6 +102,14 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertLineStockRefs(ctx.organizationId, parsed.lines);
+    // The contact's defaults (Contacts > Bookkeeping): account and tax rate for
+    // lines that don't set one.
+    parsed.lines = applyContactDefaults(
+      parsed.lines,
+      await loadContactDefaults(ctx.organizationId, parsed.contactId),
+      "purchase"
+    );
 
     await assertNotLocked(ctx.organizationId, parsed.issueDate);
 
@@ -106,6 +119,7 @@ export async function POST(request: Request) {
       parsed.currencyCode,
       parsed.contactId
     );
+    await checkMultiCurrency(ctx.organizationId, currencyCode);
 
     // A supplier-supplied invoice number drives duplicate detection; otherwise
     // we auto-number (auto-numbered bills are unique by construction).
@@ -239,6 +253,7 @@ export async function POST(request: Request) {
         createdBy: ctx.userId,
       })
       .returning();
+    emitBillCreated(ctx.organizationId, [created.id]);
 
     await db.insert(billLine).values(
       processedLines.map((l) => ({
@@ -250,6 +265,13 @@ export async function POST(request: Request) {
     // Link any source purchase orders (join table supports multiple bills/PO).
     if (parsed.purchaseOrderIds && parsed.purchaseOrderIds.length > 0) {
       await linkBillToPurchaseOrders(created.id, parsed.purchaseOrderIds);
+    }
+
+    // A bill created awaiting approval enters the matching approval workflow
+    // (if any): its approvers then act on the request, and it posts only after
+    // the last step approves. No workflow keeps the one-click approval.
+    if (created.status === "pending_approval") {
+      await openApprovalRequest(ctx, "bill", created.id, created);
     }
 
     logAudit({ ctx, action: "create", entityType: "bill", entityId: created.id, request });

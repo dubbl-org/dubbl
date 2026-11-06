@@ -1,4 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
+import { resolveTermsDays } from "@/lib/payment-terms";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -16,8 +18,11 @@ import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
 import { resolvePrice } from "@/lib/api/pricing";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { emitInvoiceCreated } from "@/lib/webhooks/events";
 
 export function registerQuoteTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -202,10 +207,10 @@ export function registerQuoteTools(server: McpServer, ctx: AuthContext) {
             where: eq(organization.id, ctx.organizationId),
             columns: { defaultPaymentTerms: true },
           });
-          termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+          termsDays = resolveTermsDays(null, org?.defaultPaymentTerms);
         }
         const dueDateObj = new Date(today + "T00:00:00Z");
-        dueDateObj.setUTCDate(dueDateObj.getUTCDate() + (termsDays || 30));
+        dueDateObj.setUTCDate(dueDateObj.getUTCDate() + (termsDays ?? 30));
         const dueDate = dueDateObj.toISOString().split("T")[0];
 
         const newBilledTotal = alreadyBilled + invoiceTotal;
@@ -266,6 +271,7 @@ export function registerQuoteTools(server: McpServer, ctx: AuthContext) {
 
           return { createdInvoice, updatedQuote };
         });
+        emitInvoiceCreated(ctx.organizationId, [result.createdInvoice.id]);
 
         return {
           quote: result.updatedQuote,
@@ -411,6 +417,16 @@ export function registerQuoteTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:invoices");
+        await assertLineStockRefs(ctx.organizationId, params.lines);
+
+        // The customer's defaults: income account and tax rate for lines that
+        // don't set one, and no tax if they're marked "Don't charge tax".
+        params.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+          params.lines,
+          await loadContactDefaults(ctx.organizationId, params.contactId),
+          "sales"
+        ));
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
 
         const quoteNumber = await getNextNumber(
           ctx.organizationId,

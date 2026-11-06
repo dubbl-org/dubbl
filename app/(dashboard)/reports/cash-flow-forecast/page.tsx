@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -21,6 +21,7 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
+import { useApi } from "@/lib/query/use-api";
 
 interface ForecastWeek {
   weekOf: string;
@@ -32,39 +33,15 @@ interface ForecastWeek {
 }
 
 export default function CashFlowForecastPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [weeksAhead, setWeeksAhead] = useState(12);
-  const [weeks, setWeeks] = useState<ForecastWeek[]>([]);
-  const [totalInflows, setTotalInflows] = useState(0);
-  const [totalOutflows, setTotalOutflows] = useState(0);
-  const [netForecast, setNetForecast] = useState(0);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetch(`/api/v1/reports/cash-flow-forecast?weeks=${weeksAhead}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setWeeks(data.weeks || []);
-        setTotalInflows(data.totalInflows || 0);
-        setTotalOutflows(data.totalOutflows || 0);
-        setNetForecast(data.netForecast || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [weeksAhead]);
+  const { data, loading } = useApi<{ weeks?: ForecastWeek[]; totalInflows?: number; totalOutflows?: number; netForecast?: number }>(
+    `/api/v1/reports/cash-flow-forecast?weeks=${weeksAhead}`,
+    { keepPrevious: true }
+  );
+  const weeks = data?.weeks || [];
+  const totalInflows = data?.totalInflows || 0;
+  const totalOutflows = data?.totalOutflows || 0;
+  const netForecast = data?.netForecast || 0;
 
   const chartData = weeks.map((w) => ({
     name: w.weekOf,
@@ -73,7 +50,7 @@ export default function CashFlowForecastPage() {
     cumulative: w.cumulativeNet / 100,
   }));
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -122,9 +99,7 @@ export default function CashFlowForecastPage() {
         />
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : weeks.length === 0 ? (
+      {weeks.length === 0 ? (
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No forecast data available. Create invoices, bills, or recurring templates to see projections.</p>

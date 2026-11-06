@@ -12,7 +12,11 @@ import { assertNotLocked } from "@/lib/api/period-lock";
 import { getNextNumber } from "@/lib/api/numbering";
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { isValidCurrencyCode } from "@/lib/currency/iso4217";
+import { checkPaymentBankAccount } from "@/lib/api/payment-bank-account";
 import { z } from "zod";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
+import { isCashPayment } from "@/lib/api/payment-credits";
 
 const allocationSchema = z.object({
   documentType: z.enum(["invoice", "bill"]),
@@ -53,6 +57,12 @@ export async function GET(request: Request) {
 
     if (contactId) {
       conditions.push(eq(payment.contactId, contactId));
+    }
+
+    // Credit notes / prepayments applied to invoices are stored as payment
+    // rows but move no money; leave them out unless asked for.
+    if (url.searchParams.get("includeCredits") !== "true") {
+      conditions.push(isCashPayment());
     }
 
     const payments = await db.query.payment.findMany({
@@ -182,6 +192,20 @@ export async function POST(request: Request) {
     }
     const currencyCode = providedCurrency ?? docCurrency ?? "USD";
 
+    // A chosen bank account must exist and be able to carry this currency;
+    // otherwise the cash leg would silently fall back to the default account.
+    if (parsed.bankAccountId) {
+      const bankError = await checkPaymentBankAccount(
+        ctx.organizationId,
+        parsed.bankAccountId,
+        [currencyCode],
+        parsed.type === "received" ? "invoice" : "bill"
+      );
+      if (bankError) {
+        return NextResponse.json({ error: bankError }, { status: 400 });
+      }
+    }
+
     // Generate payment number
     const paymentNumber = await getNextNumber(ctx.organizationId, "payment", "payment_number", "PAY");
 
@@ -210,6 +234,7 @@ export async function POST(request: Request) {
           createdBy: ctx.userId,
         })
         .returning();
+      emitPaymentReceived(ctx.organizationId, [created.id]);
 
       // Insert allocation rows
       await tx.insert(paymentAllocation).values(
@@ -298,6 +323,7 @@ export async function POST(request: Request) {
       with: { contact: true, allocations: true },
     });
 
+    await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
     logAudit({ ctx, action: "create", entityType: "payment", entityId: created.id, request });
 
     return NextResponse.json({ payment: result }, { status: 201 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ContentReveal } from "@/components/ui/content-reveal";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
   Pencil,
@@ -39,6 +38,7 @@ import {
   Network,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useApiRecords } from "@/lib/query/use-api";
 
 interface CostCenter {
   id: string;
@@ -87,8 +87,8 @@ function flattenTree(nodes: TreeNode[], depth = 0): { node: TreeNode; depth: num
 }
 
 export default function CostCentersPage() {
-  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Pages through the list (the API returns at most 100 per request).
+  const { rows: costCenters, loading } = useApiRecords<CostCenter>("/api/v1/cost-centers");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<CostCenter | null>(null);
   const [deleting, setDeleting] = useState<CostCenter | null>(null);
@@ -112,23 +112,6 @@ export default function CostCentersPage() {
     }),
     [orgId]
   );
-
-  const fetchCostCenters = useCallback(async () => {
-    if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/cost-centers?limit=500", {
-        headers: { "x-organization-id": orgId },
-      });
-      const json = await res.json();
-      if (json.data) setCostCenters(json.data);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchCostCenters();
-  }, [fetchCostCenters]);
 
   function openCreate() {
     setEditing(null);
@@ -181,7 +164,6 @@ export default function CostCentersPage() {
 
       toast.success(editing ? "Cost center updated" : "Cost center created");
       closeDrawer();
-      await fetchCostCenters();
     } catch {
       toast.error(
         editing ? "Failed to update cost center" : "Failed to create cost center"
@@ -202,7 +184,6 @@ export default function CostCentersPage() {
       if (!res.ok) throw new Error("Failed");
       toast.success("Cost center deleted");
       setDeleting(null);
-      await fetchCostCenters();
     } catch {
       toast.error("Failed to delete cost center");
     } finally {
@@ -400,11 +381,13 @@ export default function CostCentersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (top-level)</SelectItem>
-                  {availableParents.map((cc) => (
-                    <SelectItem key={cc.id} value={cc.id}>
-                      {cc.code} · {cc.name}
-                    </SelectItem>
-                  ))}
+                  {availableParents
+                    .filter((cc) => cc.isActive || cc.id === formParentId)
+                    .map((cc) => (
+                      <SelectItem key={cc.id} value={cc.id}>
+                        {cc.code} · {cc.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

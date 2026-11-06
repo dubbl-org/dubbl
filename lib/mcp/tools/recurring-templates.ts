@@ -7,6 +7,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import { processRecurringDocuments } from "@/lib/api/recurring-generate";
+import { resumeSchedule } from "@/lib/api/recurring-schedule";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -257,7 +258,7 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
 
   server.tool(
     "update_recurring_template",
-    "Update a recurring DOCUMENT template's header fields (name, frequency, status, endDate, maxOccurrences, reference, notes, currencyCode, and the invoice-only autoSend / createAsApproved automation flags). Mirrors the PATCH route: line items are NOT edited here. Only provided fields change. Returns the updated template.",
+    "Update a recurring DOCUMENT template (name, contact, frequency, status, nextRunDate, endDate, maxOccurrences, reference, notes, currencyCode, the invoice-only autoSend / createAsApproved flags, and optionally the full line set). Mirrors the PATCH route. Only provided fields change; sending lines replaces every line (unitPrice in DOLLARS, stored as cents). Use status 'paused' to pause and 'active' to resume. Returns the updated template.",
     {
       templateId: z.string().describe("The UUID of the recurring template to update"),
       name: z.string().min(1).optional().describe("New template name"),
@@ -269,6 +270,28 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
         .enum(["active", "paused", "completed"])
         .optional()
         .describe("New status: active (running), paused (skipped), or completed (stopped)"),
+      contactId: z
+        .string()
+        .optional()
+        .describe("New contact UUID (customer for invoices, supplier for bills/expenses)"),
+      nextRunDate: z
+        .string()
+        .optional()
+        .describe("Date (YYYY-MM-DD) the next document is created, e.g. to skip a run"),
+      lines: z
+        .array(
+          z.object({
+            description: z.string().min(1).describe("Line item description"),
+            quantity: z.number().optional().default(1).describe("Quantity (decimal, e.g. 1.5); stored as quantity x 100"),
+            unitPrice: z.number().optional().default(0).describe("Unit price in DOLLARS (e.g. 12.50); stored as integer cents"),
+            accountId: z.string().optional().describe("Revenue/expense account UUID"),
+            taxRateId: z.string().optional().describe("Tax rate UUID"),
+            discountPercent: z.number().int().min(0).max(10000).optional().describe("Discount in basis points (1000 = 10%)"),
+          })
+        )
+        .min(1)
+        .optional()
+        .describe("Replacement line items; omit to keep the current lines"),
       endDate: z
         .string()
         .nullable()
@@ -312,6 +335,18 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
         // omitted so they aren't overwritten to null.
         const updates: Record<string, unknown> = { updatedAt: new Date() };
         if (params.name !== undefined) updates.name = params.name;
+        if (params.contactId !== undefined) updates.contactId = params.contactId;
+        if (params.nextRunDate !== undefined) updates.nextRunDate = params.nextRunDate;
+        // Resuming skips the dates missed while paused (no back-fill).
+        if (existing.status === "paused" && params.status === "active" && params.nextRunDate === undefined) {
+          Object.assign(
+            updates,
+            resumeSchedule(
+              { ...existing, endDate: params.endDate !== undefined ? params.endDate : existing.endDate },
+              new Date().toISOString().split("T")[0]
+            )
+          );
+        }
         if (params.frequency !== undefined) updates.frequency = params.frequency;
         if (params.status !== undefined) updates.status = params.status;
         if (params.endDate !== undefined) updates.endDate = params.endDate;
@@ -328,6 +363,24 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
           .set(updates)
           .where(eq(recurringTemplate.id, params.templateId))
           .returning();
+
+        if (params.lines) {
+          await db
+            .delete(recurringTemplateLine)
+            .where(eq(recurringTemplateLine.templateId, params.templateId));
+          await db.insert(recurringTemplateLine).values(
+            params.lines.map((l, i) => ({
+              templateId: params.templateId,
+              description: l.description,
+              quantity: Math.round(l.quantity * 100),
+              unitPrice: Math.round(l.unitPrice * 100),
+              accountId: l.accountId ?? null,
+              taxRateId: l.taxRateId ?? null,
+              discountPercent: l.discountPercent ?? 0,
+              sortOrder: i,
+            }))
+          );
+        }
 
         logAudit({
           ctx,
@@ -365,11 +418,16 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
           throw new Error("Cannot toggle a completed template");
         }
 
-        const newStatus = existing.status === "active" ? "paused" : "active";
+        // Resuming skips the dates missed while paused (no back-fill).
+        const today = new Date().toISOString().split("T")[0];
+        const change =
+          existing.status === "active"
+            ? { status: "paused" as const }
+            : resumeSchedule(existing, today);
 
         const [updated] = await db
           .update(recurringTemplate)
-          .set({ status: newStatus, updatedAt: new Date() })
+          .set({ ...change, updatedAt: new Date() })
           .where(eq(recurringTemplate.id, params.templateId))
           .returning();
 
@@ -378,7 +436,7 @@ export function registerRecurringTemplateTools(server: McpServer, ctx: AuthConte
           action: "update",
           entityType: "recurring_template",
           entityId: params.templateId,
-          changes: { status: newStatus },
+          changes: change,
         });
 
         return { template: updated };

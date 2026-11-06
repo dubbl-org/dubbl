@@ -6,6 +6,8 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { z } from "zod";
+import { getOrgTaxConfig } from "@/lib/reports/tax-return";
+import { filingDeadline } from "@/lib/tax/filing-deadline";
 
 export async function GET(
   request: Request,
@@ -24,7 +26,12 @@ export async function GET(
     });
 
     if (!found) return notFound("Tax period");
-    return NextResponse.json({ taxPeriod: found });
+    const config = await getOrgTaxConfig(ctx.organizationId);
+    return NextResponse.json({
+      currency: config.baseCurrency,
+      country: config.country,
+      taxPeriod: { ...found, dueDate: filingDeadline(found.endDate, config.country, found.type) },
+    });
   } catch (err) {
     return handleError(err);
   }

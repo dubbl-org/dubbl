@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "motion/react";
 import { Plus } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -94,15 +94,7 @@ function tenureMonths(e: Employee) {
 
 export default function EmployeesPage() {
   const { open: openDrawer } = useCreateDrawer();
-  const [version, setVersion] = useState(0);
   useDocumentTitle("Payroll · Employees");
-
-  // Other screens can ask this list to reload
-  useEffect(() => {
-    const handler = () => setVersion((v) => v + 1);
-    window.addEventListener("refetch-employees", handler);
-    return () => window.removeEventListener("refetch-employees", handler);
-  }, []);
 
   const config = useMemo<ExplorerConfig<Employee>>(
     () => ({
@@ -221,7 +213,7 @@ export default function EmployeesPage() {
     [openDrawer]
   );
 
-  return <Explorer key={version} config={config} />;
+  return <Explorer config={config} />;
 }
 
 function EmployeesEmpty({ onCreate }: { onCreate: () => void }) {

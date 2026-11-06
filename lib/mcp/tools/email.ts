@@ -11,6 +11,7 @@ import type { AuthContext } from "@/lib/api/auth-context";
 import { describeRecords } from "@/lib/documents/records";
 import { requireRole } from "@/lib/api/require-role";
 import { getEmailSettings, removeEmailSettings, saveEmailSettings, testEmailSettings } from "@/lib/email/email-settings";
+import { documentsFromAddress } from "@/lib/email/senders";
 
 export function registerEmailTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -327,14 +328,18 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "get_email_settings",
-    "Show how the workspace sends document emails: its own mail server (SMTP host, port, username, from address and name, reply-to, TLS, and whether the connection is verified) or, when this returns null, dubbl's shared sender. The password is never returned; hasPassword says whether one is saved.",
+    "Show how the workspace sends document emails: its own mail server (SMTP host, port, username, from address and name, reply-to, TLS, and whether the connection is verified) or, when emailConfig is null or not verified, dubbl's shared sender (platformFrom is the address it sends from). The password is never returned; hasPassword says whether one is saved.",
     {},
-    () => wrapTool(ctx, async () => ({ emailConfig: await getEmailSettings(ctx.organizationId) }))
+    () =>
+      wrapTool(ctx, async () => ({
+        emailConfig: await getEmailSettings(ctx.organizationId),
+        platformFrom: documentsFromAddress(),
+      }))
   );
 
   server.tool(
     "save_email_settings",
-    "Set up or change the workspace's own outgoing mail server, so invoices and quotes are emailed from the business's address. Checks the login straight away; isVerified in the result says whether the server accepted it (only verified settings are used for sending). smtpPassword can be left out on later changes to keep the saved one. Requires the manage:banking permission.",
+    "Set up or change the workspace's own outgoing mail server, so invoices and quotes are emailed from the business's address. Checks the login straight away; isVerified in the result says whether the server accepted it (only verified settings are used for sending). smtpPassword can be left out on later changes to keep the saved one. Requires the manage:integrations permission.",
     {
       smtpHost: z.string().min(1).describe("Mail server host, e.g. 'smtp.gmail.com'"),
       smtpPort: z.number().int().min(1).max(65535).optional().default(587).describe("Port, usually 587 (STARTTLS) or 465 (SSL)"),
@@ -347,7 +352,7 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:banking");
+        requireRole(ctx, "manage:integrations");
         const result = await saveEmailSettings(ctx.organizationId, params);
         return { emailConfig: result.emailConfig };
       })
@@ -355,22 +360,22 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "send_test_email",
-    "Send a test message through the workspace's own mail server to its from-address. Marks the settings verified when it goes through. Requires the manage:banking permission. Returns { sentTo }.",
+    "Send a test message through the workspace's own mail server to its from-address. Marks the settings verified when it goes through. Requires the manage:integrations permission. Returns { sentTo }.",
     {},
     () =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:banking");
+        requireRole(ctx, "manage:integrations");
         return testEmailSettings(ctx.organizationId);
       })
   );
 
   server.tool(
     "remove_email_settings",
-    "Forget the workspace's own mail server, so document emails go out from dubbl's shared sender again. Requires the manage:banking permission. Returns { removed }.",
+    "Forget the workspace's own mail server, so document emails go out from dubbl's shared sender again. Requires the manage:integrations permission. Returns { removed }.",
     {},
     () =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:banking");
+        requireRole(ctx, "manage:integrations");
         return removeEmailSettings(ctx.organizationId);
       })
   );

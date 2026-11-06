@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { debitNote } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
+import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { voidDebitNote, DebitNoteError } from "@/lib/api/debit-notes";
 
 export async function POST(
   request: Request,
@@ -17,33 +14,16 @@ export async function POST(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:debit-notes");
 
-    const found = await db.query.debitNote.findFirst({
-      where: and(
-        eq(debitNote.id, id),
-        eq(debitNote.organizationId, ctx.organizationId),
-        notDeleted(debitNote.deletedAt)
-      ),
-    });
+    // Reverses the send posting and gives any applied amounts back to the bills.
+    const { debitNote: updated, previousStatus } = await voidDebitNote(ctx, id);
 
-    if (!found) return notFound("Debit note");
-    if (found.status === "void") {
-      return NextResponse.json({ error: "Already voided" }, { status: 400 });
-    }
-
-    const [updated] = await db
-      .update(debitNote)
-      .set({
-        status: "void",
-        voidedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(debitNote.id, id))
-      .returning();
-
-    logAudit({ ctx, action: "void", entityType: "debit_note", entityId: id, changes: { previousStatus: found.status }, request });
+    logAudit({ ctx, action: "void", entityType: "debit_note", entityId: id, changes: { previousStatus }, request });
 
     return NextResponse.json({ debitNote: updated });
   } catch (err) {
+    if (err instanceof DebitNoteError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return handleError(err);
   }
 }

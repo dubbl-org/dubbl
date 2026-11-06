@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, CheckCircle2, Flag, Target, Loader2, Users, DollarSign, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -27,11 +26,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
-import { useProject, formatDateShort, pct } from "../project-context";
+import { useProject, formatDateShort, pct, isPastDue, projectFetch, errorText } from "../project-context";
+import { ProjectInvoiceSheet } from "../invoice-sheet";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 export default function MilestonesPage() {
-  const { project: proj, orgId, projectId, refresh } = useProject();
+  const { project: proj, orgId, projectId, canManage } = useProject();
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
@@ -41,84 +43,20 @@ export default function MilestonesPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [assignMilestoneId, setAssignMilestoneId] = useState<string | null>(null);
-  interface Assignment { id: string; amount: number; description: string | null; paid: boolean; member?: { user?: { name: string | null; email: string | null } } }
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  interface Assignment { id: string; amount: number; description: string | null; isPaid: boolean; member?: { user?: { name: string | null; email: string | null } } }
   const [assignMemberId, setAssignMemberId] = useState("none");
   const [assignAmount, setAssignAmount] = useState("");
   const [assignDesc, setAssignDesc] = useState("");
   const [assignSaving, setAssignSaving] = useState(false);
 
-  // Progress invoice state
   const [invoiceOpen, setInvoiceOpen] = useState(false);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [invoiceSaving, setInvoiceSaving] = useState(false);
-  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([]);
-  const [selectedTimeEntryIds, setSelectedTimeEntryIds] = useState<string[]>([]);
-  const [fixedPercent, setFixedPercent] = useState("");
-  const [invoiceNotes, setInvoiceNotes] = useState("");
-  // Data from GET endpoint
-  interface UninvoicedMilestone { id: string; title: string; amount: number; invoicedAmountCents: number; remaining: number }
-  interface UninvoicedTimeEntry { id: string; date: string; description: string | null; minutes: number; hourlyRate: number; amount: number }
-  interface UninvoicedData {
-    billingType: string;
-    milestones?: UninvoicedMilestone[];
-    timeEntries?: UninvoicedTimeEntry[];
-    fixedPrice?: number;
-    totalInvoiced?: number;
-    remaining?: number;
-    invoicedPercent?: number;
-  }
-  const [uninvoicedData, setUninvoicedData] = useState<UninvoicedData | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Projects · Milestones");
 
-  useEffect(() => {
-    if (!assignMilestoneId || !orgId) return;
-    setLoadingAssignments(true);
-    fetch(`/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then(r => r.json())
-      .then(data => { if (data.assignments) setAssignments(data.assignments); })
-      .finally(() => setLoadingAssignments(false));
-  }, [assignMilestoneId, orgId, projectId]);
-
-  // Fetch uninvoiced data when invoice sheet opens
-  useEffect(() => {
-    if (!invoiceOpen || !orgId) return;
-    setInvoiceLoading(true);
-    setUninvoicedData(null);
-    setSelectedMilestoneIds([]);
-    setSelectedTimeEntryIds([]);
-    setFixedPercent("");
-    setInvoiceNotes("");
-    fetch(`/api/v1/projects/${projectId}/progress-invoice`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then(r => r.json())
-      .then(data => setUninvoicedData(data))
-      .finally(() => setInvoiceLoading(false));
-  }, [invoiceOpen, orgId, projectId]);
-
-  // Calculate invoice preview total (must be before early returns)
-  const invoicePreviewTotal = useMemo(() => {
-    if (!uninvoicedData || !proj) return 0;
-    if (uninvoicedData.billingType === "milestone") {
-      return (uninvoicedData.milestones || [])
-        .filter((m) => selectedMilestoneIds.includes(m.id))
-        .reduce((s: number, m) => s + m.remaining, 0);
-    }
-    if (uninvoicedData.billingType === "hourly") {
-      return (uninvoicedData.timeEntries || [])
-        .filter((e) => selectedTimeEntryIds.includes(e.id))
-        .reduce((s: number, e) => s + e.amount, 0);
-    }
-    if (uninvoicedData.billingType === "fixed") {
-      const pctVal = Math.min(100, Math.max(0, parseFloat(fixedPercent) || 0));
-      return Math.round((proj.fixedPrice * pctVal) / 100);
-    }
-    return 0;
-  }, [uninvoicedData, selectedMilestoneIds, selectedTimeEntryIds, fixedPercent, proj]);
+  const { data: assignmentsData, loading: loadingAssignments } = useApi<{ assignments?: Assignment[] }>(
+    assignMilestoneId ? `/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments` : null
+  );
+  const assignments = assignmentsData?.assignments ?? [];
 
   if (!proj) return null;
 
@@ -133,17 +71,14 @@ export default function MilestonesPage() {
     if (!orgId || !title.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/milestones`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ title: title.trim(), description: desc || null, dueDate: dueDate || null, amount: Math.round(parseFloat(amount || "0") * 100) }),
+        body: { title: title.trim(), description: desc || null, dueDate: dueDate || null, amount: Math.round(parseFloat(amount || "0") * 100) },
       });
-      if (!res.ok) throw new Error("Failed");
       toast.success("Milestone created");
       setAddOpen(false);
       setTitle(""); setDesc(""); setDueDate(""); setAmount("");
-      refresh();
-    } catch { toast.error("Failed to create milestone"); }
+    } catch (err) { toast.error(errorText(err, "Failed to create milestone")); }
     finally { setSaving(false); }
   }
 
@@ -152,22 +87,29 @@ export default function MilestonesPage() {
     setTogglingId(ms.id);
     try {
       const newStatus = ms.status === "completed" ? "upcoming" : "completed";
-      await fetch(`/api/v1/projects/${projectId}/milestones/${ms.id}`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones/${ms.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ status: newStatus }),
+        body: { status: newStatus },
       });
-      refresh();
-    } finally { setTogglingId(null); }
+    } catch (err) { toast.error(errorText(err, "Failed to update milestone")); }
+    finally { setTogglingId(null); }
   }
 
-  async function deleteMilestone(msId: string) {
+  async function deleteMilestone(ms: typeof milestones[0]) {
     if (!orgId || deletingId) return;
-    setDeletingId(msId);
+    const ok = await confirm({
+      title: `Delete "${ms.title}"?`,
+      description: "The milestone and its member assignments are removed for good. A milestone that is on an invoice can't be deleted.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeletingId(ms.id);
     try {
-      await fetch(`/api/v1/projects/${projectId}/milestones/${msId}`, { method: "DELETE", headers: { "x-organization-id": orgId } });
-      refresh();
-    } finally { setDeletingId(null); }
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones/${ms.id}`, { method: "DELETE" });
+      toast.success("Milestone deleted");
+    } catch (err) { toast.error(errorText(err, "Failed to delete milestone")); }
+    finally { setDeletingId(null); }
   }
 
   const members = proj.members;
@@ -176,90 +118,44 @@ export default function MilestonesPage() {
     if (!orgId || !assignMilestoneId || assignMemberId === "none") return;
     setAssignSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
+        body: {
           memberId: assignMemberId,
           amount: Math.round(parseFloat(assignAmount || "0") * 100),
           description: assignDesc || null,
-        }),
+        },
       });
-      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed"); }
       toast.success("Assignment added");
       setAssignMemberId("none"); setAssignAmount(""); setAssignDesc("");
-      // Refresh assignments
-      const r = await fetch(`/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await r.json();
-      if (data.assignments) setAssignments(data.assignments);
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
+    } catch (err) { toast.error(errorText(err, "Failed to add assignment")); }
     finally { setAssignSaving(false); }
   }
 
-  async function markAssignmentPaid(assignmentId: string) {
+  async function setAssignmentPaid(assignmentId: string, isPaid: boolean) {
     if (!orgId || !assignMilestoneId) return;
     try {
-      await fetch(`/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments/${assignmentId}`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments?assignmentId=${assignmentId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({ paid: true }),
+        body: { isPaid },
       });
-      toast.success("Marked as paid");
-      const r = await fetch(`/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await r.json();
-      if (data.assignments) setAssignments(data.assignments);
-    } catch { toast.error("Failed to update"); }
+      toast.success(isPaid ? "Marked as paid" : "Marked as unpaid");
+    } catch (err) { toast.error(errorText(err, "Failed to update assignment")); }
   }
 
-  async function handleCreateInvoice() {
-    if (!orgId || !proj || invoicePreviewTotal <= 0) return;
-    setInvoiceSaving(true);
+  async function removeAssignment(a: Assignment) {
+    if (!orgId || !assignMilestoneId) return;
+    const ok = await confirm({
+      title: "Remove this assignment?",
+      description: `${a.member?.user?.name || a.member?.user?.email || "This member"} will no longer be assigned ${formatMoney(a.amount)} for this milestone.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
-      const body: Record<string, unknown> = { notes: invoiceNotes || undefined };
-      if (proj.billingType === "milestone") {
-        body.milestoneIds = selectedMilestoneIds;
-      } else if (proj.billingType === "hourly") {
-        body.timeEntryIds = selectedTimeEntryIds;
-      } else if (proj.billingType === "fixed") {
-        body.percentageToInvoice = Math.min(100, Math.max(0, parseFloat(fixedPercent) || 0));
-      }
-
-      const res = await fetch(`/api/v1/projects/${projectId}/progress-invoice`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create invoice");
-      }
-
-      const data = await res.json();
-      toast.success(`Invoice ${data.invoice.invoiceNumber} created`);
-      setInvoiceOpen(false);
-      refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create invoice");
-    } finally {
-      setInvoiceSaving(false);
-    }
-  }
-
-  function toggleMilestoneSelection(id: string) {
-    setSelectedMilestoneIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  }
-
-  function toggleTimeEntrySelection(id: string) {
-    setSelectedTimeEntryIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+      await projectFetch(orgId, `/api/v1/projects/${projectId}/milestones/${assignMilestoneId}/assignments?assignmentId=${a.id}`, { method: "DELETE" });
+      toast.success("Assignment removed");
+    } catch (err) { toast.error(errorText(err, "Failed to remove assignment")); }
   }
 
   const isBillable = proj.billingType !== "non_billable";
@@ -299,14 +195,16 @@ export default function MilestonesPage() {
       </div>
 
       <div className="flex justify-end gap-2">
-        {isBillable && (
+        {isBillable && canManage && proj.contactId && (
           <Button size="sm" variant="outline" className="h-8" onClick={() => setInvoiceOpen(true)}>
             <FileText className="size-3.5" />Create Invoice
           </Button>
         )}
-        <Button size="sm" className="bg-brand-600 hover:bg-brand-700 h-8" onClick={() => setAddOpen(true)}>
-          <Plus className="size-3.5" />Milestone
-        </Button>
+        {canManage && (
+          <Button size="sm" className="bg-brand-600 hover:bg-brand-700 h-8" onClick={() => setAddOpen(true)}>
+            <Plus className="size-3.5" />Milestone
+          </Button>
+        )}
       </div>
 
       {/* Add Milestone Drawer */}
@@ -369,11 +267,10 @@ export default function MilestonesPage() {
       ) : (
         <div className="rounded-lg border overflow-hidden divide-y">
           {milestones.map((ms) => {
-            const overdue = ms.dueDate && new Date(ms.dueDate) < new Date() && ms.status !== "completed";
-            const uninvoiced = ms.amount - ms.invoicedAmountCents;
+            const overdue = isPastDue(ms.dueDate) && ms.status !== "completed";
             return (
               <div key={ms.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 hover:bg-muted/20 transition-colors group">
-                <button onClick={() => toggleComplete(ms)} disabled={togglingId === ms.id} className="shrink-0">
+                <button onClick={() => toggleComplete(ms)} disabled={!canManage || togglingId === ms.id} className="shrink-0" title={canManage ? (ms.status === "completed" ? "Mark as not completed" : "Mark as completed") : undefined}>
                   {togglingId === ms.id ? (
                     <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
                   ) : ms.status === "completed" ? (
@@ -400,12 +297,14 @@ export default function MilestonesPage() {
                     )}
                   </div>
                 )}
-                <button onClick={() => { setAssignMilestoneId(ms.id); setAssignments([]); }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-brand-600 transition-opacity" title="Manage Assignments">
+                <button onClick={() => setAssignMilestoneId(ms.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-brand-600 transition-opacity" title="Manage Assignments">
                   <Users className="size-3" />
                 </button>
-                <button onClick={() => deleteMilestone(ms.id)} disabled={deletingId === ms.id} className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingId === ms.id && "opacity-100 pointer-events-none")}>
-                  {deletingId === ms.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-                </button>
+                {canManage && (
+                  <button onClick={() => deleteMilestone(ms)} disabled={deletingId === ms.id} title="Delete milestone" className={cn("opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity", deletingId === ms.id && "opacity-100 pointer-events-none")}>
+                    {deletingId === ms.id ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -413,7 +312,7 @@ export default function MilestonesPage() {
       )}
 
       {/* Assignments Sheet */}
-      <Sheet open={!!assignMilestoneId} onOpenChange={open => { if (!open) { setAssignMilestoneId(null); setAssignments([]); } }}>
+      <Sheet open={!!assignMilestoneId} onOpenChange={open => { if (!open) setAssignMilestoneId(null); }}>
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
             <div className="flex items-center gap-3">
@@ -445,12 +344,25 @@ export default function MilestonesPage() {
                         {a.description && <p className="text-[11px] text-muted-foreground truncate">{a.description}</p>}
                       </div>
                       <span className="text-[11px] font-mono text-muted-foreground shrink-0">{formatMoney(a.amount)}</span>
-                      {a.paid ? (
-                        <Badge variant="outline" className="text-[9px] h-4 bg-brand-50 text-brand-700 border-brand-200">Paid</Badge>
-                      ) : (
-                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => markAssignmentPaid(a.id)}>
+                      {a.isPaid ? (
+                        canManage ? (
+                          <button onClick={() => setAssignmentPaid(a.id, false)} title="Mark as unpaid">
+                            <Badge variant="outline" className="text-[9px] h-4 bg-brand-50 text-brand-700 border-brand-200">Paid</Badge>
+                          </button>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] h-4 bg-brand-50 text-brand-700 border-brand-200">Paid</Badge>
+                        )
+                      ) : canManage ? (
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => setAssignmentPaid(a.id, true)}>
                           <DollarSign className="size-3 mr-1" />Mark Paid
                         </Button>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] h-4">Unpaid</Badge>
+                      )}
+                      {canManage && (
+                        <button onClick={() => removeAssignment(a)} className="text-muted-foreground hover:text-red-600" title="Remove assignment">
+                          <Trash2 className="size-3" />
+                        </button>
                       )}
                     </div>
                   ))}
@@ -458,10 +370,10 @@ export default function MilestonesPage() {
               )}
             </div>
 
-            <div className="h-px bg-border" />
+            {canManage && <div className="h-px bg-border" />}
 
             {/* Add Assignment Form */}
-            <div className="space-y-4">
+            {canManage && <div className="space-y-4">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add Assignment</p>
               <div className="space-y-2">
                 <Label>Member</Label>
@@ -485,215 +397,21 @@ export default function MilestonesPage() {
                   <Input value={assignDesc} onChange={e => setAssignDesc(e.target.value)} placeholder="Optional note" />
                 </div>
               </div>
-            </div>
+            </div>}
           </div>
           <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t bg-background/80 px-6 py-4 backdrop-blur-sm">
             <Button type="button" variant="outline" onClick={() => setAssignMilestoneId(null)}>Close</Button>
-            <Button onClick={handleAddAssignment} disabled={assignSaving || assignMemberId === "none"} className="bg-brand-600 hover:bg-brand-700">
-              {assignSaving ? "Adding..." : "Add Assignment"}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Progress Invoice Sheet */}
-      <Sheet open={invoiceOpen} onOpenChange={setInvoiceOpen}>
-        <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
-          <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
-                <FileText className="size-5" />
-              </div>
-              <div>
-                <SheetTitle className="text-lg">Progress Invoice</SheetTitle>
-                <SheetDescription>Create an invoice for work completed on this project.</SheetDescription>
-              </div>
-            </div>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
-            {invoiceLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : uninvoicedData ? (
-              <>
-                {/* Milestone billing */}
-                {uninvoicedData.billingType === "milestone" && (
-                  <div className="space-y-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Select milestones to invoice</p>
-                    {(uninvoicedData.milestones ?? []).length > 0 ? (
-                      <div className="rounded-lg border divide-y">
-                        {(uninvoicedData.milestones ?? []).map((m) => {
-                          const hasRemaining = m.remaining > 0;
-                          return (
-                            <label
-                              key={m.id}
-                              className={cn(
-                                "flex items-center gap-3 px-4 py-3 transition-colors",
-                                hasRemaining ? "cursor-pointer hover:bg-muted/20" : "opacity-50"
-                              )}
-                            >
-                              <Checkbox
-                                checked={selectedMilestoneIds.includes(m.id)}
-                                onCheckedChange={() => hasRemaining && toggleMilestoneSelection(m.id)}
-                                disabled={!hasRemaining}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-medium truncate">{m.title}</p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Total: {formatMoney(m.amount)} · Invoiced: {formatMoney(m.invoicedAmountCents)}
-                                </p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className={cn("text-[13px] font-mono tabular-nums font-medium", hasRemaining ? "text-foreground" : "text-muted-foreground")}>
-                                  {formatMoney(m.remaining)}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">remaining</p>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-[12px] text-muted-foreground py-3">All milestones have been fully invoiced.</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Hourly billing */}
-                {uninvoicedData.billingType === "hourly" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Uninvoiced time entries</p>
-                      {(uninvoicedData.timeEntries ?? []).length > 0 && (
-                        <button
-                          className="text-[11px] text-blue-600 hover:underline font-medium"
-                          onClick={() => {
-                            const allIds = (uninvoicedData.timeEntries ?? []).map((e) => e.id);
-                            setSelectedTimeEntryIds(prev =>
-                              prev.length === allIds.length ? [] : allIds
-                            );
-                          }}
-                        >
-                          {selectedTimeEntryIds.length === (uninvoicedData.timeEntries ?? []).length ? "Deselect all" : "Select all"}
-                        </button>
-                      )}
-                    </div>
-                    {(uninvoicedData.timeEntries ?? []).length > 0 ? (
-                      <div className="rounded-lg border divide-y max-h-[400px] overflow-y-auto">
-                        {(uninvoicedData.timeEntries ?? []).map((e) => (
-                          <label key={e.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-muted/20 transition-colors">
-                            <Checkbox
-                              checked={selectedTimeEntryIds.includes(e.id)}
-                              onCheckedChange={() => toggleTimeEntrySelection(e.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[13px] truncate">{e.description || "Time entry"}</p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {e.date} · {Math.round((e.minutes / 60) * 100) / 100}h @ {formatMoney(e.hourlyRate)}/hr
-                              </p>
-                            </div>
-                            <span className="text-[13px] font-mono tabular-nums font-medium shrink-0">
-                              {formatMoney(e.amount)}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[12px] text-muted-foreground py-3">No uninvoiced time entries.</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Fixed billing */}
-                {uninvoicedData.billingType === "fixed" && (
-                  <div className="space-y-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Fixed price progress</p>
-                    <div className="rounded-lg border p-4 space-y-3">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[13px]">
-                          <span className="text-muted-foreground">Fixed price</span>
-                          <span className="font-mono tabular-nums font-medium">{formatMoney(uninvoicedData.fixedPrice ?? 0)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[13px]">
-                          <span className="text-muted-foreground">Already invoiced</span>
-                          <span className="font-mono tabular-nums">{formatMoney(uninvoicedData.totalInvoiced ?? 0)} ({uninvoicedData.invoicedPercent ?? 0}%)</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[13px]">
-                          <span className="text-muted-foreground">Remaining</span>
-                          <span className="font-mono tabular-nums font-medium text-brand-600">{formatMoney(uninvoicedData.remaining ?? 0)}</span>
-                        </div>
-                      </div>
-                      <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-blue-500 transition-all"
-                          style={{ width: `${uninvoicedData.invoicedPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Percentage to invoice</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100 - (uninvoicedData.invoicedPercent || 0)}
-                          value={fixedPercent}
-                          onChange={e => setFixedPercent(e.target.value)}
-                          placeholder={`0 - ${100 - (uninvoicedData.invoicedPercent || 0)}`}
-                          className="font-mono"
-                        />
-                        <span className="text-[13px] text-muted-foreground shrink-0">%</span>
-                      </div>
-                      {fixedPercent && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Amount: {formatMoney(Math.round((proj.fixedPrice * Math.min(100, Math.max(0, parseFloat(fixedPercent) || 0))) / 100))}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Notes */}
-                <div className="h-px bg-border" />
-                <div className="space-y-2">
-                  <Label>Invoice notes (optional)</Label>
-                  <Textarea
-                    value={invoiceNotes}
-                    onChange={e => setInvoiceNotes(e.target.value)}
-                    placeholder="Notes to include on the invoice..."
-                    rows={2}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="text-[12px] text-muted-foreground py-3">Failed to load billing data.</p>
-            )}
-          </div>
-
-          {/* Footer with total preview */}
-          <div className="sticky bottom-0 z-10 border-t bg-background/80 backdrop-blur-sm">
-            {invoicePreviewTotal > 0 && (
-              <div className="px-6 py-3 border-b bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-muted-foreground">Invoice total</span>
-                  <span className="text-lg font-bold font-mono tabular-nums">{formatMoney(invoicePreviewTotal)}</span>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-3 px-6 py-4">
-              <Button type="button" variant="outline" onClick={() => setInvoiceOpen(false)}>Cancel</Button>
-              <Button
-                onClick={handleCreateInvoice}
-                disabled={invoiceSaving || invoicePreviewTotal <= 0}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {invoiceSaving ? "Creating..." : "Create Invoice"}
+            {canManage && (
+              <Button onClick={handleAddAssignment} disabled={assignSaving || assignMemberId === "none"} className="bg-brand-600 hover:bg-brand-700">
+                {assignSaving ? "Adding..." : "Add Assignment"}
               </Button>
-            </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      <ProjectInvoiceSheet open={invoiceOpen} onOpenChange={setInvoiceOpen} />
+      {confirmDialog}
     </div>
   );
 }

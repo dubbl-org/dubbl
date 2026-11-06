@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { projectTask } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { notifyTaskAssigned, notifySafely } from "@/lib/notifications/events";
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -30,15 +30,7 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
 
     const tasks = await db.query.projectTask.findMany({
       where: eq(projectTask.projectId, id),
@@ -63,20 +55,11 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    const { project: proj } = await requireProjectAccess(ctx, id, "contribute");
 
     const [created] = await db
       .insert(projectTask)
@@ -96,6 +79,7 @@ export async function POST(
       })
       .returning();
 
+    await notifySafely(notifyTaskAssigned(ctx.organizationId, created, proj.name, ctx.userId));
     logAudit({ ctx, action: "create", entityType: "project_task", entityId: created.id, request });
 
     return NextResponse.json({ task: created }, { status: 201 });

@@ -23,6 +23,8 @@ const updateSchema = z.object({
   chartAccountId: z.string().nullable().optional(),
   balance: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  // Notify owners/admins when the balance drops below this (cents); null turns it off
+  lowBalanceThreshold: z.number().int().min(0).nullable().optional(),
 });
 
 export async function GET(

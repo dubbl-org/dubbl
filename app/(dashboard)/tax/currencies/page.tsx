@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -188,12 +189,10 @@ function AddCurrencySheet({
 function AddRateSheet({
   open,
   setOpen,
-  onCreated,
   orgId,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
-  onCreated: () => void;
   orgId: string | null;
 }) {
   const [baseCurrency, setBaseCurrency] = useState("");
@@ -240,7 +239,6 @@ function AddRateSheet({
       setTargetCurrency("");
       setRate("");
       setDate(new Date().toISOString().slice(0, 10));
-      onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create exchange rate");
     } finally {
@@ -305,15 +303,11 @@ function AddRateSheet({
 
 export default function CurrenciesPage() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
-  const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
-  const [baseCurrency, setBaseCurrency] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ratesLoading, setRatesLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
-  const [fxReport, setFxReport] = useState<UnrealizedFxReport | null>(null);
   useDocumentTitle("Tax · Currencies");
 
   const orgId =
@@ -321,38 +315,16 @@ export default function CurrenciesPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  async function fetchOrganization() {
-    try {
-      const res = await fetch("/api/v1/organization", {
-        headers: orgId ? { "x-organization-id": orgId } : {},
-      });
-      const data = await res.json();
-      if (data.organization?.defaultCurrency) {
-        setBaseCurrency(data.organization.defaultCurrency);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
+  const { data: orgData } = useApi<{ organization?: { defaultCurrency?: string | null } }>("/api/v1/organization");
+  const baseCurrency = orgData?.organization?.defaultCurrency || null;
 
-  async function fetchExchangeRates() {
-    if (!orgId) {
-      setRatesLoading(false);
-      return;
-    }
-    try {
-      const res = await fetch("/api/v1/exchange-rates", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.data) setExchangeRates(data.data);
-    } catch {
-      /* ignore */
-    } finally {
-      setRatesLoading(false);
-    }
-  }
+  const { data: ratesData, loading: ratesLoading } = useApi<{ data?: ExchangeRate[] }>("/api/v1/exchange-rates");
+  const exchangeRates = ratesData?.data ?? [];
 
+  const { data: fxData } = useApi<UnrealizedFxReport>("/api/v1/reports/unrealized-gains-losses");
+  const fxReport = fxData?.summary ? fxData : null;
+
+  // The ISO currency list isn't org-scoped (`/api/currencies`), so it's loaded directly.
   async function fetchCurrencies() {
     try {
       const res = await fetch("/api/currencies");
@@ -363,26 +335,8 @@ export default function CurrenciesPage() {
     }
   }
 
-  async function fetchFxReport() {
-    if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/reports/unrealized-gains-losses", {
-        headers: { "x-organization-id": orgId },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.summary) setFxReport(data);
-    } catch {
-      /* ignore */
-    }
-  }
-
   useEffect(() => {
-    fetchOrganization();
-    fetchExchangeRates();
     fetchCurrencies();
-    fetchFxReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
 
   const filtered = useMemo(() => {
@@ -748,7 +702,6 @@ export default function CurrenciesPage() {
       <AddRateSheet
         open={sheetOpen}
         setOpen={setSheetOpen}
-        onCreated={() => fetchExchangeRates()}
         orgId={orgId}
       />
 

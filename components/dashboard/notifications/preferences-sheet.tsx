@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { Bell, Mail, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { CATEGORIES, TYPES } from "./meta";
 
 interface Preference {
@@ -18,6 +19,9 @@ interface Preference {
 
 type Channel = "inApp" | "email";
 type PrefState = Record<string, { inApp: boolean; email: boolean }>;
+type PrefsResponse = { preferences?: Required<Preference>[] };
+
+const PREFS_URL = "/api/v1/notifications/preferences";
 
 const DIGESTS = [
   { value: 0, label: "Right away" },
@@ -29,9 +33,34 @@ function defaults(): PrefState {
   return Object.fromEntries(TYPES.map((t) => [t.type, { inApp: true, email: false }]));
 }
 
+function toForm(data: PrefsResponse | undefined): { prefs: PrefState; digest: number } {
+  const prefs = defaults();
+  let interval: number | null = null;
+  for (const p of data?.preferences ?? []) {
+    if (!prefs[p.type]) continue;
+    if (p.channel === "in_app") prefs[p.type].inApp = p.enabled;
+    else {
+      prefs[p.type].email = p.enabled;
+      interval ??= p.digestIntervalMinutes;
+    }
+  }
+  return { prefs, digest: interval ?? 120 };
+}
+
+// Write changes into the cached answer, the way the server will store them
+function upsert(data: PrefsResponse, changes: Preference[]): PrefsResponse {
+  const list = [...(data.preferences ?? [])];
+  for (const c of changes) {
+    const i = list.findIndex((p) => p.type === c.type && p.channel === c.channel);
+    if (i >= 0) list[i] = { ...list[i], enabled: c.enabled, digestIntervalMinutes: c.digestIntervalMinutes ?? list[i].digestIntervalMinutes };
+    else list.push({ ...c, digestIntervalMinutes: c.digestIntervalMinutes ?? 30 });
+  }
+  return { ...data, preferences: list };
+}
+
 async function save(preferences: Preference[]) {
   const orgId = localStorage.getItem("activeOrgId");
-  const res = await fetch("/api/v1/notifications/preferences", {
+  const res = await fetch(PREFS_URL, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...(orgId ? { "x-organization-id": orgId } : {}) },
     body: JSON.stringify({ preferences }),
@@ -52,87 +81,52 @@ export function PreferencesSheet({
   onOpenChange: (open: boolean) => void;
   onInboxChange: () => void;
 }) {
-  const [prefs, setPrefs] = useState<PrefState>(defaults);
-  const [digest, setDigest] = useState(120);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // Loads when the sheet opens; `keepPrevious` holds the switches steady while it animates closed
+  const { data, loading, error } = useApi<PrefsResponse>(open ? PREFS_URL : null, { keepPrevious: true });
+  const cache = useApiCache();
+  const { prefs, digest } = useMemo(() => toForm(data), [data]);
+  const failed = Boolean(error && !data);
   const inboxChanged = useRef(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/v1/notifications/preferences", { headers: { "x-organization-id": orgId } });
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { preferences?: Required<Preference>[] };
-        if (cancelled) return;
-        const next = defaults();
-        let interval: number | null = null;
-        for (const p of data.preferences ?? []) {
-          if (!next[p.type]) continue;
-          if (p.channel === "in_app") next[p.type].inApp = p.enabled;
-          else {
-            next[p.type].email = p.enabled;
-            interval ??= p.digestIntervalMinutes;
-          }
-        }
-        setPrefs(next);
-        if (interval != null) setDigest(interval);
-        setFailed(false);
-      } catch {
-        if (!cancelled) setFailed(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+  // Flip the switches in the cached answer first, then save; put them back if the save fails
+  const apply = async (changes: Preference[], undo: Preference[]) => {
+    cache.update<PrefsResponse>(PREFS_URL, (d) => upsert(d, changes));
+    try {
+      await save(changes);
+      return true;
+    } catch {
+      cache.update<PrefsResponse>(PREFS_URL, (d) => upsert(d, undo));
+      return false;
+    }
+  };
 
   const toggle = async (type: string, channel: Channel, enabled: boolean) => {
-    setPrefs((p) => ({ ...p, [type]: { ...p[type], [channel]: enabled } }));
-    try {
-      await save([
-        channel === "inApp"
-          ? { type, channel: "in_app", enabled }
-          : { type, channel: "email", enabled, digestIntervalMinutes: digest },
-      ]);
+    const change = (on: boolean): Preference =>
+      channel === "inApp"
+        ? { type, channel: "in_app", enabled: on }
+        : { type, channel: "email", enabled: on, digestIntervalMinutes: digest };
+    if (await apply([change(enabled)], [change(!enabled)])) {
       if (channel === "inApp") inboxChanged.current = true;
-    } catch {
-      setPrefs((p) => ({ ...p, [type]: { ...p[type], [channel]: !enabled } }));
+    } else {
       toast.error("Couldn't save that change. Try again.");
     }
   };
 
   const changeDigest = async (value: number) => {
-    const before = digest;
-    setDigest(value);
-    try {
-      await save(TYPES.map((t) => ({ type: t.type, channel: "email", enabled: prefs[t.type].email, digestIntervalMinutes: value })));
-    } catch {
-      setDigest(before);
-      toast.error("Couldn't change email timing. Try again.");
-    }
+    const email = (minutes: number) => TYPES.map((t): Preference => ({ type: t.type, channel: "email", enabled: prefs[t.type].email, digestIntervalMinutes: minutes }));
+    if (!(await apply(email(value), email(digest)))) toast.error("Couldn't change email timing. Try again.");
   };
 
   const setAll = async (channel: Channel, enabled: boolean) => {
-    const before = prefs;
-    setPrefs((p) => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, { ...v, [channel]: enabled }])));
-    try {
-      await save(
-        TYPES.map((t) =>
-          channel === "inApp"
-            ? { type: t.type, channel: "in_app", enabled }
-            : { type: t.type, channel: "email", enabled, digestIntervalMinutes: digest }
-        )
+    const all = (on: (type: string) => boolean) =>
+      TYPES.map((t): Preference =>
+        channel === "inApp"
+          ? { type: t.type, channel: "in_app", enabled: on(t.type) }
+          : { type: t.type, channel: "email", enabled: on(t.type), digestIntervalMinutes: digest }
       );
+    if (await apply(all(() => enabled), all((type) => prefs[type][channel]))) {
       if (channel === "inApp") inboxChanged.current = true;
-    } catch {
-      setPrefs(before);
+    } else {
       toast.error("Couldn't save that change. Try again.");
     }
   };

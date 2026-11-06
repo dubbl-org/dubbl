@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { Plus, Key, Copy, Trash2, Loader2, Calendar, Clock, Lock, ArrowUpRight } from "lucide-react";
+import { Plus, Key, Copy, Trash2, Loader2, Calendar, Clock, Lock, ArrowUpRight, Bot, Unplug } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useApi } from "@/lib/query/use-api";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { getPublicAppUrl } from "@/lib/public-url";
 
 interface ApiKeyItem {
   id: string;
@@ -25,39 +27,40 @@ interface ApiKeyItem {
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
+  createdByName: string | null;
+  /** The creator left the organization, so the key no longer works. */
+  disabled: boolean;
 }
+
+interface McpConnectionItem {
+  id: string;
+  clientName: string;
+  userName: string | null;
+  userEmail: string;
+  authorizedAt: string;
+  expiresAt: string;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+const noopSubscribe = () => () => {};
 
 export default function ApiKeysPage() {
   const router = useRouter();
-  const [keys, setKeys] = useState<ApiKeyItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ keys?: ApiKeyItem[]; apiAccess?: boolean; maxKeys?: number }>("/api/v1/api-keys");
+  const keys = data?.keys ?? [];
+  const { data: mcpData, refetch: refetchMcp } = useApi<{ connections?: McpConnectionItem[] }>("/api/v1/mcp-connections");
+  const connections = mcpData?.connections ?? [];
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [apiAccess, setApiAccess] = useState(true);
-  const [maxKeys, setMaxKeys] = useState(20);
-
-  function fetchKeys() {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/api-keys", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.keys) setKeys(data.keys);
-        if (data.apiAccess !== undefined) setApiAccess(data.apiAccess);
-        if (data.maxKeys) setMaxKeys(data.maxKeys);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    fetchKeys();
-  }, []);
+  const apiAccess = data?.apiAccess ?? true;
+  const maxKeys = data?.maxKeys || 20;
 
   async function createKey() {
     const orgId = localStorage.getItem("activeOrgId");
@@ -76,7 +79,6 @@ export default function ApiKeysPage() {
       if (!res.ok) throw new Error(data.error || "Failed to create key");
       setNewKey(data.plainKey);
       setName("");
-      fetchKeys();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create key");
     } finally {
@@ -95,26 +97,43 @@ export default function ApiKeysPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success("API key revoked");
-      fetchKeys();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete key");
     } finally { setDeletingId(null); }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_URL || "https://dubbl.dev";
+  async function disconnect(id: string) {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId || disconnectingId) return;
+    setDisconnectingId(id);
+    try {
+      const res = await fetch(`/api/v1/mcp-connections/${id}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      await refetchMcp();
+      toast.success("MCP connection revoked");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to revoke connection");
+    } finally { setDisconnectingId(null); }
+  }
+
+  // This instance's own address (the server render falls back to the configured app URL)
+  const baseUrl = useSyncExternalStore(noopSubscribe, () => window.location.origin, getPublicAppUrl);
   const curlExample = `curl -X GET ${baseUrl}/api/v1/invoices \\
   -H "Authorization: Bearer dk_live_..."`;
 
   return (
     <ContentReveal className="space-y-8">
-      {/* Pro required banner */}
+      {/* Plan without API access (only when an admin turned it off) */}
       {!apiAccess && !loading && (
         <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
           <Lock className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Pro feature</p>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">API access not included</p>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-              API keys require a Pro plan.
+              Your organization&apos;s plan doesn&apos;t include API access.
             </p>
           </div>
           <Button
@@ -196,21 +215,36 @@ export default function ApiKeysPage() {
 
               {/* Name + prefix */}
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{k.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium truncate">{k.name}</p>
+                  {k.disabled && (
+                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      Disabled
+                    </span>
+                  )}
+                </div>
                 <p className="mt-0.5 font-mono text-xs text-muted-foreground truncate">
                   {k.keyPrefix}...
                 </p>
+                {k.disabled && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {k.createdByName ?? "Its creator"} is no longer a member, so this key stops working. Create a new key and delete this one.
+                  </p>
+                )}
               </div>
 
               {/* Metadata */}
               <div className="hidden items-center gap-6 sm:flex">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Clock className="size-3" />
-                  <span>{k.lastUsedAt ? `Used ${k.lastUsedAt}` : "Never used"}</span>
+                  <span>{k.lastUsedAt ? `Used ${formatDate(k.lastUsedAt)}` : "Never used"}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Calendar className="size-3" />
-                  <span>Created {k.createdAt}</span>
+                  <span>
+                    Created {formatDate(k.createdAt)}
+                    {k.createdByName ? ` by ${k.createdByName}` : ""}
+                  </span>
                 </div>
               </div>
 
@@ -232,6 +266,54 @@ export default function ApiKeysPage() {
           ))}
         </div>
       )}
+
+      {/* MCP connections (AI assistants) */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-medium">MCP connections</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            AI assistants members connected to this organization. Revoking one signs it out at once; the member can connect it again.
+          </p>
+        </div>
+        {connections.length === 0 ? (
+          <div className="rounded-xl border px-5 py-6 text-center text-xs text-muted-foreground">
+            No AI assistants are connected.
+          </div>
+        ) : (
+          <div className="rounded-xl border">
+            {connections.map((c, i) => (
+              <div
+                key={c.id}
+                className={`flex items-center gap-4 px-5 py-3.5 ${i !== connections.length - 1 ? "border-b" : ""}`}
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{c.clientName}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                    {c.userName || c.userEmail} · authorized {formatDate(c.authorizedAt)}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 text-xs text-muted-foreground hover:text-red-600"
+                  onClick={() => disconnect(c.id)}
+                  disabled={disconnectingId === c.id}
+                >
+                  {disconnectingId === c.id ? (
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  ) : (
+                    <Unplug className="mr-1.5 size-3.5" />
+                  )}
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Authentication / Usage */}
       <div className="space-y-3">

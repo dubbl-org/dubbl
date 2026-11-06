@@ -6,6 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { resumeSchedule } from "@/lib/api/recurring-schedule";
 
 export async function POST(
   request: Request,
@@ -33,11 +34,16 @@ export async function POST(
       );
     }
 
-    const newStatus = existing.status === "active" ? "paused" : "active";
+    // Resuming skips the dates missed while paused instead of back-filling them.
+    const today = new Date().toISOString().split("T")[0];
+    const change =
+      existing.status === "active"
+        ? { status: "paused" as const }
+        : resumeSchedule(existing, today);
 
     const [updated] = await db
       .update(recurringTemplate)
-      .set({ status: newStatus, updatedAt: new Date() })
+      .set({ ...change, updatedAt: new Date() })
       .where(eq(recurringTemplate.id, id))
       .returning();
 

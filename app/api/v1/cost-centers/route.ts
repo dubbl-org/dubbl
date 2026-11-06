@@ -26,6 +26,10 @@ export async function GET(request: Request) {
       eq(costCenter.organizationId, ctx.organizationId),
       notDeleted(costCenter.deletedAt),
     ];
+    // ?active=true limits the list to active cost centers (what pickers offer).
+    if (url.searchParams.get("active") === "true") {
+      conditions.push(eq(costCenter.isActive, true));
+    }
 
     const centers = await db.query.costCenter.findMany({
       where: and(...conditions),

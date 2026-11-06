@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowDownUp, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -10,6 +10,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface CashFlowRow {
   accountName: string;
@@ -25,47 +26,19 @@ const columns: Column<CashFlowRow>[] = [
 
 export default function CashFlowPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [operating, setOperating] = useState<CashFlowRow[]>([]);
-  const [investing, setInvesting] = useState<CashFlowRow[]>([]);
-  const [financing, setFinancing] = useState<CashFlowRow[]>([]);
-  const [totalOperating, setTotalOperating] = useState(0);
-  const [totalInvesting, setTotalInvesting] = useState(0);
-  const [totalFinancing, setTotalFinancing] = useState(0);
-  const [netCashFlow, setNetCashFlow] = useState(0);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/cash-flow?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setOperating(data.operating || []);
-        setInvesting(data.investing || []);
-        setFinancing(data.financing || []);
-        setTotalOperating(data.totalOperating || 0);
-        setTotalInvesting(data.totalInvesting || 0);
-        setTotalFinancing(data.totalFinancing || 0);
-        setNetCashFlow(data.netCashFlow || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  const { data, loading } = useApi<{ operating?: CashFlowRow[]; investing?: CashFlowRow[]; financing?: CashFlowRow[]; totalOperating?: number; totalInvesting?: number; totalFinancing?: number; netCashFlow?: number }>(
+    `/api/v1/reports/cash-flow?${new URLSearchParams({ startDate, endDate })}`,
+    { keepPrevious: true }
+  );
+  const operating = data?.operating || [];
+  const investing = data?.investing || [];
+  const financing = data?.financing || [];
+  const totalOperating = data?.totalOperating || 0;
+  const totalInvesting = data?.totalInvesting || 0;
+  const totalFinancing = data?.totalFinancing || 0;
+  const netCashFlow = data?.netCashFlow || 0;
 
   const sections = [
     {
@@ -91,7 +64,7 @@ export default function CashFlowPage() {
     },
   ];
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -115,50 +88,46 @@ export default function CashFlowPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          <div className="space-y-6">
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-              {sections.map((s) => (
-                <StatCard
-                  key={s.title}
-                  title={s.title}
-                  value={formatMoney(s.total)}
-                  icon={s.icon}
-                  changeType={s.total >= 0 ? "positive" : "negative"}
-                />
-              ))}
-              <StatCard
-                title="Change in cash"
-                value={formatMoney(netCashFlow)}
-                icon={DollarSign}
-                changeType={netCashFlow >= 0 ? "positive" : "negative"}
-              />
-            </div>
-
+      <ContentReveal>
+        <div className="space-y-6">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
             {sections.map((s) => (
-              <div key={s.title} className="space-y-2">
-                <div>
-                  <h2 className="text-lg font-semibold">{s.title}</h2>
-                  <p className="text-[13px] text-muted-foreground">{s.help}</p>
-                </div>
-                <DataTable columns={columns} data={s.data} loading={false} emptyMessage={`No cash movement ${s.title.toLowerCase()}.`} />
-                <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
-                  <span>Total {s.title.toLowerCase()}</span>
-                  <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
-                </div>
-              </div>
+              <StatCard
+                key={s.title}
+                title={s.title}
+                value={formatMoney(s.total)}
+                icon={s.icon}
+                changeType={s.total >= 0 ? "positive" : "negative"}
+              />
             ))}
-
-            <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 rounded-lg font-semibold text-sm sm:text-base">
-              <span>Total change in cash this period</span>
-              <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
-            </div>
+            <StatCard
+              title="Change in cash"
+              value={formatMoney(netCashFlow)}
+              icon={DollarSign}
+              changeType={netCashFlow >= 0 ? "positive" : "negative"}
+            />
           </div>
-        </ContentReveal>
-      )}
+
+          {sections.map((s) => (
+            <div key={s.title} className="space-y-2">
+              <div>
+                <h2 className="text-lg font-semibold">{s.title}</h2>
+                <p className="text-[13px] text-muted-foreground">{s.help}</p>
+              </div>
+              <DataTable columns={columns} data={s.data} loading={false} emptyMessage={`No cash movement ${s.title.toLowerCase()}.`} />
+              <div className="flex justify-between px-3 py-2 sm:px-4 bg-muted/50 rounded-lg text-sm font-semibold">
+                <span>Total {s.title.toLowerCase()}</span>
+                <span className="font-mono tabular-nums">{formatMoney(s.total)}</span>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex justify-between px-3 py-2 sm:px-4 sm:py-3 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 rounded-lg font-semibold text-sm sm:text-base">
+            <span>Total change in cash this period</span>
+            <span className="font-mono tabular-nums">{formatMoney(netCashFlow)}</span>
+          </div>
+        </div>
+      </ContentReveal>
     </ContentReveal>
   );
 }

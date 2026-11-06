@@ -42,6 +42,10 @@ import {
   formatDateShort,
   daysUntil,
   pct,
+  isPastDue,
+  localISODate,
+  summarizeTimeEntries,
+  timeEntryAmount,
   type ProjectDetail,
 } from "./project-context";
 import Link from "next/link";
@@ -53,9 +57,10 @@ export default function ProjectOverviewPage() {
   if (!proj) return null;
 
   const daysLeft = daysUntil(proj.endDate);
-  const unbilledEntries = proj.timeEntries.filter(e => e.isBillable && !e.invoiceId);
-  const unbilledAmount = unbilledEntries.reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
-  const totalAmount = proj.timeEntries.reduce((sum, e) => sum + Math.round((e.minutes / 60) * e.hourlyRate), 0);
+  // Money only counts billable time; non-billable time adds hours, not revenue.
+  const timeSummary = summarizeTimeEntries(proj.timeEntries);
+  const unbilledAmount = timeSummary.unbilledAmount;
+  const totalAmount = timeSummary.billableAmount;
 
   const tasksByStatus = proj.tasks.reduce((acc, t) => {
     acc[t.status] = (acc[t.status] || 0) + 1;
@@ -71,7 +76,7 @@ export default function ProjectOverviewPage() {
   const upcomingMilestones = proj.milestones.filter(m => m.status !== "completed").slice(0, 5);
   const recentTime = proj.timeEntries.slice(0, 6);
   const pinnedNotes = proj.notes.filter(n => n.isPinned);
-  const billableMinutes = proj.timeEntries.filter(e => e.isBillable).reduce((s, e) => s + e.minutes, 0);
+  const billableMinutes = timeSummary.billableMinutes;
 
   // Build stat cards - always show at least 4
   const stats: StatCardProps[] = [];
@@ -82,9 +87,9 @@ export default function ProjectOverviewPage() {
     stats.push({ icon: Zap, label: "Tasks", value: totalTasks > 0 ? `${doneTasks}/${totalTasks}` : "0", sub: totalTasks > 0 ? `${progressPct}% complete` : "No tasks yet", progress: totalTasks > 0 ? progressPct : 0, color: "var(--brand-600)" });
   }
   if (proj.enableBilling) {
-    stats.push({ icon: DollarSign, label: "Revenue", value: formatMoney(totalAmount), sub: unbilledAmount > 0 ? `${formatMoney(unbilledAmount)} unbilled` : "all invoiced" });
+    stats.push({ icon: DollarSign, label: "Billable time", value: formatMoney(totalAmount), sub: unbilledAmount > 0 ? `${formatMoney(unbilledAmount)} not invoiced` : "all invoiced" });
     if (proj.budget > 0) {
-      stats.push({ icon: DollarSign, label: "Budget", value: formatMoney(proj.totalBilled), sub: `of ${formatMoney(proj.budget)}`, progress: budgetPct, color: budgetPct > 90 ? "#ef4444" : "#f59e0b" });
+      stats.push({ icon: DollarSign, label: "Budget", value: formatMoney(proj.totalBilled), sub: `billed of ${formatMoney(proj.budget)}`, progress: budgetPct, color: budgetPct > 90 ? "#ef4444" : "#f59e0b" });
     }
   }
   stats.push({ icon: Users, label: "Team", value: String(proj.members.length), sub: `${proj.members.filter(m => m.role === "manager").length} managers` });
@@ -159,20 +164,21 @@ export default function ProjectOverviewPage() {
               </div>
               <div className="space-y-1.5 text-[13px]">
                 <Row label="Total billed" value={<span className="font-mono tabular-nums font-medium">{formatMoney(proj.totalBilled)}</span>} />
-                <Row label="Revenue" value={<span className="font-mono tabular-nums">{formatMoney(totalAmount)}</span>} />
-                {unbilledAmount > 0 && <Row label="Unbilled" value={<span className="font-mono tabular-nums text-amber-600">{formatMoney(unbilledAmount)}</span>} />}
+                {proj.unissuedBilled > 0 && <Row label="In draft invoices" value={<span className="font-mono tabular-nums text-muted-foreground">{formatMoney(proj.unissuedBilled)}</span>} />}
+                {proj.enableTimeTracking && <Row label="Billable time value" value={<span className="font-mono tabular-nums">{formatMoney(totalAmount)}</span>} />}
+                {unbilledAmount > 0 && <Row label="Not yet invoiced" value={<span className="font-mono tabular-nums text-amber-600">{formatMoney(unbilledAmount)}</span>} />}
                 {proj.budget > 0 && (
                   <>
                     <div className="h-px bg-border my-1" />
                     <Row label="Budget" value={<span className="font-mono tabular-nums">{formatMoney(proj.budget)}</span>} />
-                    <Row label="Remaining" value={<span className={cn("font-mono tabular-nums font-semibold", proj.budget - proj.totalBilled < 0 ? "text-red-600" : "text-brand-600")}>{formatMoney(proj.budget - proj.totalBilled)}</span>} />
+                    <Row label="Left to bill" value={<span className={cn("font-mono tabular-nums font-semibold", proj.budget - proj.totalBilled < 0 ? "text-red-600" : "text-brand-600")}>{formatMoney(proj.budget - proj.totalBilled)}</span>} />
                   </>
                 )}
                 {proj.enableTimeTracking && (
                   <>
                     <div className="h-px bg-border my-1" />
                     <Row label="Billable time" value={<span className="font-mono tabular-nums">{formatHours(billableMinutes)}</span>} />
-                    <Row label="Avg rate" value={<span className="font-mono tabular-nums">{billableMinutes > 0 ? formatMoney(Math.round(totalAmount / (billableMinutes / 60))) : "-"}/hr</span>} />
+                    <Row label="Avg rate" value={<span className="font-mono tabular-nums">{billableMinutes > 0 ? formatMoney(timeSummary.avgRate) : "-"}/hr</span>} />
                   </>
                 )}
               </div>
@@ -213,7 +219,7 @@ export default function ProjectOverviewPage() {
               <ProgressBar label="Time" value={0} color="#3b82f6" sub={proj.enableTimeTracking ? formatHours(proj.totalHours) + " logged" : "Not tracked"} />
             )}
             {proj.enableBilling && proj.budget > 0 ? (
-              <ProgressBar label="Budget" value={budgetPct} color={budgetPct > 90 ? "#ef4444" : "#f59e0b"} sub={`${formatMoney(proj.totalBilled)} of ${formatMoney(proj.budget)}`} />
+              <ProgressBar label="Budget" value={budgetPct} color={budgetPct > 90 ? "#ef4444" : "#f59e0b"} sub={`${formatMoney(proj.totalBilled)} billed of ${formatMoney(proj.budget)}`} />
             ) : (
               <ProgressBar label="Budget" value={0} color="#f59e0b" sub={proj.enableBilling ? formatMoney(proj.totalBilled) + " billed" : "Not tracked"} />
             )}
@@ -252,7 +258,7 @@ export default function ProjectOverviewPage() {
         <div className="space-y-4">
           <ListCard icon={Zap} label="Active Tasks" href={`/projects/${proj.id}/tasks`} count={activeTasks.length}>
             {activeTasks.length > 0 ? activeTasks.map((task) => {
-              const overdue = task.dueDate && new Date(task.dueDate) < new Date();
+              const overdue = isPastDue(task.dueDate);
               const tsc = taskStatusConfig[task.status];
               return (
                 <div key={task.id} className="flex items-center gap-2.5 px-4 py-2 hover:bg-muted/20 transition-colors">
@@ -272,7 +278,7 @@ export default function ProjectOverviewPage() {
           {proj.enableMilestones && (
             <ListCard icon={Flag} label="Milestones" href={`/projects/${proj.id}/milestones`} count={proj.milestones.length}>
               {upcomingMilestones.length > 0 ? upcomingMilestones.map((ms) => {
-                const overdue = ms.dueDate && new Date(ms.dueDate) < new Date();
+                const overdue = isPastDue(ms.dueDate);
                 return (
                   <div key={ms.id} className="flex items-center gap-2.5 px-4 py-2.5">
                     <Target className="size-3.5 text-muted-foreground/40 shrink-0" />
@@ -297,7 +303,7 @@ export default function ProjectOverviewPage() {
                 <span className="text-[11px] text-muted-foreground/60 shrink-0 w-14 truncate">{e.user?.name?.split(" ")[0] || "-"}</span>
                 <span className="truncate flex-1 text-muted-foreground">{e.description || "-"}</span>
                 <span className="font-mono text-xs tabular-nums shrink-0 font-medium">{formatHours(e.minutes)}</span>
-                <span className="font-mono text-[11px] tabular-nums shrink-0 text-muted-foreground">{formatMoney(Math.round((e.minutes / 60) * e.hourlyRate))}</span>
+                <span className="font-mono text-[11px] tabular-nums shrink-0 text-muted-foreground">{e.isBillable ? formatMoney(timeEntryAmount(e.minutes, e.hourlyRate)) : "Non-billable"}</span>
               </div>
             )) : (
               <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No time entries yet</div>
@@ -451,7 +457,7 @@ function TimeAreaChart({ entries, color }: { entries: ProjectDetail["timeEntries
     for (let i = 13; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = localISODate(d);
       days.push({
         name: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         date: dateStr,
@@ -582,17 +588,15 @@ function MiniCalendar({ proj }: { proj: ProjectDetail }) {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayStr = localISODate(today);
 
   const events = useMemo(() => {
-    const nowDate = new Date();
-    nowDate.setHours(0, 0, 0, 0);
     const map: Record<string, { tasks: number; milestones: number; time: number; overdue: boolean }> = {};
     proj.tasks.forEach(t => {
       if (!t.dueDate) return;
       if (!map[t.dueDate]) map[t.dueDate] = { tasks: 0, milestones: 0, time: 0, overdue: false };
       map[t.dueDate].tasks++;
-      if (t.status !== "done" && t.status !== "cancelled" && new Date(t.dueDate) < nowDate) map[t.dueDate].overdue = true;
+      if (t.status !== "done" && t.status !== "cancelled" && isPastDue(t.dueDate)) map[t.dueDate].overdue = true;
     });
     proj.milestones.forEach(m => {
       if (!m.dueDate) return;

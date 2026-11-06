@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Landmark, Wallet, Banknote, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { DateCell, DueCell, MoneyCell, MutedCell, StatusPill, daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApiRecords, useApis } from "@/lib/query/use-api";
 
 interface Loan {
   id: string;
@@ -92,49 +93,22 @@ function planFrom(loan: Loan, schedule: ScheduleEntry[]): LoanPlan {
  * The list route doesn't include repayment schedules, so load each loan's
  * schedule once to answer "how much do we still owe" and "what's due next".
  */
-function useLoanPlans(version: number) {
-  const [plans, setPlans] = useState<Record<string, LoanPlan> | null>(null);
+function useLoanPlans() {
+  const { rows: loans, data: pages, error, loading } = useApiRecords<Loan>("/api/v1/loans");
+  const details = useApis<{ schedule?: ScheduleEntry[] }>(loans.map((l) => `/api/v1/loans/${l.id}`));
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const headers = { "x-organization-id": orgId };
-    (async () => {
-      try {
-        const loans: Loan[] = [];
-        for (let page = 1, pages = 1; page <= pages && page <= 20; page++) {
-          const json = await fetch(`/api/v1/loans?page=${page}&limit=100`, { headers }).then((r) => r.json());
-          loans.push(...((json.data ?? []) as Loan[]));
-          pages = json.pagination?.totalPages ?? 1;
-        }
-        const details = await Promise.all(
-          loans.map((l) =>
-            fetch(`/api/v1/loans/${l.id}`, { headers })
-              .then((r) => (r.ok ? r.json() : null))
-              .then((json) => [l.id, planFrom(l, (json?.schedule ?? []) as ScheduleEntry[])] as const)
-              .catch(() => [l.id, planFrom(l, [])] as const)
-          )
-        );
-        if (!cancelled) setPlans(Object.fromEntries(details));
-      } catch {
-        if (!cancelled) setPlans({});
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [version]);
-
-  return plans;
+  return useMemo<Record<string, LoanPlan> | null>(() => {
+    if (error && !pages) return {};
+    if (loading || !pages || details.loading) return null;
+    return Object.fromEntries(loans.map((l, i) => [l.id, planFrom(l, details.data[i]?.schedule ?? [])]));
+  }, [loans, pages, error, loading, details]);
 }
 
 export default function LoansPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [planVersion, setPlanVersion] = useState(0);
-  const plans = useLoanPlans(planVersion);
+  const plans = useLoanPlans();
 
   useDocumentTitle("Accounting · Loans");
 
@@ -293,7 +267,6 @@ export default function LoansPage() {
                             throw err;
                           }
                           toast.success("Payment recorded");
-                          setPlanVersion((v) => v + 1);
                           helpers.refresh();
                         },
                       })

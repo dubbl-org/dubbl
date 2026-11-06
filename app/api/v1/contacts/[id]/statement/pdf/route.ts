@@ -124,14 +124,14 @@ export async function GET(
 
     if (isCustomer) {
       const priorInvoices = await db
-        .select({ total: invoice.amountDue })
+        .select({ total: invoice.total })
         .from(invoice)
         .where(
           and(
             eq(invoice.organizationId, ctx.organizationId),
             eq(invoice.contactId, id),
             lt(invoice.issueDate, startDate),
-            notInArray(invoice.status, ["draft", "void"]),
+            notInArray(invoice.status, ["draft", "void", "pending_approval", "rejected"]),
             isNull(invoice.deletedAt)
           )
         );
@@ -169,14 +169,14 @@ export async function GET(
 
     if (isSupplier) {
       const priorBills = await db
-        .select({ total: bill.amountDue })
+        .select({ total: bill.total })
         .from(bill)
         .where(
           and(
             eq(bill.organizationId, ctx.organizationId),
             eq(bill.contactId, id),
             lt(bill.issueDate, startDate),
-            notInArray(bill.status, ["draft", "void"]),
+            notInArray(bill.status, ["draft", "void", "pending_approval"]),
             isNull(bill.deletedAt)
           )
         );
@@ -225,7 +225,7 @@ export async function GET(
             eq(invoice.contactId, id),
             gte(invoice.issueDate, startDate),
             lte(invoice.issueDate, endDate),
-            notInArray(invoice.status, ["draft", "void"]),
+            notInArray(invoice.status, ["draft", "void", "pending_approval", "rejected"]),
             isNull(invoice.deletedAt)
           )
         );
@@ -303,7 +303,7 @@ export async function GET(
             eq(bill.contactId, id),
             gte(bill.issueDate, startDate),
             lte(bill.issueDate, endDate),
-            notInArray(bill.status, ["draft", "void"]),
+            notInArray(bill.status, ["draft", "void", "pending_approval"]),
             isNull(bill.deletedAt)
           )
         );

@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
+import { nextRunAfterResume } from "@/lib/reports/schedule-timing";
 
 const updateSchema = z.object({
   frequency: z.enum(["daily", "weekly", "monthly", "quarterly"]).optional(),
@@ -75,6 +76,11 @@ export async function PATCH(
     if (parsed.timeOfDay !== undefined) updates.timeOfDay = parsed.timeOfDay;
     if (parsed.timezone !== undefined) updates.timezone = parsed.timezone;
     if (parsed.isActive !== undefined) updates.isActive = parsed.isActive;
+    // Turning a paused schedule back on: a send time that passed while it was
+    // paused moves to the next one in the future instead of sending at once.
+    if (parsed.isActive === true && !existing.isActive) {
+      updates.nextRunAt = nextRunAfterResume(parsed.frequency ?? existing.frequency, existing.nextRunAt);
+    }
 
     const [updated] = await db
       .update(reportSchedule)

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, Gauge } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface Ratios {
   currentRatio: number | null;
@@ -95,39 +96,16 @@ const ratioInfo: Record<string, { label: string; description: string; format: (v
 
 export default function FinancialRatiosPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [ratios, setRatios] = useState<Ratios | null>(null);
-  const [balances, setBalances] = useState<Balances | null>(null);
+  const { data, loading } = useApi<{ ratios?: Ratios | null; balances?: Balances | null }>(
+    `/api/v1/reports/financial-ratios?${new URLSearchParams({ startDate, endDate })}`,
+    { keepPrevious: true }
+  );
+  const ratios = data?.ratios || null;
+  const balances = data?.balances || null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/financial-ratios?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setRatios(data.ratios || null);
-        setBalances(data.balances || null);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -146,9 +124,7 @@ export default function FinancialRatiosPage() {
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !ratios ? (
+      {!ratios ? (
         <ContentReveal>
           <div className="rounded-xl border border-dashed py-12 text-center">
             <p className="text-sm text-muted-foreground">No financial data available.</p>

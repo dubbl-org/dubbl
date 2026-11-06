@@ -35,6 +35,8 @@ const updateSchema = z.object({
   usefulLifeMonths: z.number().int().min(1).optional(),
   depreciationMethod: depreciationMethodEnum.optional(),
   convention: conventionEnum.optional(),
+  // Declining-balance yearly rate in basis points; null = double declining.
+  depreciationRateBp: z.number().int().min(1).max(100000).nullable().optional(),
   totalExpectedUnits: z.number().int().min(0).nullable().optional(),
   unitOfMeasure: z.string().nullable().optional(),
   isCwip: z.boolean().optional(),

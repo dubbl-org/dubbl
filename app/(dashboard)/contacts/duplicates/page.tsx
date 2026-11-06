@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CheckCircle2, EyeOff, Loader2, Merge, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { postJson } from "@/components/dashboard/explorer/action-button";
 import { PartyCell, StatusPill, formatDay } from "@/components/dashboard/explorer/cells";
 import type { ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { useApi } from "@/lib/query/use-api";
 
 type Reason = "name" | "email" | "taxNumber";
 
@@ -71,33 +72,16 @@ function loadDismissed(): string[] {
 export default function DuplicatesPage() {
   useDocumentTitle("Contacts · Duplicates");
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [groups, setGroups] = useState<Group[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
-  const [dismissed, setDismissed] = useState<string[]>([]);
+  const { data, error: loadError, refetch } = useApi<{ data?: Group[] }>("/api/v1/contacts/duplicates");
+  const groups = useMemo(() => (data ? data.data ?? [] : null), [data]);
+  const error = loadError && !data ? loadError.message || "Couldn't check for duplicates" : null;
+  // Groups marked "not duplicates" are remembered on this device, read once the scan is in.
+  const [dismissedState, setDismissed] = useState<string[] | null>(null);
+  const dismissed = useMemo(() => dismissedState ?? (groups ? loadDismissed() : []), [dismissedState, groups]);
   const [showDismissed, setShowDismissed] = useState(false);
   const [keep, setKeep] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch("/api/v1/contacts/duplicates", { headers: { "x-organization-id": orgId } })
-      .then(async (r) => {
-        const json = await r.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!r.ok) throw new Error(json.error || "Couldn't check for duplicates");
-        setGroups(json.data ?? []);
-        setDismissed(loadDismissed());
-        setError(null);
-      })
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Couldn't check for duplicates"));
-    return () => {
-      cancelled = true;
-    };
-  }, [version]);
-
-  const rescan = useCallback(() => setVersion((v) => v + 1), []);
+  const rescan = useCallback(() => void refetch(), [refetch]);
 
   const visible = useMemo(() => (groups ?? []).filter((g) => showDismissed || !dismissed.includes(g.key)), [groups, dismissed, showDismissed]);
   const hiddenCount = (groups ?? []).filter((g) => dismissed.includes(g.key)).length;
@@ -124,7 +108,6 @@ export default function DuplicatesPage() {
           // The route merges the contact in the URL (source) into targetContactId (survivor).
           for (const m of others) await postJson(`/api/v1/contacts/${m.id}/merge`, { targetContactId: survivor.id });
           toast.success(`Merged into ${survivor.name}`);
-          rescan();
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Couldn't merge these contacts");
           throw err;

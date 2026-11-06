@@ -2,12 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { bankRule, bankTransaction, bankAccount } from "@/lib/db/schema";
-import { eq, and, sql, desc, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, sql, desc, isNull } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { softDelete } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { autoReconcileBankTransactions } from "@/lib/api/bank-auto-reconcile";
+import {
+  applyBankRulesToAccount,
+  applyBankRulesToTransaction,
+  getBankRuleSuggestions,
+  loadActiveBankRules,
+} from "@/lib/api/bank-rules";
+import { decideRuleOutcome } from "@/lib/banking/rule-outcome";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
@@ -108,7 +115,7 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
         .boolean()
         .optional()
         .default(false)
-        .describe("Whether to automatically reconcile matching transactions"),
+        .describe("Categorize matching transactions automatically: when true (and accountId is set), a match POSTS the categorization journal entry and marks the line reconciled, like categorize_bank_transaction. When false, the rule only fills in the account / contact / tax rate as a suggestion."),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -168,7 +175,7 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
       autoReconcile: z
         .boolean()
         .optional()
-        .describe("Whether to automatically reconcile matching transactions"),
+        .describe("Categorize matching transactions automatically: true posts the categorization journal entry for each match (needs accountId); false only suggests the category"),
       isActive: z.boolean().optional().describe("Enable or disable the rule"),
     },
     (params) =>
@@ -232,7 +239,7 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "get_bank_rule_suggestions",
-    "Analyze categorized bank transactions to suggest new rule patterns. Finds common description patterns among transactions that already have a category account assigned. Returns top suggestions sorted by frequency.",
+    "Suggest new bank rules from repeat categorizations: bank line descriptions the user has categorized (posted) to the same account at least twice, leaving out anything an active rule already matches. Each suggestion gives a 'contains' keyword on the description (matchValue), the account it was categorized to (accountId, accountName, accountCode), how many lines it covers (occurrences) and a sampleDescription. Pass a suggestion's matchField / matchType / matchValue / accountId to create_bank_rule to turn it into a rule.",
     {
       limit: z
         .number()
@@ -245,188 +252,95 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const { bankAccount } = await import("@/lib/db/schema");
-
-        // Get org's bank account IDs
-        const orgAccounts = await db
-          .select({ id: bankAccount.id })
-          .from(bankAccount)
-          .where(
-            and(
-              eq(bankAccount.organizationId, ctx.organizationId),
-              notDeleted(bankAccount.deletedAt)
-            )
-          );
-
-        const accountIds = orgAccounts.map((a) => a.id);
-        if (accountIds.length === 0) {
-          return { suggestions: [], message: "No bank accounts found" };
-        }
-
-        // Find patterns in categorized transactions
-        const suggestions = await db
-          .select({
-            description: bankTransaction.description,
-            accountId: bankTransaction.accountId,
-            contactId: bankTransaction.contactId,
-            count: sql<number>`count(*)`.mapWith(Number),
-          })
-          .from(bankTransaction)
-          .where(
-            and(
-              sql`${bankTransaction.bankAccountId} IN (${sql.join(
-                accountIds.map((id) => sql`${id}`),
-                sql`, `
-              )})`,
-              isNotNull(bankTransaction.accountId)
-            )
-          )
-          .groupBy(
-            bankTransaction.description,
-            bankTransaction.accountId,
-            bankTransaction.contactId
-          )
-          .orderBy(sql`count(*) DESC`)
-          .limit(params.limit);
-
-        return {
-          suggestions: suggestions.map((s) => ({
-            matchField: "description" as const,
-            matchType: "contains" as const,
-            matchValue: s.description,
-            accountId: s.accountId,
-            contactId: s.contactId,
-            transactionCount: s.count,
-          })),
-        };
+        const suggestions = await getBankRuleSuggestions(ctx.organizationId, params.limit);
+        return { suggestions };
       })
   );
 
   server.tool(
     "apply_bank_rules",
-    "Apply all active bank rules to uncategorized transactions. Matches rules against transaction descriptions/references and updates matching transactions with the rule's account, contact, and tax rate. Returns the number of transactions updated.",
+    "Run the org's active bank rules over bank lines that are still to do (status 'unreconciled' with no category yet), the same engine statement imports use. Per matched line: a split rule, or a rule with autoReconcile=true and a single account, POSTS the categorization journal entry (exactly like categorize_bank_transaction) and marks the line reconciled; any other match only fills in the rule's account / contact / tax rate as a suggestion and leaves the line to do. A line is never marked reconciled without a journal entry: lines dated in a locked period or missing an exchange rate stay as suggestions (counted in skipped). Returns per-account and total counts: applied (lines a rule matched), reconciled (posted), split, skipped.",
     {
+      bankAccountId: z
+        .string()
+        .optional()
+        .describe("UUID of one bank account to run the rules on. Omit to run them on every bank account in the organization."),
       dryRun: z
         .boolean()
         .optional()
         .default(false)
-        .describe("If true, returns matches without applying changes"),
+        .describe("If true, only lists which to-do lines each rule would match (and whether it would post or just suggest) without changing anything"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const { bankAccount } = await import("@/lib/db/schema");
+        requireRole(ctx, "manage:banking");
 
-        // Get active rules ordered by priority
-        const rules = await db.query.bankRule.findMany({
-          where: and(
-            eq(bankRule.organizationId, ctx.organizationId),
-            eq(bankRule.isActive, true),
-            notDeleted(bankRule.deletedAt)
-          ),
-          orderBy: desc(bankRule.priority),
-        });
-
-        if (rules.length === 0) {
-          return { matched: 0, updated: 0, message: "No active rules found" };
-        }
-
-        // Get org's bank account IDs
-        const orgAccounts = await db
-          .select({ id: bankAccount.id })
+        const accounts = await db
+          .select({ id: bankAccount.id, accountName: bankAccount.accountName })
           .from(bankAccount)
           .where(
             and(
               eq(bankAccount.organizationId, ctx.organizationId),
-              notDeleted(bankAccount.deletedAt)
+              notDeleted(bankAccount.deletedAt),
+              params.bankAccountId ? eq(bankAccount.id, params.bankAccountId) : undefined
             )
           );
 
-        const accountIds = orgAccounts.map((a) => a.id);
-        if (accountIds.length === 0) {
-          return { matched: 0, updated: 0, message: "No bank accounts found" };
+        if (params.bankAccountId && accounts.length === 0) {
+          throw new Error("Bank account not found");
         }
 
-        // Get uncategorized transactions
-        const uncategorized = await db
-          .select()
-          .from(bankTransaction)
-          .where(
-            and(
-              sql`${bankTransaction.bankAccountId} IN (${sql.join(
-                accountIds.map((id) => sql`${id}`),
-                sql`, `
-              )})`,
-              isNull(bankTransaction.accountId)
-            )
-          );
-
-        let matched = 0;
-        let updated = 0;
-        const matches: Array<{
-          transactionId: string;
-          ruleName: string;
-          description: string;
-        }> = [];
-
-        for (const tx of uncategorized) {
-          for (const rule of rules) {
-            const fieldValue =
-              rule.matchField === "reference"
-                ? (tx.reference ?? "")
-                : tx.description;
-            const value = fieldValue.toLowerCase();
-            const match = rule.matchValue.toLowerCase();
-
-            let isMatch = false;
-            switch (rule.matchType) {
-              case "contains":
-                isMatch = value.includes(match);
-                break;
-              case "equals":
-                isMatch = value === match;
-                break;
-              case "starts_with":
-                isMatch = value.startsWith(match);
-                break;
-              case "ends_with":
-                isMatch = value.endsWith(match);
-                break;
-            }
-
-            if (isMatch) {
-              matched++;
+        if (params.dryRun) {
+          const rules = await loadActiveBankRules(ctx.organizationId);
+          if (rules.length === 0) {
+            return { matched: 0, dryRun: true, matches: [], message: "No active rules found" };
+          }
+          const matches: Array<{
+            transactionId: string;
+            bankAccountId: string;
+            description: string;
+            amount: number;
+            ruleName: string;
+            outcome: "split" | "post" | "suggest";
+          }> = [];
+          for (const acct of accounts) {
+            const lines = await db.query.bankTransaction.findMany({
+              where: and(
+                eq(bankTransaction.bankAccountId, acct.id),
+                eq(bankTransaction.status, "unreconciled"),
+                isNull(bankTransaction.accountId)
+              ),
+            });
+            for (const line of lines) {
+              const assignment = applyBankRulesToTransaction(rules, line);
+              if (!assignment) continue;
               matches.push({
-                transactionId: tx.id,
-                ruleName: rule.name,
-                description: tx.description,
+                transactionId: line.id,
+                bankAccountId: acct.id,
+                description: line.description,
+                amount: line.amount,
+                ruleName: assignment.ruleName,
+                outcome: decideRuleOutcome(assignment, true),
               });
-
-              if (!params.dryRun) {
-                const setValues: Record<string, unknown> = {};
-                if (rule.accountId) setValues.accountId = rule.accountId;
-                if (rule.contactId) setValues.contactId = rule.contactId;
-                if (rule.taxRateId) setValues.taxRateId = rule.taxRateId;
-
-                if (Object.keys(setValues).length > 0) {
-                  await db
-                    .update(bankTransaction)
-                    .set(setValues)
-                    .where(eq(bankTransaction.id, tx.id));
-                  updated++;
-                }
-              }
-
-              break; // First matching rule wins (highest priority first)
             }
+          }
+          return { matched: matches.length, dryRun: true, matches };
+        }
+
+        const results = [];
+        const totals = { applied: 0, reconciled: 0, split: 0, skipped: 0 };
+        for (const acct of accounts) {
+          const result = await applyBankRulesToAccount(ctx.organizationId, acct.id, ctx.userId);
+          totals.applied += result.applied;
+          totals.reconciled += result.reconciled;
+          totals.split += result.split;
+          totals.skipped += result.skipped;
+          if (result.applied > 0) {
+            results.push({ bankAccountId: acct.id, accountName: acct.accountName, ...result });
           }
         }
 
-        return {
-          matched,
-          updated: params.dryRun ? 0 : updated,
-          dryRun: params.dryRun,
-          matches: params.dryRun ? matches : undefined,
-        };
+        return { ...totals, dryRun: false, accounts: results };
       })
   );
 
@@ -462,7 +376,7 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "set_bank_balance_alert",
-    "Set or clear a low balance alert threshold for a bank account. When the account balance drops below the threshold, a notification is sent to org admins. Amount in cents.",
+    "Set or clear the low balance alert threshold for a bank account (the 'Low balance alert' field in the bank account's Settings tab). A daily check sends a 'Low bank balance' notification to org owners and admins while the balance is below the threshold, at most once a day per account. Amount in cents. Returns { bankAccountId, accountName, lowBalanceThreshold, currentBalance } (cents).",
     {
       bankAccountId: z
         .string()
@@ -470,12 +384,14 @@ export function registerBankRuleTools(server: McpServer, ctx: AuthContext) {
       threshold: z
         .number()
         .int()
+        .min(0)
         .nullable()
         .describe("Low balance threshold in cents (e.g. 100000 = $1000.00). Set to null to clear the alert."),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:bank-rules");
+        // Same permission as editing the bank account in the app
+        requireRole(ctx, "manage:banking");
 
         const account = await db.query.bankAccount.findFirst({
           where: and(

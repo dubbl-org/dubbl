@@ -6,15 +6,25 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const s3 = new S3Client({
-  region: process.env.S3_REGION || "us-east-1",
-  endpoint: process.env.S3_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
+function client(endpoint: string | undefined) {
+  return new S3Client({
+    region: process.env.S3_REGION || "us-east-1",
+    endpoint,
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    },
+    forcePathStyle: true,
+  });
+}
+
+// The server talks to S3_ENDPOINT. Presigned links are opened by the browser,
+// so they're signed for S3_PUBLIC_ENDPOINT when the two differ (in Docker the
+// server reaches MinIO at http://minio:9000, the browser at localhost:9000).
+const s3 = client(process.env.S3_ENDPOINT);
+const s3Public = process.env.S3_PUBLIC_ENDPOINT
+  ? client(process.env.S3_PUBLIC_ENDPOINT)
+  : s3;
 
 const bucket = process.env.S3_BUCKET || "dubbl";
 
@@ -24,7 +34,7 @@ export async function getUploadUrl(key: string, contentType: string) {
     Key: key,
     ContentType: contentType,
   });
-  return getSignedUrl(s3, command, { expiresIn: 3600 });
+  return getSignedUrl(s3Public, command, { expiresIn: 3600 });
 }
 
 /** Short-lived read link. Pass `saveAs` to make browsers download it under that name. */
@@ -36,7 +46,7 @@ export async function getDownloadUrl(key: string, expiresIn = 300, saveAs?: stri
       ? { ResponseContentDisposition: `attachment; filename="${saveAs.replace(/["\\\r\n]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(saveAs)}` }
       : {}),
   });
-  return getSignedUrl(s3, command, { expiresIn });
+  return getSignedUrl(s3Public, command, { expiresIn });
 }
 
 export async function deleteObject(key: string) {

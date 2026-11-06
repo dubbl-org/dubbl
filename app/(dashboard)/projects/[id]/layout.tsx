@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
   CircleDot,
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BlurReveal } from "@/components/ui/blur-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { TagPicker } from "@/components/dashboard/tag-picker";
 import { cn } from "@/lib/utils";
 import {
   ProjectProvider,
@@ -27,12 +28,13 @@ import {
   formatHours,
   daysUntil,
 } from "./project-context";
+import { ProjectInvoiceSheet } from "./invoice-sheet";
 import { formatMoney } from "@/lib/money";
 
 function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
-  const { project: proj, loading, orgId, projectId } = useProject();
+  const { project: proj, loading, projectId, canManage } = useProject();
   const pathname = usePathname();
-  const router = useRouter();
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   if (loading) return <BrandLoader />;
   if (!proj) {
@@ -61,23 +63,6 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
     { href: `${base}/settings`, label: "Settings", icon: Settings2 },
   ];
 
-  async function handleGenerateInvoice() {
-    if (!orgId) return;
-    try {
-      const res = await fetch(`/api/v1/projects/${projectId}/invoice`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Failed");
-      const data = await res.json();
-      toast.success("Invoice generated");
-      router.push(`/sales/${data.invoice.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate invoice");
-    }
-  }
-
   return (
     <div>
       {/* ── Header: full-width spread ── */}
@@ -93,6 +78,7 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
         <Badge variant="outline" className={cn("text-[10px] h-5 shrink-0", priorityConfig[proj.priority]?.color)}>
           {priorityConfig[proj.priority]?.label}
         </Badge>
+        <TagPicker entityType="project" entityId={proj.id} className="shrink-0" />
 
         {/* Spacer pushes right-side stats and actions */}
         <div className="flex-1" />
@@ -111,7 +97,7 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
             </span>
           )}
           {proj.enableBilling && proj.budget > 0 && (
-            <span className="font-mono tabular-nums">{formatMoney(proj.totalBilled)}/{formatMoney(proj.budget)}</span>
+            <span className="font-mono tabular-nums" title="Billed on issued invoices / budget">{formatMoney(proj.totalBilled)}/{formatMoney(proj.budget)}</span>
           )}
           {proj.members.length > 0 && (
             <span className="flex items-center gap-1"><Users className="size-3" />{proj.members.length}</span>
@@ -127,11 +113,12 @@ function ProjectLayoutInner({ children }: { children: React.ReactNode }) {
           <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block border-l pl-3 ml-1">{proj.contact.name}</span>
         )}
 
-        {proj.enableBilling && proj.contactId && (
-          <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={handleGenerateInvoice}>
+        {proj.enableBilling && proj.billingType !== "non_billable" && proj.contactId && canManage && (
+          <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setInvoiceOpen(true)}>
             <Receipt className="mr-1 size-3" />Invoice
           </Button>
         )}
+        <ProjectInvoiceSheet open={invoiceOpen} onOpenChange={setInvoiceOpen} />
       </div>
 
       {/* ── Gradient divider ── */}

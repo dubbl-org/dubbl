@@ -20,7 +20,7 @@ import type { AuthContext } from "@/lib/api/auth-context";
 export function registerCostCenterTools(server: McpServer, ctx: AuthContext) {
   server.tool(
     "list_cost_centers",
-    "List the organization's cost centers with pagination, newest first. Each row includes its parent cost center (if any). Returns the cost centers and the total count.",
+    "List the organization's cost centers with pagination, newest first. Each row includes isActive and its parent cost center (if any). Inactive cost centers should not be assigned to new records; pass activeOnly=true to get only the ones to offer. Returns the cost centers and the total count.",
     {
       limit: z
         .number()
@@ -31,6 +31,11 @@ export function registerCostCenterTools(server: McpServer, ctx: AuthContext) {
         .default(50)
         .describe("Number of cost centers to return (max 100)"),
       page: z.number().int().min(1).optional().default(1).describe("Page number (1-based)"),
+      activeOnly: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("When true, only return active cost centers (the ones that should be offered when assigning a cost center). Defaults to false (active and inactive)."),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -38,6 +43,7 @@ export function registerCostCenterTools(server: McpServer, ctx: AuthContext) {
           eq(costCenter.organizationId, ctx.organizationId),
           notDeleted(costCenter.deletedAt),
         ];
+        if (params.activeOnly) conditions.push(eq(costCenter.isActive, true));
 
         const offset = (params.page - 1) * params.limit;
         const centers = await db.query.costCenter.findMany({

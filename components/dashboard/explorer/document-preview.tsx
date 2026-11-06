@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { PartyCell, StatusPill } from "./cells";
 import type { ExplorerStatus } from "./types";
 
@@ -59,30 +60,10 @@ export function DocumentPreview({
   actions?: ReactNode;
   children?: ReactNode;
 }) {
-  const [doc, setDoc] = useState<{ url: string; data: PreviewDoc } | null>(null);
-  const loading = Boolean(url && pick) && doc?.url !== url;
-
-  useEffect(() => {
-    if (!url || !pick) return;
-    let cancelled = false;
-    const orgId = localStorage.getItem("activeOrgId");
-    fetch(url, { headers: orgId ? { "x-organization-id": orgId } : {} })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled) setDoc({ url, data: json ? pick(json) : {} });
-      })
-      .catch(() => {
-        if (!cancelled) setDoc({ url, data: {} });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // `pick` is a pure mapper defined alongside the page config
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  const { data: json, loading, error } = useApi<Record<string, unknown>>(url && pick ? url : null);
 
   const money = (c: number | null | undefined) => formatMoney(c ?? 0, currency || "USD");
-  const data = doc && doc.url === url ? doc.data : null;
+  const data: PreviewDoc | null = pick && json ? pick(json) : pick && error ? {} : null;
 
   return (
     <div className="px-5 pb-8 pt-5">

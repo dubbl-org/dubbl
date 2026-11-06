@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -16,44 +15,51 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface ReorderItem {
   id: string;
   code: string;
   name: string;
   sku: string | null;
+  /** Cents per unit. */
+  purchasePrice: number;
   quantityOnHand: number;
   reorderPoint: number;
   suggestedReorderQuantity: number;
+  /** The preferred linked supplier, else the first linked one. */
   preferredSupplier: {
     contactId: string;
     contactName: string;
-    purchasePrice: number;
+    /** Cents per unit, 0 when not set. */
+    purchasePrice: number | null;
   } | null;
+}
+
+/** Open a purchase order for the suggested quantity, from the item's supplier. */
+function reorderDraft(item: ReorderItem) {
+  const price = item.preferredSupplier?.purchasePrice || item.purchasePrice || 0;
+  return {
+    contactId: item.preferredSupplier?.contactId,
+    lines: [
+      {
+        description: item.name,
+        quantity: String(item.suggestedReorderQuantity),
+        unitPrice: price ? (price / 100).toFixed(2) : "",
+        accountId: "",
+        taxRateId: "",
+        inventoryItemId: item.id,
+      },
+    ],
+  };
 }
 
 export default function AlertsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [items, setItems] = useState<ReorderItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: ReorderItem[] }>("/api/v1/inventory/reorder-suggestions");
+  const items = data?.data || [];
   useDocumentTitle("Inventory · Stock Alerts");
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    fetch("/api/v1/inventory/reorder-suggestions", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) setItems(data.data || []);
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [orgId]);
 
   if (loading) return <BrandLoader />;
 
@@ -166,7 +172,7 @@ export default function AlertsPage() {
                   className="h-7 text-xs gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openDrawer("purchaseOrder");
+                    openDrawer("purchaseOrder", reorderDraft(item));
                   }}
                 >
                   <ShoppingCart className="size-3" />

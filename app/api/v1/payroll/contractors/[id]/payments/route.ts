@@ -59,6 +59,16 @@ export async function POST(
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
+    const owner = await db.query.contractor.findFirst({
+      where: and(
+        eq(contractor.id, id),
+        eq(contractor.organizationId, ctx.organizationId),
+        notDeleted(contractor.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!owner) return notFound("Contractor");
+
     const [payment] = await db
       .insert(contractorPayment)
       .values({ contractorId: id, ...parsed })

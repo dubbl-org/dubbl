@@ -160,7 +160,7 @@ export function NotConfigured() {
       <TillyMark size={40} state="muted" follow />
       <p className="mt-4 text-[14.5px] font-semibold">Tilly isn&apos;t switched on yet</p>
       <p className="mt-1.5 max-w-[280px] text-[13px] leading-relaxed text-muted-foreground">
-        Add an <code className="rounded bg-foreground/[0.06] px-1 font-mono text-[12px]">ANTHROPIC_API_KEY</code> to your server&apos;s
+        Add an <code className="rounded bg-foreground/[0.06] px-1 font-mono text-[12px]">OPENROUTER_API_KEY</code> to your server&apos;s
         environment and restart dubbl.
       </p>
     </div>

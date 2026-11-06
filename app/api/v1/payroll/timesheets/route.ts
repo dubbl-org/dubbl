@@ -1,9 +1,9 @@
 import { db } from "@/lib/db";
-import { timesheet } from "@/lib/db/schema";
+import { timesheet, payrollEmployee } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, ok, created } from "@/lib/api/response";
+import { handleError, ok, created, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { logAudit } from "@/lib/api/audit";
@@ -60,6 +60,18 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    if (parsed.periodEnd < parsed.periodStart) {
+      return validationError("The period end must be on or after its start");
+    }
+    const emp = await db.query.payrollEmployee.findFirst({
+      where: and(
+        eq(payrollEmployee.id, parsed.employeeId),
+        eq(payrollEmployee.organizationId, ctx.organizationId),
+        notDeleted(payrollEmployee.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!emp) return notFound("Employee");
 
     const [ts] = await db
       .insert(timesheet)

@@ -51,6 +51,8 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
+import { OwnerSelect } from "@/components/dashboard/crm/owner-select";
+import { useContactDefaults } from "@/components/dashboard/use-contact-defaults";
 import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-items-editor";
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
@@ -60,7 +62,8 @@ import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picke
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { formatMoney, decimalToCents, decimalToMinorUnits } from "@/lib/money";
+import { formatMoney, decimalToCents, decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/money";
+import { DEPRECIATION_METHODS, DEPRECIATION_CONVENTIONS, methodOption, CONVENTION_HINT } from "@/lib/fixed-assets/labels";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "bankTransfer" | "contractor" | "deal" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";
 
@@ -70,6 +73,10 @@ interface DrawerInitialData {
   /** Deals: open the drawer on this pipeline and stage. */
   pipelineId?: string;
   stageId?: string;
+  /** Supplier credits: pre-fill from a bill ("Record a supplier credit" on a bill). */
+  debitNote?: { billId: string; contactId: string; currencyCode: string; reference: string; lines: LineItem[] };
+  /** Purchase orders: start with these lines (e.g. from reorder alerts). */
+  lines?: LineItem[];
 }
 
 interface CreateDrawerContextValue {
@@ -106,7 +113,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <InventoryDrawer open={activeType === "inventory"} onClose={close} />
       <QuoteDrawer open={activeType === "quote"} onClose={close} />
       <SalesReceiptDrawer open={activeType === "salesReceipt"} onClose={close} />
-      <PurchaseOrderDrawer open={activeType === "purchaseOrder"} onClose={close} />
+      <PurchaseOrderDrawer open={activeType === "purchaseOrder"} onClose={close} initialData={initialData} />
       <ExpenseDrawer open={activeType === "expense"} onClose={close} />
       <FixedAssetDrawer open={activeType === "fixedAsset"} onClose={close} />
       <BudgetDrawer open={activeType === "budget"} onClose={close} />
@@ -122,7 +129,7 @@ export function CreateDrawerProvider({ children }: { children: React.ReactNode }
       <BankTransferDrawer open={activeType === "bankTransfer"} onClose={close} />
       <ContractorDrawer open={activeType === "contractor"} onClose={close} />
       <DealDrawer open={activeType === "deal"} onClose={close} initialData={initialData} />
-      <DebitNoteDrawer open={activeType === "debitNote"} onClose={close} />
+      <DebitNoteDrawer open={activeType === "debitNote"} onClose={close} initialData={initialData} />
       <CustomerCreditDrawer open={activeType === "customerCredit"} onClose={close} />
       <LoanDrawer open={activeType === "loan"} onClose={close} />
       <OpeningBalanceDrawer open={activeType === "openingBalance"} onClose={close} />
@@ -201,7 +208,8 @@ function ContactDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           phone: form.get("phone") || null,
           taxNumber: form.get("taxNumber") || null,
           type: form.get("type") || "customer",
-          paymentTermsDays: parseInt(form.get("paymentTermsDays") as string) || 30,
+          // 0 = due on receipt, so only fall back when the field isn't a number.
+          paymentTermsDays: Number.isNaN(parseInt(form.get("paymentTermsDays") as string)) ? 30 : parseInt(form.get("paymentTermsDays") as string),
           notes: form.get("notes") || null,
         }),
       });
@@ -347,7 +355,8 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           endDate: endDate || null,
           enableTasks: true,
           enableTimeTracking: true,
-          enableMilestones: false,
+          // Milestone-billed projects are invoiced from their milestones.
+          enableMilestones: form.get("billingType") === "milestone",
           enableNotes: true,
           enableBilling: true,
         }),
@@ -401,6 +410,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="on_hold">On Hold</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
                     </SelectContent>
                   </Select>
@@ -461,6 +471,7 @@ function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () => void }
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-budget">Budget</Label>
                   <CurrencyInput id="drawer-project-budget" name="budget" prefix="$" value={projectBudget} onChange={setProjectBudget} />
+                  <p className="text-[11px] text-muted-foreground">The most you plan to bill the client.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-project-rate">Hourly Rate</Label>
@@ -535,6 +546,16 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "sales", setLines);
+  // Due date follows the contact's payment terms.
+  const termsDays = contactDefaults.paymentTermsDays;
+  useEffect(() => {
+    if (termsDays == null || !issueDate) return;
+    const d = new Date(issueDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + termsDays);
+    setDueDate(d.toISOString().split("T")[0]);
+  }, [termsDays, issueDate]);
 
   useEffect(() => {
     if (!open) {
@@ -579,6 +600,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
             unitPrice: parseFloat(l.unitPrice) || 0,
             accountId: l.accountId || null,
             taxRateId: l.taxRateId || null,
+            inventoryItemId: l.inventoryItemId || null,
           })),
         }),
       });
@@ -592,6 +614,13 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
           ? "Invoice saved for approval — approve it from the invoice's page to send it"
           : "Invoice created"
       );
+      if (data.creditLimitWarning) {
+        const w = data.creditLimitWarning as { creditLimit: number; projectedOutstanding: number; exceededBy: number };
+        toast.warning(
+          `This customer is now ${formatMoney(w.exceededBy)} over their credit limit of ${formatMoney(w.creditLimit)} (they owe ${formatMoney(w.projectedOutstanding)} with this invoice).`,
+          { duration: 10000 }
+        );
+      }
       onClose();
       router.push(`/sales/${data.invoice.id}`);
     } catch (err) {
@@ -698,7 +727,7 @@ function InvoiceDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" stockItems newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -739,6 +768,16 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "purchase", setLines);
+  // Due date follows the contact's payment terms.
+  const termsDays = contactDefaults.paymentTermsDays;
+  useEffect(() => {
+    if (termsDays == null || !issueDate) return;
+    const d = new Date(issueDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + termsDays);
+    setDueDate(d.toISOString().split("T")[0]);
+  }, [termsDays, issueDate]);
 
   useEffect(() => {
     if (!open) {
@@ -773,6 +812,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             unitPrice: parseFloat(l.unitPrice) || 0,
             accountId: l.accountId || null,
             taxRateId: l.taxRateId || null,
+            inventoryItemId: l.inventoryItemId || null,
           })),
         }),
       });
@@ -897,7 +937,7 @@ function BillDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" stockItems newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -1019,8 +1059,13 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSaving(true);
     const form = new FormData(e.currentTarget);
+    const openingQty = parseInt(form.get("quantityOnHand") as string) || 0;
+    if (openingQty > 0 && !(parseFloat(invPurchasePrice) > 0)) {
+      toast.error("Enter a purchase price to add opening stock");
+      return;
+    }
+    setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
@@ -1036,7 +1081,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
           sku: form.get("sku") || null,
           purchasePrice: Math.round(parseFloat(form.get("purchasePrice") as string || "0") * 100),
           salePrice: Math.round(parseFloat(form.get("salePrice") as string || "0") * 100),
-          quantityOnHand: parseInt(form.get("quantityOnHand") as string) || 0,
+          quantityOnHand: openingQty,
           reorderPoint: parseInt(form.get("reorderPoint") as string) || 0,
         }),
       });
@@ -1117,6 +1162,7 @@ function InventoryDrawer({ open, onClose }: { open: boolean; onClose: () => void
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-qty">Initial Quantity</Label>
                   <Input id="drawer-inv-qty" name="quantityOnHand" type="number" min={0} defaultValue={0} />
+                  <p className="text-[11px] text-muted-foreground">Valued at the purchase price. Goes into your default location, if you have one.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="drawer-inv-reorder">Reorder Point</Label>
@@ -1155,6 +1201,8 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "sales", setLines);
 
   useEffect(() => {
     if (!open) {
@@ -1247,7 +1295,7 @@ function QuoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -1286,6 +1334,8 @@ function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => v
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "sales", setLines);
 
   useEffect(() => {
     if (!open) {
@@ -1327,6 +1377,7 @@ function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => v
             unitPrice: parseFloat(l.unitPrice) || 0,
             accountId: l.accountId || null,
             taxRateId: l.taxRateId || null,
+            inventoryItemId: l.inventoryItemId || null,
           })),
         }),
       });
@@ -1387,7 +1438,7 @@ function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => v
 
             <div className="space-y-4">
               <SectionLabel>What was sold</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" stockItems newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -1436,7 +1487,7 @@ function SalesReceiptDrawer({ open, onClose }: { open: boolean; onClose: () => v
 // ---------------------------------------------------------------------------
 // Purchase Order Drawer
 // ---------------------------------------------------------------------------
-function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function PurchaseOrderDrawer({ open, onClose, initialData }: { open: boolean; onClose: () => void; initialData?: DrawerInitialData }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [contactId, setContactId] = useState("");
@@ -1453,8 +1504,11 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
       setContactId(""); setReference(""); setNotes(""); setDeliveryDate("");
       setIssueDate(new Date().toISOString().split("T")[0]);
       setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    } else {
+      if (initialData?.contactId) setContactId(initialData.contactId);
+      if (initialData?.lines?.length) setLines(initialData.lines);
     }
-  }, [open]);
+  }, [open, initialData]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1478,6 +1532,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
             unitPrice: parseFloat(l.unitPrice) || 0,
             accountId: l.accountId || null,
             taxRateId: l.taxRateId || null,
+            inventoryItemId: l.inventoryItemId || null,
           })),
         }),
       });
@@ -1538,7 +1593,7 @@ function PurchaseOrderDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["expense"]} taxContext="purchase" stockItems />
             </div>
 
             <div className="h-px bg-border" />
@@ -1834,28 +1889,53 @@ interface FixedAssetAccount {
   type: string;
 }
 
+interface FixedAssetCategory {
+  id: string;
+  name: string;
+  defaultDepreciationMethod: string;
+  defaultConvention: string;
+  defaultUsefulLifeMonths: number | null;
+  defaultResidualValue: number;
+  defaultDepreciationRateBp: number | null;
+  assetAccountId: string | null;
+  depreciationAccountId: string | null;
+  accumulatedDepAccountId: string | null;
+  cwipAccountId: string | null;
+}
+
 function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [accounts, setAccounts] = useState<FixedAssetAccount[]>([]);
+  const [categories, setCategories] = useState<FixedAssetCategory[]>([]);
+  const [categoryId, setCategoryId] = useState("none");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [assetNumber, setAssetNumber] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
   const [purchasePrice, setPurchasePrice] = useState("");
+  const [isCwip, setIsCwip] = useState(false);
+  const [cwipAccountId, setCwipAccountId] = useState("");
   const [residualValue, setResidualValue] = useState("");
   const [usefulLifeMonths, setUsefulLifeMonths] = useState("60");
   const [depreciationMethod, setDepreciationMethod] = useState("straight_line");
+  const [convention, setConvention] = useState("full_month");
+  const [ratePct, setRatePct] = useState("");
+  const [totalExpectedUnits, setTotalExpectedUnits] = useState("");
+  const [unitOfMeasure, setUnitOfMeasure] = useState("");
   const [assetAccountId, setAssetAccountId] = useState("");
   const [depreciationAccountId, setDepreciationAccountId] = useState("");
   const [accumulatedDepAccountId, setAccumulatedDepAccountId] = useState("");
 
   useEffect(() => {
     if (!open) {
+      setCategoryId("none");
       setName(""); setDescription(""); setAssetNumber("");
       setPurchaseDate(new Date().toISOString().split("T")[0]);
-      setPurchasePrice(""); setResidualValue(""); setUsefulLifeMonths("60");
-      setDepreciationMethod("straight_line");
+      setPurchasePrice(""); setIsCwip(false); setCwipAccountId("");
+      setResidualValue(""); setUsefulLifeMonths("60");
+      setDepreciationMethod("straight_line"); setConvention("full_month"); setRatePct("");
+      setTotalExpectedUnits(""); setUnitOfMeasure("");
       setAssetAccountId(""); setDepreciationAccountId(""); setAccumulatedDepAccountId("");
       return;
     }
@@ -1864,19 +1944,43 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
     fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
       .then((data) => { if (data.accounts) setAccounts(data.accounts); });
+    fetch("/api/v1/asset-categories?limit=100&isActive=true", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => { if (data.data) setCategories(data.data); });
   }, [open]);
 
   const assetAccounts = accounts.filter((a) => a.type === "asset");
   const expenseAccounts = accounts.filter((a) => a.type === "expense");
 
+  // Picking a category fills in its defaults; everything stays editable.
+  function applyCategory(id: string) {
+    setCategoryId(id);
+    const c = categories.find((x) => x.id === id);
+    if (!c) return;
+    setDepreciationMethod(c.defaultDepreciationMethod);
+    setConvention(c.defaultConvention);
+    if (c.defaultUsefulLifeMonths != null) setUsefulLifeMonths(String(c.defaultUsefulLifeMonths));
+    setResidualValue(c.defaultResidualValue ? (c.defaultResidualValue / 100).toFixed(2) : "");
+    setRatePct(c.defaultDepreciationRateBp != null ? String(c.defaultDepreciationRateBp / 100) : "");
+    if (c.assetAccountId) setAssetAccountId(c.assetAccountId);
+    if (c.depreciationAccountId) setDepreciationAccountId(c.depreciationAccountId);
+    if (c.accumulatedDepAccountId) setAccumulatedDepAccountId(c.accumulatedDepAccountId);
+    if (c.cwipAccountId) setCwipAccountId(c.cwipAccountId);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name || !assetNumber || !purchasePrice) { toast.error("Please fill in required fields"); return; }
+    if (depreciationMethod === "units_of_production" && !(parseInt(totalExpectedUnits) > 0)) {
+      toast.error("Enter how many units it should last for");
+      return;
+    }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
     try {
+      const rate = ratePct.trim() ? parseFloat(ratePct) : NaN;
       const res = await fetch("/api/v1/fixed-assets", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
@@ -1884,11 +1988,23 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           name,
           description: description || null,
           assetNumber,
+          categoryId: categoryId !== "none" ? categoryId : null,
           purchaseDate,
-          purchasePrice: Math.round(parseFloat(purchasePrice) * 100),
-          residualValue: residualValue ? Math.round(parseFloat(residualValue) * 100) : 0,
+          purchasePrice: decimalToCents(purchasePrice),
+          residualValue: residualValue ? decimalToCents(residualValue) : 0,
           usefulLifeMonths: parseInt(usefulLifeMonths) || 60,
           depreciationMethod,
+          convention,
+          depreciationRateBp:
+            depreciationMethod === "declining_balance" && Number.isFinite(rate) && rate > 0
+              ? Math.round(rate * 100)
+              : null,
+          totalExpectedUnits:
+            depreciationMethod === "units_of_production" ? parseInt(totalExpectedUnits) || null : null,
+          unitOfMeasure:
+            depreciationMethod === "units_of_production" ? unitOfMeasure || null : null,
+          isCwip,
+          cwipAccountId: isCwip ? cwipAccountId || null : null,
           assetAccountId: assetAccountId || null,
           depreciationAccountId: depreciationAccountId || null,
           accumulatedDepAccountId: accumulatedDepAccountId || null,
@@ -1925,6 +2041,21 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
           <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-4">
               <SectionLabel>Asset Info</SectionLabel>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={categoryId} onValueChange={applyCategory}>
+                  <SelectTrigger><SelectValue placeholder="No category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No category</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Fills in the method, lifespan and accounts below from the category. You can still change them.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Asset Name *</Label>
@@ -1955,13 +2086,54 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                   <CurrencyInput prefix="$" value={purchasePrice} onChange={setPurchasePrice} placeholder="10000.00" />
                 </div>
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Is it in use yet?</Label>
+                  <Select value={isCwip ? "cwip" : "in_use"} onValueChange={(v) => setIsCwip(v === "cwip")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_use">In use now</SelectItem>
+                      <SelectItem value="cwip">Still being built (work in progress)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {isCwip && (
+                  <div className="space-y-2">
+                    <Label>Work in progress account</Label>
+                    <Select value={cwipAccountId} onValueChange={setCwipAccountId}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {assetAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              {isCwip && (
+                <p className="text-[11px] text-muted-foreground">
+                  Its value doesn&apos;t drop while it&apos;s being built. Add construction costs as they come in, then use Bring into use.
+                </p>
+              )}
             </div>
 
             <div className="h-px bg-border" />
 
             <div className="space-y-4">
               <SectionLabel>Depreciation</SectionLabel>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Method</Label>
+                <Select value={depreciationMethod} onValueChange={setDepreciationMethod}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DEPRECIATION_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{methodOption(m.value)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Residual Value</Label>
                   <CurrencyInput prefix="$" value={residualValue} onChange={setResidualValue} placeholder="500.00" />
@@ -1970,17 +2142,42 @@ function FixedAssetDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                   <Label>Useful Life (months)</Label>
                   <Input type="number" value={usefulLifeMonths} onChange={(e) => setUsefulLifeMonths(e.target.value)} placeholder="60" />
                 </div>
+              </div>
+              {depreciationMethod !== "units_of_production" && (
                 <div className="space-y-2">
-                  <Label>Method</Label>
-                  <Select value={depreciationMethod} onValueChange={setDepreciationMethod}>
+                  <Label>The first month</Label>
+                  <Select value={convention} onValueChange={setConvention}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="straight_line">Straight Line</SelectItem>
-                      <SelectItem value="declining_balance">Declining Balance</SelectItem>
+                      {DEPRECIATION_CONVENTIONS.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground">{CONVENTION_HINT}</p>
                 </div>
-              </div>
+              )}
+              {depreciationMethod === "declining_balance" && (
+                <div className="space-y-2">
+                  <Label>Yearly rate (%)</Label>
+                  <Input type="number" min={0} step="0.01" value={ratePct} onChange={(e) => setRatePct(e.target.value)} placeholder="e.g. 20" />
+                  <p className="text-[11px] text-muted-foreground">
+                    Share of what&apos;s left written off each year. Leave blank for double the straight-line rate.
+                  </p>
+                </div>
+              )}
+              {depreciationMethod === "units_of_production" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Total units over its life *</Label>
+                    <Input type="number" min={1} value={totalExpectedUnits} onChange={(e) => setTotalExpectedUnits(e.target.value)} placeholder="100000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unit</Label>
+                    <Input value={unitOfMeasure} onChange={(e) => setUnitOfMeasure(e.target.value)} placeholder="miles, hours, copies..." />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="h-px bg-border" />
@@ -2380,23 +2577,28 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   const [position, setPosition] = useState("");
   const [salary, setSalary] = useState("");
   const [payFrequency, setPayFrequency] = useState("monthly");
-  const [taxRate, setTaxRate] = useState("20");
+  const [taxRate, setTaxRate] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [empStartDate, setEmpStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [empCurrency, setEmpCurrency] = useState("USD");
+  const [payType, setPayType] = useState<"salary" | "hourly">("salary");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [department, setDepartment] = useState("");
 
   useEffect(() => {
     if (!open) {
       setEmpName(""); setEmail(""); setEmployeeNumber(""); setPosition("");
-      setSalary(""); setPayFrequency("monthly"); setTaxRate("20");
+      setSalary(""); setPayFrequency("monthly"); setTaxRate("");
       setBankAccountNumber(""); setEmpStartDate(new Date().toISOString().split("T")[0]);
-      setEmpCurrency("USD");
+      setEmpCurrency("USD"); setPayType("salary"); setHourlyRate(""); setDepartment("");
     }
   }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!empName || !employeeNumber || !salary) { toast.error("Please fill in required fields"); return; }
+    const hourly = payType === "hourly";
+    if (!empName || !employeeNumber || (hourly ? !hourlyRate : !salary)) { toast.error("Please fill in required fields"); return; }
+    const hourlyRateCents = hourly ? Math.round(parseFloat(hourlyRate) * 100) : null;
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
@@ -2410,9 +2612,14 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           email: email || null,
           employeeNumber,
           position: position || null,
-          salary: Math.round(parseFloat(salary) * 100),
+          department: department.trim() || null,
+          compensationType: payType,
+          hourlyRate: hourlyRateCents,
+          // Hourly staff: yearly pay estimated at 2,080 hours (40 a week) for cost reports
+          salary: hourly ? Math.round((hourlyRateCents ?? 0) * 2080) : Math.round(parseFloat(salary) * 100),
           payFrequency,
-          taxRate: Math.round(parseFloat(taxRate) * 100),
+          // Left empty, the API uses the Default Tax Rate from payroll settings.
+          ...(taxRate.trim() ? { taxRate: Math.round(parseFloat(taxRate) * 100) } : {}),
           bankAccountNumber: bankAccountNumber || null,
           startDate: empStartDate,
           currency: empCurrency,
@@ -2468,6 +2675,10 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                   <Label>Position</Label>
                   <Input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Software Engineer" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Engineering" />
+                </div>
               </div>
             </div>
 
@@ -2477,9 +2688,27 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
               <SectionLabel>Compensation</SectionLabel>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Annual Salary *</Label>
-                  <CurrencyInput prefix="$" value={salary} onChange={setSalary} placeholder="75000.00" />
+                  <Label>Pay Type</Label>
+                  <Select value={payType} onValueChange={(v) => setPayType(v as "salary" | "hourly")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="salary">Salary</SelectItem>
+                      <SelectItem value="hourly">Hourly</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+                {payType === "hourly" ? (
+                  <div className="space-y-2">
+                    <Label>Hourly Rate *</Label>
+                    <CurrencyInput prefix="$" value={hourlyRate} onChange={setHourlyRate} placeholder="25.00" />
+                    <p className="text-[11px] text-muted-foreground">Paid for approved timesheet hours, or standard hours when there&apos;s no timesheet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Annual Salary *</Label>
+                    <CurrencyInput prefix="$" value={salary} onChange={setSalary} placeholder="75000.00" />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Pay Frequency</Label>
                   <Select value={payFrequency} onValueChange={setPayFrequency}>
@@ -2493,7 +2722,7 @@ function EmployeeDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                 </div>
                 <div className="space-y-2">
                   <Label>Tax Rate (%)</Label>
-                  <Input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="20.00" />
+                  <Input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="Payroll default" />
                 </div>
                 <div className="space-y-2">
                   <Label>Currency</Label>
@@ -2538,6 +2767,8 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "sales", setLines);
 
   useEffect(() => {
     if (!open) {
@@ -2624,7 +2855,7 @@ function CreditNoteDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -2660,6 +2891,8 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
   const [lines, setLines] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" },
   ]);
+  // The contact's default account / tax rate / "don't charge tax" (Contacts → Bookkeeping).
+  const contactDefaults = useContactDefaults(contactId, "sales", setLines);
 
   useEffect(() => {
     if (!open) {
@@ -2787,7 +3020,7 @@ function RecurringDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
             <div className="space-y-4">
               <SectionLabel>Line Items</SectionLabel>
-              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" />
+              <LineItemsEditor lines={lines} onChange={setLines} accountTypeFilter={["revenue"]} taxContext="sales" newLineDefaults={contactDefaults.newLineDefaults} taxLocked={contactDefaults.taxLocked} />
             </div>
 
             <div className="h-px bg-border" />
@@ -3378,6 +3611,11 @@ function TransferDrawer({ open, onClose }: { open: boolean; onClose: () => void 
       setSaving(false);
       return;
     }
+    if (fromWarehouseId === toWarehouseId) {
+      toast.error("Pick two different locations");
+      setSaving(false);
+      return;
+    }
 
     const validLines = lines.filter((l) => l.inventoryItemId && l.quantity > 0);
     if (validLines.length === 0) {
@@ -3639,30 +3877,33 @@ function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   const [cEmail, setCEmail] = useState("");
   const [cCompany, setCCompany] = useState("");
   const [cRate, setCRate] = useState("");
+  const [cTaxId, setCTaxId] = useState("");
   const [cCurrency, setCCurrency] = useState("USD");
 
   useEffect(() => {
     if (!open) {
-      setCName(""); setCEmail(""); setCCompany(""); setCRate(""); setCCurrency("USD");
+      setCName(""); setCEmail(""); setCCompany(""); setCRate(""); setCTaxId(""); setCCurrency("USD");
     }
   }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!cName) { toast.error("Name is required"); return; }
-    setSaving(true);
+    if (!cName.trim()) { toast.error("Name is required"); return; }
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
+    setSaving(true);
 
     try {
       const res = await fetch("/api/v1/payroll/contractors", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        // Blank optional fields are left out; the rate is sent as hourlyRate in cents
         body: JSON.stringify({
-          name: cName,
-          email: cEmail || null,
-          company: cCompany || null,
-          defaultRate: cRate ? Math.round(parseFloat(cRate) * 100) : null,
+          name: cName.trim(),
+          ...(cEmail.trim() ? { email: cEmail.trim() } : {}),
+          ...(cCompany.trim() ? { company: cCompany.trim() } : {}),
+          ...(cTaxId.trim() ? { taxId: cTaxId.trim() } : {}),
+          ...(cRate ? { hourlyRate: Math.round(parseFloat(cRate) * 100) } : {}),
           currency: cCurrency,
         }),
       });
@@ -3711,7 +3952,11 @@ function ContractorDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                   <Input value={cCompany} onChange={(e) => setCCompany(e.target.value)} placeholder="Acme LLC" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Default Rate</Label>
+                  <Label>Tax ID</Label>
+                  <Input value={cTaxId} onChange={(e) => setCTaxId(e.target.value)} placeholder="EIN or SSN for the 1099" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Hourly Rate</Label>
                   <CurrencyInput prefix="$" value={cRate} onChange={setCRate} placeholder="150.00" />
                 </div>
                 <div className="space-y-2">
@@ -3749,6 +3994,7 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
   const [probability, setProbability] = useState("");
   const [expectedClose, setExpectedClose] = useState<string | undefined>();
   const [source, setSource] = useState<string>("");
+  const [ownerId, setOwnerId] = useState("");
   const [dirty, setDirty] = useState(false);
 
   // Pre-fill contactId from initialData
@@ -3792,6 +4038,7 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
     setProbability("");
     setExpectedClose(undefined);
     setSource("");
+    setOwnerId("");
     setContactId("");
     setDirty(false);
   }
@@ -3829,6 +4076,7 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
           probability: probability ? parseInt(probability) : null,
           expectedCloseDate: expectedClose || null,
           source: source || null,
+          assignedTo: ownerId || null,
           notes: (form.get("notes") as string) || null,
         }),
       });
@@ -3909,10 +4157,14 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
             <div className="h-px bg-border" />
 
             <div className="space-y-4">
-              <SectionLabel>Contact</SectionLabel>
+              <SectionLabel>Contact &amp; Owner</SectionLabel>
               <div className="space-y-2">
                 <Label>Associated Contact</Label>
                 <ContactPicker value={contactId} onChange={(v) => { setContactId(v); markDirty(); }} placeholder="Select a contact..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Owner</Label>
+                <OwnerSelect value={ownerId} onChange={(v) => { setOwnerId(v); markDirty(); }} />
               </div>
             </div>
 
@@ -3971,10 +4223,11 @@ function DealDrawer({ open, onClose, initialData }: { open: boolean; onClose: ()
 // ---------------------------------------------------------------------------
 // Debit Note Drawer (supplier credit — money a supplier owes you back)
 // ---------------------------------------------------------------------------
-function DebitNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function DebitNoteDrawer({ open, onClose, initialData }: { open: boolean; onClose: () => void; initialData?: DrawerInitialData }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [contactId, setContactId] = useState("");
+  const [billId, setBillId] = useState("");
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -3985,11 +4238,21 @@ function DebitNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   useEffect(() => {
     if (!open) {
-      setContactId(""); setReference(""); setNotes(""); setCurrencyCode("");
+      setContactId(""); setBillId(""); setReference(""); setNotes(""); setCurrencyCode("");
       setIssueDate(new Date().toISOString().split("T")[0]);
       setLines([{ description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
     }
   }, [open]);
+
+  // Started from a bill: copy its supplier, currency, number and lines (with
+  // their accounts and tax rates) so only what's being credited needs changing.
+  useEffect(() => {
+    const from = initialData?.debitNote;
+    if (!open || !from) return;
+    setContactId(from.contactId); setBillId(from.billId);
+    setCurrencyCode(from.currencyCode); setReference(from.reference);
+    if (from.lines.length > 0) setLines(from.lines);
+  }, [open, initialData]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -4004,6 +4267,7 @@ function DebitNoteDrawer({ open, onClose }: { open: boolean; onClose: () => void
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           contactId, issueDate,
+          billId: billId || null,
           reference: reference || null,
           notes: notes || null,
           currencyCode: currencyCode || undefined,
@@ -4523,8 +4787,8 @@ function OpeningBalanceDrawer({ open, onClose }: { open: boolean; onClose: () =>
               <div className="space-y-1">
                 <Label>Account balances</Label>
                 <p className="text-xs text-muted-foreground">
-                  Each line is money in (debit) or money out (credit). The Debit and
-                  Credit columns must add up to the same total.
+                  Put what you own (cash, money owed to you) in Debit, and what you
+                  owe and your equity in Credit. The two columns must add up to the same total.
                 </p>
               </div>
               <div className="overflow-x-auto rounded-lg border">
@@ -4726,38 +4990,99 @@ function AccrualScheduleDrawer({ open, onClose }: { open: boolean; onClose: () =
 // ---------------------------------------------------------------------------
 interface InvoiceOption {
   id: string;
-  number: string | null;
-  total: number;
+  invoiceNumber: string;
+  status: string;
+  subtotal: number;
+  currencyCode: string;
   contact?: { name?: string | null } | null;
 }
+
+interface InvoiceLineOption {
+  id: string;
+  description: string;
+  amount: number;
+  accountId: string | null;
+  account?: { code: string; name: string } | null;
+}
+
+// Only invoices that have booked their income can be spread.
+const SCHEDULABLE_INVOICE_STATUSES = ["sent", "partial", "paid", "overdue"];
+const WHOLE_INVOICE = "__whole__";
 
 function RevenueScheduleDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
   const [invoiceId, setInvoiceId] = useState("");
+  const [lines, setLines] = useState<InvoiceLineOption[]>([]);
+  const [lineId, setLineId] = useState(WHOLE_INVOICE);
   const [totalAmount, setTotalAmount] = useState("0.00");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [endDate, setEndDate] = useState("");
   const [method, setMethod] = useState("straight_line");
 
+  const selectedInvoice = invoices.find((inv) => inv.id === invoiceId);
+  const currency = selectedInvoice?.currencyCode || "USD";
+  const incomeLines = lines.filter((l) => l.accountId && l.amount > 0);
+  const mixedAccounts = new Set(incomeLines.map((l) => l.accountId)).size > 1;
+
   useEffect(() => {
     if (!open) {
-      setInvoiceId(""); setTotalAmount("0.00"); setEndDate(""); setMethod("straight_line");
+      setInvoiceId(""); setLines([]); setLineId(WHOLE_INVOICE);
+      setTotalAmount("0.00"); setEndDate(""); setMethod("straight_line");
       setStartDate(new Date().toISOString().split("T")[0]);
       return;
     }
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
-    fetch("/api/v1/invoices", { headers: { "x-organization-id": orgId } })
+    fetch("/api/v1/invoices?limit=100", { headers: { "x-organization-id": orgId } })
       .then((r) => r.json())
-      .then((data) => { if (data.data) setInvoices(data.data); })
+      .then((data) => {
+        if (data.data) {
+          setInvoices((data.data as InvoiceOption[]).filter((inv) => SCHEDULABLE_INVOICE_STATUSES.includes(inv.status)));
+        }
+      })
       .catch(() => {});
   }, [open]);
+
+  // Load the chosen invoice's lines; default the amount to its income before tax.
+  useEffect(() => {
+    setLines([]);
+    setLineId(WHOLE_INVOICE);
+    if (!invoiceId) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch(`/api/v1/invoices/${invoiceId}`, { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((data) => {
+        const inv = data.invoice as { subtotal: number; currencyCode: string; lines?: InvoiceLineOption[] } | undefined;
+        if (!inv) return;
+        const ls = inv.lines ?? [];
+        setLines(ls);
+        const accounts = new Set(ls.filter((l) => l.accountId && l.amount > 0).map((l) => l.accountId));
+        if (accounts.size > 1) {
+          setTotalAmount("0.00");
+        } else {
+          setTotalAmount(minorUnitsToDecimal(ls.reduce((t, l) => t + (l.accountId && l.amount > 0 ? l.amount : 0), 0), inv.currencyCode));
+        }
+      })
+      .catch(() => {});
+  }, [invoiceId]);
+
+  function chooseLine(value: string) {
+    setLineId(value);
+    const line = lines.find((l) => l.id === value);
+    if (line) setTotalAmount(minorUnitsToDecimal(line.amount, currency));
+    else setTotalAmount(minorUnitsToDecimal(incomeLines.reduce((t, l) => t + l.amount, 0), currency));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!invoiceId) { toast.error("Please choose an invoice"); return; }
+    if (mixedAccounts && lineId === WHOLE_INVOICE) { toast.error("Choose which line to spread"); return; }
+    if (!endDate) { toast.error("Please choose an end date"); return; }
+    const amount = decimalToMinorUnits(totalAmount, currency);
+    if (!amount || amount <= 0) { toast.error("Enter the amount to spread"); return; }
     setSaving(true);
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) { setSaving(false); return; }
@@ -4768,8 +5093,8 @@ function RevenueScheduleDrawer({ open, onClose }: { open: boolean; onClose: () =
         headers: { "Content-Type": "application/json", "x-organization-id": orgId },
         body: JSON.stringify({
           invoiceId,
-          // Route expects DOLLARS (it multiplies by 100).
-          totalAmount: parseFloat(totalAmount) || 0,
+          invoiceLineId: lineId === WHOLE_INVOICE ? null : lineId,
+          totalAmount: amount, // integer cents
           startDate,
           endDate,
           method,
@@ -4815,22 +5140,45 @@ function RevenueScheduleDrawer({ open, onClose }: { open: boolean; onClose: () =
                   <SelectContent>
                     {invoices.map((inv) => (
                       <SelectItem key={inv.id} value={inv.id}>
-                        {inv.number || inv.id.slice(0, 8)}
+                        {inv.invoiceNumber}
                         {inv.contact?.name ? ` · ${inv.contact.name}` : ""}
+                        {` · ${formatMoney(inv.subtotal, inv.currencyCode)}`}
                       </SelectItem>
                     ))}
                     {invoices.length === 0 && (
                       <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                        No invoices yet
+                        No sent invoices yet
                       </div>
                     )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  The amount moves out of income now and is counted back period by period.
+                </p>
               </div>
+              {incomeLines.length > 1 && (
+                <div className="space-y-2">
+                  <Label>Line</Label>
+                  <Select value={lineId} onValueChange={chooseLine}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {!mixedAccounts && <SelectItem value={WHOLE_INVOICE}>Whole invoice</SelectItem>}
+                      {mixedAccounts && <SelectItem value={WHOLE_INVOICE} disabled>Choose a line (they use different income accounts)</SelectItem>}
+                      {incomeLines.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.description || "Line"} · {formatMoney(l.amount, currency)}
+                          {l.account ? ` · ${l.account.code} ${l.account.name}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="drawer-revsched-amount">Total amount</Label>
-                  <CurrencyInput id="drawer-revsched-amount" prefix="$" value={totalAmount} onChange={setTotalAmount} />
+                  <Label htmlFor="drawer-revsched-amount">Amount to spread</Label>
+                  <CurrencyInput id="drawer-revsched-amount" prefix={currency === "USD" ? "$" : currency} value={totalAmount} onChange={setTotalAmount} />
+                  <p className="text-xs text-muted-foreground">Before tax</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Method</Label>
@@ -4842,6 +5190,13 @@ function RevenueScheduleDrawer({ open, onClose }: { open: boolean; onClose: () =
                       <SelectItem value="on_completion">All on completion</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {method === "straight_line"
+                      ? "Counted automatically each month."
+                      : method === "milestone"
+                        ? "Split by month, but you count each part when it's done."
+                        : "Counted in full on the end date."}
+                  </p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -5022,8 +5377,8 @@ function RecurringJournalDrawer({ open, onClose }: { open: boolean; onClose: () 
               <div className="space-y-1">
                 <Label>Journal lines</Label>
                 <p className="text-xs text-muted-foreground">
-                  Each line is money in (debit) or money out (credit). The Debit and
-                  Credit columns must add up to the same total.
+                  Debits increase what you own and your expenses; credits increase what
+                  you owe, your equity and your income. The two columns must add up to the same total.
                 </p>
               </div>
               <div className="overflow-x-auto rounded-lg border">

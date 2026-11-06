@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Wallet } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { formatMoney } from "@/lib/money";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface Period {
   label: string;
@@ -48,61 +49,21 @@ const GROUP_OPTIONS: { value: string; label: string }[] = [
 
 export default function BankCashFlowPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [groupBy, setGroupBy] = useState("month");
   const [bankAccountId, setBankAccountId] = useState("");
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [data, setData] = useState<BankCashFlowData | null>(null);
 
   // Load the org's bank accounts for the account picker.
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch("/api/v1/bank-accounts", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.bankAccounts) setAccounts(d.bankAccounts);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: accountList } = useApi<{ bankAccounts?: BankAccount[] }>("/api/v1/bank-accounts");
+  const accounts = accountList?.bankAccounts || [];
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate, groupBy });
-    if (bankAccountId) params.set("bankAccountId", bankAccountId);
-    fetch(`/api/v1/reports/bank-cash-flow?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.periods) setData(d);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [startDate, endDate, groupBy, bankAccountId]);
+  const params = new URLSearchParams({ startDate, endDate, groupBy });
+  if (bankAccountId) params.set("bankAccountId", bankAccountId);
+  const { data: report, loading } = useApi<BankCashFlowData>(`/api/v1/reports/bank-cash-flow?${params}`, { keepPrevious: true });
+  const data = report?.periods ? report : null;
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const periods = data?.periods ?? [];
   const totals = data?.totals ?? { inflows: 0, outflows: 0, net: 0 };
@@ -121,6 +82,7 @@ export default function BankCashFlowPage() {
         <ExportButton
           data={periods}
           columns={["label", "inflows", "outflows", "net", "balance"]}
+          moneyColumns={["inflows", "outflows", "net", "balance"]}
           filename="bank-cash-flow"
         />
       </PageHeader>
@@ -172,90 +134,86 @@ export default function BankCashFlowPage() {
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="Money in"
-              value={formatMoney(totals.inflows, currency)}
-              icon={ArrowDownToLine}
-            />
-            <StatCard
-              title="Money out"
-              value={formatMoney(Math.abs(totals.outflows), currency)}
-              icon={ArrowUpFromLine}
-            />
-            <StatCard
-              title="Net change"
-              value={formatMoney(totals.net, currency)}
-              icon={Wallet}
-            />
-          </div>
+      <ContentReveal className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            title="Money in"
+            value={formatMoney(totals.inflows, currency)}
+            icon={ArrowDownToLine}
+          />
+          <StatCard
+            title="Money out"
+            value={formatMoney(Math.abs(totals.outflows), currency)}
+            icon={ArrowUpFromLine}
+          />
+          <StatCard
+            title="Net change"
+            value={formatMoney(totals.net, currency)}
+            icon={Wallet}
+          />
+        </div>
 
-          <div className="rounded-lg border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Period</TableHead>
-                  <TableHead className="w-32 text-right">Money in</TableHead>
-                  <TableHead className="w-32 text-right">Money out</TableHead>
-                  <TableHead className="w-32 text-right">Net change</TableHead>
-                  <TableHead className="w-36 text-right">Running balance</TableHead>
+        <div className="rounded-lg border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Period</TableHead>
+                <TableHead className="w-32 text-right">Money in</TableHead>
+                <TableHead className="w-32 text-right">Money out</TableHead>
+                <TableHead className="w-32 text-right">Net change</TableHead>
+                <TableHead className="w-36 text-right">Running balance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {periods.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-sm text-muted-foreground py-8"
+                  >
+                    No bank movements in this date range.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {periods.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-sm text-muted-foreground py-8"
-                    >
-                      No bank movements in this date range.
+              ) : (
+                periods.map((p) => (
+                  <TableRow key={p.startDate}>
+                    <TableCell className="font-medium text-sm">{p.label}</TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-brand-600">
+                      {formatMoney(p.inflows, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-rose-600">
+                      {formatMoney(Math.abs(p.outflows), currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums">
+                      {formatMoney(p.net, currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums">
+                      {formatMoney(p.balance, currency)}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  periods.map((p) => (
-                    <TableRow key={p.startDate}>
-                      <TableCell className="font-medium text-sm">{p.label}</TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums text-brand-600">
-                        {formatMoney(p.inflows, currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums text-rose-600">
-                        {formatMoney(Math.abs(p.outflows), currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">
-                        {formatMoney(p.net, currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">
-                        {formatMoney(p.balance, currency)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-              {periods.length > 0 && (
-                <TableBody>
-                  <TableRow className="bg-muted/30 font-bold">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
-                      {formatMoney(totals.inflows, currency)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
-                      {formatMoney(Math.abs(totals.outflows), currency)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums">
-                      {formatMoney(totals.net, currency)}
-                    </TableCell>
-                    <TableCell />
-                  </TableRow>
-                </TableBody>
+                ))
               )}
-            </Table>
-          </div>
-        </ContentReveal>
-      )}
+            </TableBody>
+            {periods.length > 0 && (
+              <TableBody>
+                <TableRow className="bg-muted/30 font-bold">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {formatMoney(totals.inflows, currency)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {formatMoney(Math.abs(totals.outflows), currency)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">
+                    {formatMoney(totals.net, currency)}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            )}
+          </Table>
+        </div>
+      </ContentReveal>
     </ContentReveal>
   );
 }

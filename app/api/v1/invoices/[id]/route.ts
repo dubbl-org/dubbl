@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { db } from "@/lib/db";
 import { invoice, invoiceLine, paymentAllocation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
@@ -125,6 +128,19 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+    if (parsed.lines) {
+      await assertLineStockRefs(ctx.organizationId, parsed.lines);
+      // Lines are replaced wholesale; cost centers already on the invoice stay allowed.
+      const savedLines = await db.query.invoiceLine.findMany({
+        where: eq(invoiceLine.invoiceId, id),
+        columns: { costCenterId: true },
+      });
+      await assertCostCentersActive(
+        ctx.organizationId,
+        parsed.lines.map((l) => l.costCenterId),
+        savedLines.map((l) => l.costCenterId)
+      );
+    }
 
     // Build the invoice-field patch (only set keys the caller actually sent so we
     // don't clobber existing values with undefined).
@@ -137,6 +153,12 @@ export async function PATCH(
     // When lines are supplied, replace the whole line set, persisting the
     // inventory/job-costing dimensions, and recompute the invoice totals.
     if (parsed.lines) {
+      // Same contact defaults as on create (account, tax, "Don't charge tax").
+      parsed.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+        parsed.lines,
+        await loadContactDefaults(ctx.organizationId, existing.contactId),
+        "sales"
+      ));
       const taxRateIds = parsed.lines
         .map((l) => l.taxRateId)
         .filter(Boolean) as string[];
@@ -180,8 +202,29 @@ export async function PATCH(
       // Draft invoices are unpaid, so amountDue tracks the new total.
       patch.amountDue = total - existing.amountPaid;
 
+      // Keep project-billing tags (what a project-generated line bills, see
+      // lib/api/project-billing.ts) on lines that survive the edit, matched by
+      // project + description, so milestones / fixed-price shares stay invoiced.
+      const oldLines = await db
+        .select({
+          projectId: invoiceLine.projectId,
+          description: invoiceLine.description,
+          projectBillingKind: invoiceLine.projectBillingKind,
+          projectMilestoneId: invoiceLine.projectMilestoneId,
+        })
+        .from(invoiceLine)
+        .where(eq(invoiceLine.invoiceId, id));
+      const taggedLines = processedLines.map((l) => {
+        const i = oldLines.findIndex(
+          (o) => o.projectBillingKind && o.projectId === l.projectId && o.description === l.description
+        );
+        if (i < 0) return l;
+        const [match] = oldLines.splice(i, 1);
+        return { ...l, projectBillingKind: match.projectBillingKind, projectMilestoneId: match.projectMilestoneId };
+      });
+
       await db.delete(invoiceLine).where(eq(invoiceLine.invoiceId, id));
-      await db.insert(invoiceLine).values(processedLines);
+      await db.insert(invoiceLine).values(taggedLines);
     }
 
     const [updated] = await db

@@ -189,7 +189,7 @@ function McpAuthorizeContent() {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground/60">
-          OAuth 2.1 with PKCE &middot; Pro/Business plan required
+          OAuth 2.1 with PKCE
         </p>
       </motion.div>
     </div>

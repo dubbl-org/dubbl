@@ -6,9 +6,12 @@ import { handleError, ok, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  // Currency the consolidated worksheet is reported in.
+  presentationCurrency: currencyCodeSchema.optional(),
 });
 
 export async function GET(

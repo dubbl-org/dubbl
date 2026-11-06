@@ -3,6 +3,7 @@ import { documentEmailLog, emailConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkEmailLimit } from "@/lib/api/check-limit";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
+import { documentsFromAddress } from "@/lib/email/senders";
 import { sendEmail } from "@/lib/email/smtp-client";
 
 interface SendDocumentEmailOptions {
@@ -52,7 +53,7 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
         to: options.recipientEmail,
         subject: options.subject,
         html: options.body,
-        from: "dubbl <invoices@dubbl.dev>",
+        from: documentsFromAddress(),
         replyTo: options.replyTo || undefined,
         attachments,
       });

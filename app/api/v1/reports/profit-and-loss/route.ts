@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { organization } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { organization, tag } from "@/lib/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError } from "@/lib/api/response";
+import { handleError, notFound, validationError } from "@/lib/api/response";
 import type { Statement, StatementRow } from "@/lib/reports/statement-export";
 import {
   aggregateByDateRange,
@@ -28,6 +28,9 @@ interface PLPeriod {
   totalExpenses: number;
   netIncome: number;
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parseBasis(value: string | null): ReportBasis {
   return value === "cash" ? "cash" : "accrual";
@@ -87,10 +90,27 @@ export async function GET(request: Request) {
     const compareTo = url.searchParams.get("compareTo");
     const hasComparison = Boolean(compareFrom && compareTo);
 
+    // Optional tag filter: only postings of records carrying this tag.
+    const tagId = url.searchParams.get("tagId") || undefined;
+    let tagName: string | undefined;
+    if (tagId) {
+      if (!UUID_RE.test(tagId)) return validationError("tagId must be a UUID");
+      const found = await db.query.tag.findFirst({
+        where: and(
+          eq(tag.id, tagId),
+          eq(tag.organizationId, ctx.organizationId),
+          isNull(tag.deletedAt)
+        ),
+        columns: { name: true },
+      });
+      if (!found) return notFound("Tag");
+      tagName = found.name;
+    }
+
     const primaryAccounts = await aggregateByDateRange(
       ctx.organizationId,
       { startDate, endDate },
-      { basis, accountTypes: ["revenue", "expense"] }
+      { basis, accountTypes: ["revenue", "expense"], tagId }
     );
     const primary = toPeriod(startDate, endDate, primaryAccounts);
 
@@ -99,7 +119,7 @@ export async function GET(request: Request) {
       const cmpAccounts = await aggregateByDateRange(
         ctx.organizationId,
         { startDate: compareFrom!, endDate: compareTo! },
-        { basis, accountTypes: ["revenue", "expense"] }
+        { basis, accountTypes: ["revenue", "expense"], tagId }
       );
       comparison = toPeriod(compareFrom!, compareTo!, cmpAccounts);
     }
@@ -111,6 +131,7 @@ export async function GET(request: Request) {
       });
       const currency = org?.defaultCurrency || "USD";
       const statement = buildStatement(primary, comparison, basis, currency);
+      if (tagName) statement.title = `${statement.title} (tag: ${tagName})`;
 
       const { toPdf, toXlsx } = await import("@/lib/reports/statement-export");
       if (format === "pdf") {
@@ -137,6 +158,7 @@ export async function GET(request: Request) {
       startDate,
       endDate,
       basis,
+      ...(tagId ? { tagId, tagName } : {}),
       revenue: primary.revenue,
       totalRevenue: primary.totalRevenue,
       expenses: primary.expenses,

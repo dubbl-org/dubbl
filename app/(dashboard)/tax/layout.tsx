@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Percent, Coins, Calendar, Globe, FileSpreadsheet, MapPin, Calculator } from "lucide-react";
 import { TabLayout } from "@/components/dashboard/tab-layout";
+import { useApi } from "@/lib/query/use-api";
 
 const EU_COUNTRIES = [
   "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
@@ -38,32 +38,11 @@ export default function TaxLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [countryCode, setCountryCode] = useState<string | null>(null);
-  const [openPeriods, setOpenPeriods] = useState(0);
+  const { data: orgData } = useApi<{ organization?: { countryCode?: string | null }; countryCode?: string | null }>("/api/v1/organization");
+  const countryCode = orgData?.organization?.countryCode || orgData?.countryCode || null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    const headers = { "x-organization-id": orgId };
-
-    fetch("/api/v1/organization", { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        const code = data.organization?.countryCode || data.countryCode;
-        if (code) setCountryCode(code);
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/tax-periods", { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.taxPeriods) {
-          const open = data.taxPeriods.filter((p: { status: string }) => p.status === "open").length;
-          setOpenPeriods(open);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const { data: periodsData } = useApi<{ taxPeriods?: { status: string }[] }>("/api/v1/tax-periods");
+  const openPeriods = periodsData?.taxPeriods ? periodsData.taxPeriods.filter((p) => p.status === "open").length : 0;
 
   const baseTabs = [
     { href: "/tax", label: "Tax Rates", icon: Percent, exact: true },

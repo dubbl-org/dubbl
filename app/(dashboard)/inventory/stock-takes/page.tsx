@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ClipboardList, Clock, FileText, Plus, CheckCircle2, ArrowRight, Play } from "lucide-react";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
 import { ActionButton } from "@/components/dashboard/explorer/action-button";
@@ -74,20 +75,8 @@ async function patchJson(url: string, body: unknown) {
 }
 
 function CountLines({ id }: { id: string }) {
-  const [state, setState] = useState<{ id: string; lines: StockTakeLine[] } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const orgId = localStorage.getItem("activeOrgId");
-    fetch(`/api/v1/stock-takes/${id}`, { headers: orgId ? { "x-organization-id": orgId } : {} })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => !cancelled && setState({ id, lines: json?.stockTake?.lines ?? [] }))
-      .catch(() => !cancelled && setState({ id, lines: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  const lines = state?.id === id ? state.lines : null;
+  const { data, error } = useApi<{ stockTake?: { lines?: StockTakeLine[] } }>(`/api/v1/stock-takes/${id}`);
+  const lines = data ? (data.stockTake?.lines ?? []) : error ? [] : null;
   if (!lines) {
     return (
       <div className="mt-6 space-y-2">
@@ -155,25 +144,10 @@ export default function StockTakesPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   useDocumentTitle("Inventory · Stock Takes");
-  const [version, setVersion] = useState(0);
-  const [warehouses, setWarehouses] = useState<Record<string, string>>({});
-
-  // A new stock take from the create drawer reloads the list
-  useEffect(() => {
-    const handler = () => setVersion((v) => v + 1);
-    window.addEventListener("refetch-stock-takes", handler);
-    return () => window.removeEventListener("refetch-stock-takes", handler);
-  }, []);
 
   // Location names (the list only carries the id)
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/warehouses", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((json: { data?: { id: string; name: string }[] }) => setWarehouses(Object.fromEntries((json.data ?? []).map((w) => [w.id, w.name]))))
-      .catch(() => {});
-  }, []);
+  const { data: warehousesJson } = useApi<{ data?: { id: string; name: string }[] }>("/api/v1/warehouses");
+  const warehouses = useMemo<Record<string, string>>(() => Object.fromEntries((warehousesJson?.data ?? []).map((w) => [w.id, w.name])), [warehousesJson]);
 
   const config = useMemo<ExplorerConfig<StockTake>>(() => {
     const location = (st: StockTake) => (st.warehouseId ? warehouses[st.warehouseId] ?? null : "All locations");
@@ -267,7 +241,7 @@ export default function StockTakesPage() {
     };
   }, [warehouses, openDrawer, router]);
 
-  return <Explorer key={version} config={config} />;
+  return <Explorer config={config} />;
 }
 
 function StockTakesEmpty({ onCreate }: { onCreate: () => void }) {

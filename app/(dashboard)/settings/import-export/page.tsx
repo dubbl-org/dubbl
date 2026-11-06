@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -110,14 +111,23 @@ const ENTITIES: {
     key: "invoices",
     label: "Invoices",
     icon: Receipt,
-    note: "Import contacts + accounts first",
+    note: "One row per line. Import contacts first",
     previewEndpoint: "/api/v1/bulk/invoices/preview",
     importEndpoint: "/api/v1/bulk/invoices/import",
     targetFields: [
-      { key: "contactId", label: "Contact ID", required: true },
+      { key: "invoiceNumber", label: "Invoice Number" },
+      { key: "contactName", label: "Contact Name" },
+      { key: "contactEmail", label: "Contact Email" },
       { key: "issueDate", label: "Issue Date", required: true },
-      { key: "dueDate", label: "Due Date", required: true },
+      { key: "dueDate", label: "Due Date" },
       { key: "reference", label: "Reference" },
+      { key: "currencyCode", label: "Currency" },
+      { key: "lineDescription", label: "Line Description", required: true },
+      { key: "lineQuantity", label: "Line Quantity" },
+      { key: "lineUnitPrice", label: "Line Unit Price" },
+      { key: "lineAmount", label: "Line Amount" },
+      { key: "lineAccountCode", label: "Line Account Code" },
+      { key: "lineTaxRate", label: "Line Tax Rate" },
     ],
   },
   {
@@ -200,8 +210,9 @@ export default function ImportExportPage() {
   const [source, setSource] = useState<SourceSystem>("quickbooks");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [activeEntity, setActiveEntity] = useState<typeof ENTITIES[number] | null>(null);
-  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(true);
+  const { data: jobsData, loading: jobsLoading } = useApi<{ jobs?: ImportJob[] }>("/api/v1/bulk/import-jobs?" + new URLSearchParams({ limit: "20" }));
+  const importJobs = jobsData?.jobs || [];
+  const cache = useApiCache();
 
   // Export state
   const [selectedExports, setSelectedExports] = useState<Set<string>>(new Set());
@@ -210,24 +221,6 @@ export default function ImportExportPage() {
   const [exporting, setExporting] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") || "" : "";
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/bulk/import-jobs?" + new URLSearchParams({ limit: "20" }), {
-        headers: { "x-organization-id": orgId },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setImportJobs(data.jobs || []);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   const handleEntityClick = (entity: typeof ENTITIES[number]) => {
     setActiveEntity(entity);
@@ -269,7 +262,8 @@ export default function ImportExportPage() {
         });
         if (!res.ok) throw new Error("Export failed");
         const blob = await res.blob();
-        downloadBlob(blob, `${key}.csv`);
+        // "all" comes back as a ZIP of every entity.
+        downloadBlob(blob, key === "all" ? "dubbl-export.zip" : `${key}.csv`);
       }
       toast.success("Export downloaded");
     } catch {
@@ -542,7 +536,7 @@ export default function ImportExportPage() {
             importEndpoint={activeEntity.importEndpoint}
             columnAliases={columnAliases}
             source={source}
-            onComplete={fetchJobs}
+            onComplete={() => cache.invalidate("/api/v1/bulk/import-jobs")}
           />
         )}
       </div>

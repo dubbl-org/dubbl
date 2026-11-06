@@ -20,7 +20,8 @@ import {
   ensureAccountByCode,
   resolveBaseRate,
 } from "@/lib/api/journal-automation";
-import { calculateMonthlyDepreciation } from "@/lib/fixed-assets/depreciation";
+import { nextDepreciationCharge } from "@/lib/fixed-assets/depreciation";
+import { postAssetDepreciation } from "@/lib/fixed-assets/post-depreciation";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 const depreciationMethods = [
@@ -146,17 +147,22 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
         .nullable()
         .optional()
         .describe("Date placed in service / began depreciating (YYYY-MM-DD); defaults to purchaseDate"),
-      residualValue: z.number().int().min(0).optional().default(0).describe("Salvage/residual value in integer cents"),
+      residualValue: z.number().int().min(0).optional().describe("Salvage/residual value in integer cents (default: the category's, else 0)"),
       depreciationMethod: z
         .enum(depreciationMethods)
         .optional()
-        .default("straight_line")
-        .describe("Depreciation method"),
+        .describe("Depreciation method (default: the category's, else straight_line)"),
       convention: z
         .enum(conventions)
         .optional()
-        .default("full_month")
-        .describe("First/last-period timing convention"),
+        .describe("How much the first month takes (default: the category's, else full_month). mid_month/half_year/mid_quarter halve the first month and pro_rata_days prorates it by day; the shortfall is taken one month after the useful life. full_at_purchase charges everything in the first month."),
+      depreciationRateBp: z
+        .number()
+        .int()
+        .min(1)
+        .nullable()
+        .optional()
+        .describe("Declining-balance yearly rate in basis points (2000 = 20%). Omit to use the category's rate; null or no category rate means double declining balance. Ignored for other methods."),
       totalExpectedUnits: z
         .number()
         .int()
@@ -195,6 +201,12 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
         const residualValue = params.residualValue ?? category?.defaultResidualValue ?? 0;
         const depreciationMethod = params.depreciationMethod ?? category?.defaultDepreciationMethod ?? "straight_line";
         const convention = params.convention ?? category?.defaultConvention ?? "full_month";
+        const depreciationRateBp =
+          depreciationMethod !== "declining_balance"
+            ? null
+            : params.depreciationRateBp !== undefined
+              ? params.depreciationRateBp
+              : category?.defaultDepreciationRateBp ?? null;
         const isCwip = params.isCwip ?? false;
 
         const [created] = await db
@@ -212,6 +224,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             usefulLifeMonths: params.usefulLifeMonths,
             depreciationMethod,
             convention,
+            depreciationRateBp,
             totalExpectedUnits: params.totalExpectedUnits ?? null,
             unitOfMeasure: params.unitOfMeasure || null,
             netBookValue: params.purchasePrice,
@@ -234,6 +247,105 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { asset: created };
+      })
+  );
+
+  server.tool(
+    "update_fixed_asset",
+    "Update a fixed asset's details and depreciation settings. Only the fields you pass are changed; omitted fields are left untouched. 'residualValue' is integer cents; 'depreciationRateBp' is the declining-balance yearly rate in basis points (2000 = 20%, null = double declining). Does NOT change purchasePrice, accumulatedDepreciation or netBookValue and posts no journal entry; future depreciation charges use the new settings. Account fields are chart-account UUIDs. Returns the updated asset.",
+    {
+      assetId: z.string().uuid().describe("UUID of the fixed asset to update"),
+      name: z.string().min(1).optional().describe("New asset name"),
+      description: z.string().nullable().optional().describe("New description (null to clear)"),
+      assetNumber: z.string().min(1).optional().describe("New asset number/tag"),
+      categoryId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("Asset category UUID (null to clear). Reassigning does not copy the category's defaults onto the asset."),
+      inServiceDate: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Date placed in service / began depreciating (YYYY-MM-DD; null to clear)"),
+      residualValue: z.number().int().min(0).optional().describe("Salvage/residual value in integer cents"),
+      usefulLifeMonths: z.number().int().min(1).optional().describe("Useful life in months (depreciation period)"),
+      depreciationMethod: z.enum(depreciationMethods).optional().describe("Depreciation method"),
+      convention: z.enum(conventions).optional().describe("First/last-period timing convention"),
+      depreciationRateBp: z
+        .number()
+        .int()
+        .min(1)
+        .max(100000)
+        .nullable()
+        .optional()
+        .describe("Declining-balance yearly rate in basis points (2000 = 20%). null means double declining balance. Ignored for other methods."),
+      totalExpectedUnits: z
+        .number()
+        .int()
+        .min(0)
+        .nullable()
+        .optional()
+        .describe("Total expected lifetime units for units_of_production (null to clear)"),
+      unitOfMeasure: z.string().nullable().optional().describe("Unit of measure for units_of_production (e.g. 'hours', 'km'; null to clear)"),
+      isCwip: z.boolean().optional().describe("Whether the asset is capital-work-in-progress"),
+      cwipAccountId: z.string().uuid().nullable().optional().describe("Chart account UUID where CWIP cost accumulates (null to clear)"),
+      assetAccountId: z.string().uuid().nullable().optional().describe("Chart account UUID for the asset cost (null to clear)"),
+      depreciationAccountId: z.string().uuid().nullable().optional().describe("Chart account UUID for depreciation expense (null to clear)"),
+      accumulatedDepAccountId: z.string().uuid().nullable().optional().describe("Chart account UUID for accumulated depreciation (null to clear)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:assets");
+
+        const existing = await db.query.fixedAsset.findFirst({
+          where: and(
+            eq(fixedAsset.id, params.assetId),
+            eq(fixedAsset.organizationId, ctx.organizationId),
+            notDeleted(fixedAsset.deletedAt)
+          ),
+        });
+        if (!existing) throw new Error("Fixed asset not found");
+
+        const { assetId, ...fields } = params;
+        const updates = Object.fromEntries(
+          Object.entries(fields).filter(([, v]) => v !== undefined)
+        ) as Partial<typeof fixedAsset.$inferInsert>;
+
+        // Validate the category belongs to this org when reassigning.
+        if (updates.categoryId) {
+          const category = await db.query.assetCategory.findFirst({
+            where: and(
+              eq(assetCategory.id, updates.categoryId),
+              eq(assetCategory.organizationId, ctx.organizationId),
+              notDeleted(assetCategory.deletedAt)
+            ),
+          });
+          if (!category) throw new Error("Asset category not found");
+        }
+
+        const [updated] = await db
+          .update(fixedAsset)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(
+            and(
+              eq(fixedAsset.id, assetId),
+              eq(fixedAsset.organizationId, ctx.organizationId)
+            )
+          )
+          .returning();
+
+        await db.insert(auditLog).values({
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: "update",
+          entityType: "fixed_asset",
+          entityId: assetId,
+          changes: updates,
+        });
+
+        return { asset: updated };
       })
   );
 
@@ -562,10 +674,10 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
   // ─── Run depreciation ──────────────────────────────────────────────
   server.tool(
     "run_asset_depreciation",
-    "Post one period's depreciation charge for a single active asset. Computes the charge from the asset's method/convention and the count of periods already booked (safe for declining-balance/SYD/uneven schedules); for units_of_production pass 'unitsThisPeriod'. Posts a balanced journal entry (DR depreciation expense / CR accumulated depreciation) when both accounts are configured, records a depreciationEntry, and updates accumulatedDepreciation / netBookValue (marking the asset 'fully_depreciated' when NBV reaches residual). Atomic. Amounts are integer cents. Returns the depreciation entry, the new asset totals and the journalEntryId.",
+    "Post one month's depreciation charge for a single active asset, using the same calculation as the Record value drop button and the nightly job (method, convention, declining-balance rate, and the count of months already booked). At most one charge per calendar month: if the month of 'date' already has one, nothing is posted and an error is returned. Fails if 'date' is in a locked period or closed financial year. For units_of_production pass 'unitsThisPeriod' (required). Posts a balanced journal entry (DR depreciation expense / CR accumulated depreciation) when both accounts are configured, records a depreciationEntry, and updates accumulatedDepreciation / netBookValue (marking the asset 'fully_depreciated' when nothing is left). Atomic. Amounts are integer cents. Returns the depreciation entry, the new asset totals and the journalEntryId.",
     {
       assetId: z.string().uuid().describe("UUID of the active fixed asset to depreciate"),
-      date: z.string().optional().describe("Posting date (YYYY-MM-DD); defaults to today"),
+      date: z.string().optional().describe("Posting date (YYYY-MM-DD); defaults to today. One charge per calendar month."),
       unitsThisPeriod: z
         .number()
         .int()
@@ -586,100 +698,18 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
         });
         if (!asset) throw new Error("Fixed asset not found");
         if (asset.status !== "active") throw new Error("Asset is not active");
+        if (asset.depreciationMethod === "units_of_production" && !params.unitsThisPeriod)
+          throw new Error("unitsThisPeriod is required for units_of_production assets");
 
         const date = params.date || todayIso();
-
-        const [priorCount] = await db
-          .select({ count: sql<number>`count(*)`.mapWith(Number) })
-          .from(depreciationEntry)
-          .where(eq(depreciationEntry.fixedAssetId, asset.id));
-        const periodIndex = Number(priorCount?.count ?? 0);
-
-        const amount = calculateMonthlyDepreciation({
-          purchasePrice: asset.purchasePrice,
-          residualValue: asset.residualValue,
-          usefulLifeMonths: asset.usefulLifeMonths,
-          depreciationMethod: asset.depreciationMethod,
-          accumulatedDepreciation: asset.accumulatedDepreciation,
-          purchaseDate: asset.purchaseDate,
-          periodIndex,
-          convention: asset.convention,
-          inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
-          totalExpectedUnits: asset.totalExpectedUnits,
+        const result = await postAssetDepreciation(asset, {
+          date,
           unitsThisPeriod: params.unitsThisPeriod,
-          periodDate: date,
+          ctx,
         });
-
-        if (amount <= 0) throw new Error("No depreciation remaining for this period");
-
-        const newAccumulated = asset.accumulatedDepreciation + amount;
-        const newNetBookValue = asset.purchasePrice - newAccumulated;
-        const newStatus =
-          newNetBookValue <= asset.residualValue ? "fully_depreciated" : "active";
-
-        const result = await db.transaction(async (tx) => {
-          let journalEntryId: string | null = null;
-
-          if (asset.depreciationAccountId && asset.accumulatedDepAccountId) {
-            const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
-            const [entry] = await tx
-              .insert(journalEntry)
-              .values({
-                organizationId: ctx.organizationId,
-                entryNumber,
-                date,
-                description: `Depreciation - ${asset.name} (${asset.assetNumber})`,
-                reference: asset.assetNumber,
-                status: "posted",
-                sourceType: "depreciation",
-                sourceId: asset.id,
-                postedAt: new Date(),
-                createdBy: ctx.userId,
-              })
-              .returning();
-            journalEntryId = entry.id;
-
-            await tx.insert(journalLine).values([
-              {
-                journalEntryId: entry.id,
-                accountId: asset.depreciationAccountId,
-                description: `Depreciation - ${asset.name}`,
-                debitAmount: amount,
-                creditAmount: 0,
-              },
-              {
-                journalEntryId: entry.id,
-                accountId: asset.accumulatedDepAccountId,
-                description: `Depreciation - ${asset.name}`,
-                debitAmount: 0,
-                creditAmount: amount,
-              },
-            ]);
-          }
-
-          const [depEntry] = await tx
-            .insert(depreciationEntry)
-            .values({
-              fixedAssetId: asset.id,
-              date,
-              amount,
-              unitsThisPeriod: params.unitsThisPeriod ?? null,
-              journalEntryId,
-            })
-            .returning();
-
-          await tx
-            .update(fixedAsset)
-            .set({
-              accumulatedDepreciation: newAccumulated,
-              netBookValue: newNetBookValue,
-              status: newStatus,
-              updatedAt: new Date(),
-            })
-            .where(eq(fixedAsset.id, asset.id));
-
-          return { depEntry, journalEntryId };
-        });
+        if (result.status === "already_this_month")
+          throw new Error(`Depreciation for ${result.month} is already recorded for this asset`);
+        if (result.status === "nothing_due") throw new Error("No depreciation remaining for this period");
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
@@ -687,17 +717,13 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
           action: "depreciate",
           entityType: "fixed_asset",
           entityId: asset.id,
-          changes: { amount, journalEntryId: result.journalEntryId },
+          changes: { amount: result.amount, journalEntryId: result.journalEntryId },
         });
 
         return {
-          depreciationEntry: result.depEntry,
+          depreciationEntry: result.depreciationEntry,
           journalEntryId: result.journalEntryId,
-          asset: {
-            accumulatedDepreciation: newAccumulated,
-            netBookValue: newNetBookValue,
-            status: newStatus,
-          },
+          asset: result.asset,
         };
       })
   );
@@ -747,20 +773,7 @@ export function registerFixedAssetTools(server: McpServer, ctx: AuthContext) {
             .where(eq(depreciationEntry.fixedAssetId, asset.id));
           const periodIndex = Number(priorCount?.count ?? 0);
 
-          catchUpAmount = calculateMonthlyDepreciation({
-            purchasePrice: asset.purchasePrice,
-            residualValue: asset.residualValue,
-            usefulLifeMonths: asset.usefulLifeMonths,
-            depreciationMethod: asset.depreciationMethod,
-            accumulatedDepreciation: asset.accumulatedDepreciation,
-            purchaseDate: asset.purchaseDate,
-            periodIndex,
-            convention: asset.convention,
-            inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
-            totalExpectedUnits: asset.totalExpectedUnits,
-            unitsThisPeriod: undefined,
-            periodDate: params.date,
-          });
+          catchUpAmount = nextDepreciationCharge(asset, periodIndex, params.date);
         }
 
         const result = await db.transaction(async (tx) => {

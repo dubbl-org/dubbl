@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowLeft, Play, Search, X, FileText, CheckCircle2, XCircle, Gift, ScrollText, Send, Plus, BookOpen, ArrowRight } from "lucide-react";
+import { ArrowLeft, Play, Search, X, FileText, CheckCircle2, XCircle, Gift, ScrollText, Send, Plus, BookOpen, ArrowRight, Trash2, Ban, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface PayrollRunDetail {
   id: string;
@@ -47,11 +48,29 @@ interface PayrollRunDetail {
   totalNet: number;
   journalEntryId: string | null;
   processedAt: string | null;
+  notes: string | null;
   items: PayrollItemRow[];
+  approvalRecords?: {
+    id: string;
+    status: string;
+    comment: string | null;
+    decidedAt: string | null;
+    approver: { user: { name: string | null; email: string } | null } | null;
+  }[];
+  journalEntry?: { id: string; entryNumber: number; voidedAt: string | null; voidReason: string | null } | null;
+}
+
+interface TaxLine {
+  id: string;
+  jurisdictionLevel: string;
+  jurisdiction: string | null;
+  taxKind: string;
+  amount: number;
 }
 
 interface PayrollItemRow {
   id: string;
+  employeeId: string;
   grossAmount: number;
   taxAmount: number;
   deductions: number;
@@ -61,6 +80,8 @@ interface PayrollItemRow {
   currency: string | null;
   fxRate: number | null;
   employee: { name: string; employeeNumber: string } | null;
+  taxBreakdowns?: TaxLine[];
+  deductionBreakdowns?: { id: string; amount: number; category: string; deductionType: { name: string } | null }[];
 }
 
 interface Bonus {
@@ -89,11 +110,37 @@ const statusLabels: Record<string, string> = {
   pending_approval: "Waiting for sign-off",
 };
 
+const approvalLabels: Record<string, string> = {
+  pending: "Waiting for sign-off",
+  approved: "Signed off",
+  rejected: "Sent back",
+};
+
+const TAX_KIND_LABELS: Record<string, string> = {
+  social_security: "Social Security",
+  medicare: "Medicare",
+  additional_medicare: "Additional Medicare",
+};
+
+/** "Federal income tax", "State income tax (CA)", "Social Security", ... */
+function taxLabel(t: TaxLine): string {
+  if (t.taxKind !== "income_tax") return TAX_KIND_LABELS[t.taxKind] ?? t.taxKind.replace(/_/g, " ");
+  const level = t.jurisdictionLevel === "federal" ? "Federal" : t.jurisdictionLevel === "state" ? "State" : "Local";
+  return `${level} income tax${t.jurisdiction ? ` (${t.jurisdiction})` : ""}`;
+}
+
+function formatDateTime(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 const bonusTypes = [
   { value: "performance", label: "Performance" },
   { value: "signing", label: "Signing" },
   { value: "holiday", label: "Holiday" },
   { value: "referral", label: "Referral" },
+  { value: "spot", label: "Spot" },
   { value: "retention", label: "Retention" },
   { value: "other", label: "Other" },
 ];
@@ -107,19 +154,29 @@ const anim = (delay: number) => ({
 export default function PayrollRunDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [run, setRun] = useState<PayrollRunDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = useApi<{ run?: PayrollRunDetail }>(`/api/v1/payroll/runs/${id}`);
+  const run = data?.run ?? null;
   const [processing, setProcessing] = useState(false);
   const [submittingApproval, setSubmittingApproval] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [generatingPayslips, setGeneratingPayslips] = useState(false);
+  const [emailingPayslips, setEmailingPayslips] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   useDocumentTitle("Payroll · Run Details");
 
-  const [bonuses, setBonuses] = useState<Bonus[]>([]);
+  const bonusesUrl = `/api/v1/payroll/runs/${id}/bonuses`;
+  const { data: bonusesData, refetch: refetchBonuses } = useApi<{ bonuses?: Bonus[] }>(bonusesUrl);
+  const bonuses = bonusesData?.bonuses ?? [];
+  const cache = useApiCache();
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
   const [bonusForm, setBonusForm] = useState({
     employeeId: "",
@@ -128,34 +185,6 @@ export default function PayrollRunDetailPage() {
     description: "",
   });
   const [creatingBonus, setCreatingBonus] = useState(false);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch(`/api/v1/payroll/runs/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.run) setRun(data.run);
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch(`/api/v1/payroll/runs/${id}/bonuses`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.bonuses) setBonuses(data.bonuses);
-      })
-      .catch(() => {});
-  }, [id]);
 
   async function handleProcess() {
     const confirmed = await confirm({
@@ -180,7 +209,7 @@ export default function PayrollRunDetailPage() {
         throw new Error(data.error || "Failed");
       }
       toast.success("Payroll finished and recorded");
-      window.location.reload();
+      await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't finish the payroll");
     } finally {
@@ -203,7 +232,7 @@ export default function PayrollRunDetailPage() {
         throw new Error(data.error || "Failed");
       }
       toast.success("Sent for sign-off");
-      window.location.reload();
+      await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't send for sign-off");
     } finally {
@@ -232,7 +261,7 @@ export default function PayrollRunDetailPage() {
         throw new Error(data.error || "Failed");
       }
       toast.success("Payroll approved");
-      window.location.reload();
+      await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't approve the payroll");
     } finally {
@@ -241,13 +270,6 @@ export default function PayrollRunDetailPage() {
   }
 
   async function handleReject() {
-    const confirmed = await confirm({
-      title: "Reject this payroll run?",
-      description: "This will send the run back to draft status.",
-      confirmLabel: "Reject",
-      destructive: true,
-    });
-    if (!confirmed) return;
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
     setRejecting(true);
@@ -255,14 +277,17 @@ export default function PayrollRunDetailPage() {
     try {
       const res = await fetch(`/api/v1/payroll/runs/${id}/reject`, {
         method: "POST",
-        headers: { "x-organization-id": orgId },
+        headers: { "x-organization-id": orgId, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: rejectReason.trim() || undefined }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed");
       }
-      toast.success("Payroll run rejected");
-      window.location.reload();
+      toast.success("Payroll sent back");
+      setRejectOpen(false);
+      setRejectReason("");
+      await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reject");
     } finally {
@@ -312,7 +337,7 @@ export default function PayrollRunDetailPage() {
         body: JSON.stringify({
           employeeId: bonusForm.employeeId,
           bonusType: bonusForm.bonusType,
-          amount: parseFloat(bonusForm.amount),
+          amount: Math.round(parseFloat(bonusForm.amount) * 100),
           description: bonusForm.description || null,
         }),
       });
@@ -320,10 +345,8 @@ export default function PayrollRunDetailPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed");
       }
-      const data = await res.json();
-      if (data.bonus) {
-        setBonuses((prev) => [...prev, data.bonus]);
-      }
+      // The employee's pay and the run totals are recalculated with the bonus.
+      await Promise.all([refetch(), refetchBonuses()]);
       toast.success("Bonus added");
       setBonusDialogOpen(false);
       setBonusForm({ employeeId: "", bonusType: "", amount: "", description: "" });
@@ -331,6 +354,110 @@ export default function PayrollRunDetailPage() {
       toast.error(err instanceof Error ? err.message : "Failed to add bonus");
     } finally {
       setCreatingBonus(false);
+    }
+  }
+
+  async function handleRemoveBonus(bonusId: string) {
+    const confirmed = await confirm({
+      title: "Remove this bonus?",
+      description: "The employee's pay in this run is worked out again without it.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/v1/payroll/runs/${id}/bonuses/${bonusId}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      await Promise.all([refetch(), refetchBonuses()]);
+      toast.success("Bonus removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't remove the bonus");
+    }
+  }
+
+  async function handleDeleteRun() {
+    const confirmed = await confirm({
+      title: "Delete this payroll run?",
+      description: "The run and its pay amounts are removed. Nothing has been recorded in your books yet.",
+      confirmLabel: "Delete run",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    setRemoving(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/runs/${id}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      toast.success("Payroll run deleted");
+      cache.invalidate("/api/v1/payroll/runs");
+      router.push("/payroll/runs");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't delete the run");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  async function handleVoidRun() {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    setRemoving(true);
+    try {
+      const qs = voidReason.trim() ? `?reason=${encodeURIComponent(voidReason.trim())}` : "";
+      const res = await fetch(`/api/v1/payroll/runs/${id}${qs}`, {
+        method: "DELETE",
+        headers: { "x-organization-id": orgId },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      toast.success("Payroll run voided and reversed in your books");
+      setVoidOpen(false);
+      setVoidReason("");
+      await refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't void the run");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  async function handleEmailPayslips() {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    setEmailingPayslips(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/runs/${id}/email-payslips`, {
+        method: "POST",
+        headers: { "x-organization-id": orgId },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      const parts = [`${data.sent} sent`];
+      if (data.skippedNoEmail) parts.push(`${data.skippedNoEmail} with no email address`);
+      if (data.alreadySent) parts.push(`${data.alreadySent} already sent`);
+      if (data.failed?.length) parts.push(`couldn't send to ${data.failed.join(", ")}`);
+      toast.success(`Payslips emailed: ${parts.join(", ")}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't email the payslips");
+    } finally {
+      setEmailingPayslips(false);
     }
   }
 
@@ -399,33 +526,61 @@ export default function PayrollRunDetailPage() {
                   {run.runType.replace(/_/g, " ")}
                 </Badge>
               )}
-              {run.approvalStatus && (
+              {run.approvalStatus && run.status !== "pending_approval" && run.status !== "completed" && run.status !== "void" && (
                 <Badge
                   variant="outline"
-                  className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                  className={run.approvalStatus === "approved"
+                    ? "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300"
+                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"}
                 >
-                  {run.approvalStatus.replace(/_/g, " ")}
+                  {approvalLabels[run.approvalStatus] || run.approvalStatus.replace(/_/g, " ")}
                 </Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              {run.processedAt ? `Finished and recorded ${run.processedAt}` : "Not finished yet"}
+              {run.processedAt ? `Finished and recorded ${formatDateTime(run.processedAt)}` : "Not finished yet"}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {(run.status === "draft" || run.status === "pending_approval") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteRun}
+              disabled={removing}
+              title="Delete this unfinished run"
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              Delete
+            </Button>
+          )}
+          {run.status === "completed" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVoidOpen(true)}
+              disabled={removing}
+              title="Cancel this finished run and reverse its accounting entry"
+            >
+              <Ban className="mr-1.5 size-3.5" />
+              Void run
+            </Button>
+          )}
           {run.status === "draft" && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSubmitForApproval}
-                disabled={submittingApproval}
-                title="Send this payroll to someone for sign-off before it's finished"
-              >
-                <Send className="mr-1.5 size-3.5" />
-                {submittingApproval ? "Sending..." : "Send for sign-off"}
-              </Button>
+              {run.approvalStatus !== "approved" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSubmitForApproval}
+                  disabled={submittingApproval}
+                  title="Send this payroll to someone for sign-off before it's finished"
+                >
+                  <Send className="mr-1.5 size-3.5" />
+                  {submittingApproval ? "Sending..." : "Send for sign-off"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={handleProcess}
@@ -452,16 +607,42 @@ export default function PayrollRunDetailPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={handleReject}
+                onClick={() => setRejectOpen(true)}
                 disabled={rejecting}
               >
                 <XCircle className="mr-1.5 size-3.5" />
-                {rejecting ? "Rejecting..." : "Reject"}
+                Send back
               </Button>
             </>
           )}
         </div>
       </div>
+
+      {run.status === "void" && (
+        <div className="rounded-xl border border-dashed bg-card p-4 text-sm">
+          <p className="font-medium">This run was voided</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            A reversing accounting entry cancelled its wages, withholdings and payment
+            {run.journalEntry?.voidReason ? `. Reason: ${run.journalEntry.voidReason}` : "."}
+          </p>
+        </div>
+      )}
+
+      {(run.approvalRecords?.length ?? 0) > 0 && (
+        <div className="rounded-xl border bg-card p-4 space-y-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sign-off</p>
+          {run.approvalRecords!.map((r) => (
+            <p key={r.id} className="text-sm">
+              <span className="font-medium">{r.approver?.user?.name || r.approver?.user?.email || "Approver"}</span>
+              <span className="text-muted-foreground">
+                {" "}· {approvalLabels[r.status] || r.status}
+                {r.decidedAt ? ` ${formatDateTime(r.decidedAt)}` : ""}
+                {r.comment ? `: ${r.comment}` : ""}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -546,9 +727,11 @@ export default function PayrollRunDetailPage() {
         ) : (
           <div className="rounded-xl border bg-card divide-y">
             {filteredItems.map((item) => (
+              <div key={item.id}>
               <div
-                key={item.id}
-                className="flex items-center justify-between gap-4 px-4 py-3"
+                className="flex items-center justify-between gap-4 px-4 py-3 cursor-pointer hover:bg-muted/40"
+                onClick={() => setExpanded((cur) => (cur === item.id ? null : item.id))}
+                title="Show the taxes and deductions"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{item.employee?.name || "-"}</p>
@@ -583,13 +766,42 @@ export default function PayrollRunDetailPage() {
                   </div>
                   <div className="hidden sm:block text-right">
                     <p className="text-xs text-muted-foreground">Other deductions</p>
-                    <p className="text-sm font-mono tabular-nums">{formatMoney(item.deductions, item.currency ?? "USD")}</p>
+                    {/* item.deductions includes the tax, so take it out here. */}
+                    <p className="text-sm font-mono tabular-nums">{formatMoney(Math.max(0, item.deductions - item.taxAmount), item.currency ?? "USD")}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Take-home</p>
                     <p className="text-sm font-mono tabular-nums font-medium">{formatMoney(item.netAmount, item.currency ?? "USD")}</p>
                   </div>
                 </div>
+              </div>
+              {expanded === item.id && (
+                <div className="px-4 pb-3 text-xs space-y-1">
+                  {(item.taxBreakdowns ?? []).map((t) => (
+                    <div key={t.id} className="flex justify-between">
+                      <span className="text-muted-foreground">{taxLabel(t)}</span>
+                      <span className="font-mono tabular-nums">{formatMoney(t.amount, item.currency ?? "USD")}</span>
+                    </div>
+                  ))}
+                  {(item.taxBreakdowns ?? []).length === 0 && item.taxAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tax</span>
+                      <span className="font-mono tabular-nums">{formatMoney(item.taxAmount, item.currency ?? "USD")}</span>
+                    </div>
+                  )}
+                  {(item.deductionBreakdowns ?? []).map((d) => (
+                    <div key={d.id} className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {d.deductionType?.name ?? "Deduction"} ({d.category === "pre_tax" ? "before tax" : "after tax"})
+                      </span>
+                      <span className="font-mono tabular-nums">{formatMoney(d.amount, item.currency ?? "USD")}</span>
+                    </div>
+                  ))}
+                  {(item.taxBreakdowns ?? []).length === 0 && (item.deductionBreakdowns ?? []).length === 0 && item.taxAmount === 0 && (
+                    <p className="text-muted-foreground">Nothing withheld</p>
+                  )}
+                </div>
+              )}
               </div>
             ))}
           </div>
@@ -603,6 +815,7 @@ export default function PayrollRunDetailPage() {
             <Gift className="size-4" />
             Bonuses ({bonuses.length})
           </h3>
+          {run.status === "draft" && (
           <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -614,7 +827,7 @@ export default function PayrollRunDetailPage() {
               <DialogHeader>
                 <DialogTitle>Add Bonus</DialogTitle>
                 <DialogDescription>
-                  Add a bonus for an employee in this payroll run.
+                  Add a bonus for an employee in this payroll run. Their pay is worked out again with the bonus taxed as part of it.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
@@ -630,7 +843,7 @@ export default function PayrollRunDetailPage() {
                     <SelectContent>
                       {(run.items || []).map((item) =>
                         item.employee ? (
-                          <SelectItem key={item.id} value={item.id}>
+                          <SelectItem key={item.id} value={item.employeeId}>
                             {item.employee.name} ({item.employee.employeeNumber})
                           </SelectItem>
                         ) : null
@@ -684,6 +897,7 @@ export default function PayrollRunDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         {bonuses.length === 0 ? (
@@ -692,7 +906,9 @@ export default function PayrollRunDetailPage() {
               <Gift className="size-5 text-muted-foreground" />
             </div>
             <p className="text-sm font-medium">No bonuses added</p>
-            <p className="text-xs text-muted-foreground mt-1">Add bonuses for employees in this payroll run</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {run.status === "draft" ? "Add bonuses for employees in this payroll run" : "Bonuses can only be added while a run isn't finished"}
+            </p>
           </div>
         ) : (
           <div className="rounded-xl border bg-card divide-y">
@@ -712,9 +928,16 @@ export default function PayrollRunDetailPage() {
                     )}
                   </div>
                 </div>
-                <p className="text-sm font-mono tabular-nums font-medium shrink-0">
-                  {formatMoney(bonus.amount)}
-                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-sm font-mono tabular-nums font-medium">
+                    {formatMoney(bonus.amount)}
+                  </p>
+                  {run.status === "draft" && (
+                    <Button variant="ghost" size="icon" className="size-7" onClick={() => handleRemoveBonus(bonus.id)} title="Remove bonus">
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -740,8 +963,66 @@ export default function PayrollRunDetailPage() {
             <ScrollText className="mr-1.5 size-3.5" />
             View Payslips
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEmailPayslips}
+            disabled={emailingPayslips}
+            title="Email each employee their payslip as a PDF"
+          >
+            <Mail className="mr-1.5 size-3.5" />
+            {emailingPayslips ? "Sending..." : "Email Payslips"}
+          </Button>
         </div>
       )}
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send this payroll back?</DialogTitle>
+            <DialogDescription>
+              It goes back to not finished so it can be fixed and sent for sign-off again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Reason</Label>
+            <Textarea
+              placeholder="What needs changing (optional)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="destructive" size="sm" onClick={handleReject} disabled={rejecting}>
+              {rejecting ? "Sending back..." : "Send back"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={voidOpen} onOpenChange={setVoidOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void this payroll run?</DialogTitle>
+            <DialogDescription>
+              A reversing accounting entry, on the same date as the original, cancels the wages, taxes, deductions and payment this run recorded. The run is kept, marked Cancelled. Pay any corrections with a new run.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Reason</Label>
+            <Textarea
+              placeholder="Why it's being voided (optional)"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="destructive" size="sm" onClick={handleVoidRun} disabled={removing}>
+              {removing ? "Voiding..." : "Void run"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {confirmDialog}
     </ContentReveal>

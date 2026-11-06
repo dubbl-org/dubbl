@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -35,6 +35,9 @@ import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { centsToDecimal } from "@/lib/money";
+import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApiError } from "@/lib/query/api";
 
 // ---------------------------------------------------------------------------
 // Shared interfaces
@@ -61,6 +64,9 @@ export interface ContactDetail {
   creditLimit: number | null;
   isTaxExempt: boolean;
   is1099Vendor: boolean;
+  w9TaxClassification?: string | null;
+  taxIdentifier?: string | null;
+  backupWithholding?: boolean;
   currencyCode: string | null;
   defaultRevenueAccountId: string | null;
   defaultExpenseAccountId: string | null;
@@ -140,7 +146,7 @@ export const activityTypeConfig: Record<ActivityItem["type"], {
     icon: Banknote,
     color: "text-brand-600 dark:text-brand-400",
     bg: "bg-brand-50 dark:bg-brand-950/40",
-    href: (id) => `/payments/${id}`,
+    href: (id) => `/sales/payments/${id}`,
   },
   bill: {
     label: "Bill",
@@ -174,7 +180,8 @@ const TABS = [
 
 export interface ContactContextValue {
   contact: ContactDetail;
-  setContact: React.Dispatch<React.SetStateAction<ContactDetail | null>>;
+  /** Show a saved contact (e.g. a PATCH answer) right away and drop the unsaved form edits. */
+  setContact: (contact: ContactDetail) => void;
   fetchContact: () => Promise<void>;
   confirm: ReturnType<typeof useConfirm>["confirm"];
   confirmDialog: ReturnType<typeof useConfirm>["dialog"];
@@ -201,6 +208,31 @@ export interface ContactContextValue {
 
 const ContactContext = createContext<ContactContextValue | null>(null);
 
+/** The form fields shared between details and bookkeeping, as edited. */
+interface ContactForm {
+  type: string;
+  revenueAccountId: string;
+  expenseAccountId: string;
+  taxRateId: string;
+  taxExempt: boolean;
+  is1099Vendor: boolean;
+  creditLimit: string;
+  currencyCode: string;
+}
+
+function toForm(c: ContactDetail | null): ContactForm {
+  return {
+    type: c?.type ?? "customer",
+    revenueAccountId: c?.defaultRevenueAccountId || "none",
+    expenseAccountId: c?.defaultExpenseAccountId || "none",
+    taxRateId: c?.defaultTaxRateId || "none",
+    taxExempt: c?.isTaxExempt ?? false,
+    is1099Vendor: c?.is1099Vendor ?? false,
+    creditLimit: c?.creditLimit != null ? centsToDecimal(c.creditLimit) : "",
+    currencyCode: c?.currencyCode || "",
+  };
+}
+
 export function useContactContext() {
   const ctx = useContext(ContactContext);
   if (!ctx) throw new Error("useContactContext must be used within ContactDetailLayout");
@@ -218,56 +250,49 @@ export default function ContactDetailLayout({ children }: { children: React.Reac
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { open: openDrawer } = useCreateDrawer();
 
-  const [contact, setContact] = useState<ContactDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cache = useApiCache();
+  const contactUrl = `/api/v1/contacts/${id}`;
+  const { data, error, loading, refetch } = useApi<{ contact?: ContactDetail }>(contactUrl);
+  const contact = data?.contact ?? null;
 
-  // Shared form state
-  const [formType, setFormType] = useState<string>("customer");
-  const [formRevenueAccountId, setFormRevenueAccountId] = useState<string>("none");
-  const [formExpenseAccountId, setFormExpenseAccountId] = useState<string>("none");
-  const [formTaxRateId, setFormTaxRateId] = useState<string>("none");
-  const [formTaxExempt, setFormTaxExempt] = useState(false);
-  const [form1099Vendor, setForm1099Vendor] = useState(false);
-  const [formCreditLimit, setFormCreditLimit] = useState("");
-  const [formCurrencyCode, setFormCurrencyCode] = useState("");
+  // Shared form state: unsaved edits (for this contact) on top of the loaded contact
+  const [draft, setDraft] = useState<{ id: string; form: ContactForm } | null>(null);
+  const form = draft?.id === id ? draft.form : toForm(contact);
+  const setField = <K extends keyof ContactForm>(key: K) => (v: ContactForm[K]) =>
+    setDraft((d) => ({ id, form: { ...(d?.id === id ? d.form : form), [key]: v } }));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (error && !data && !(error instanceof ApiError)) toast.error("Failed to load contact");
+  }, [error, data]);
+
+  function setContact(c: ContactDetail) {
+    // A PATCH answer may leave out the joined fields (people, accounts), so keep those.
+    cache.update<{ contact?: ContactDetail }>(contactUrl, (d) => ({ ...d, contact: { ...d.contact, ...c } }));
+    setDraft(null);
+  }
+
+  async function fetchContact() {
+    await refetch();
+  }
 
   // "Merge duplicates" dialog: combine another contact's records into this one.
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeSearch, setMergeSearch] = useState("");
-  const [mergeResults, setMergeResults] = useState<
-    { id: string; name: string; email: string | null }[]
-  >([]);
   const [merging, setMerging] = useState(false);
 
   useEntityTitle(contact?.name ?? undefined);
 
   // Search other contacts to pick the duplicate to fold into this one.
-  useEffect(() => {
-    if (!mergeOpen) return;
-    const orgId = getOrgId();
-    if (!orgId) return;
-    const params = new URLSearchParams();
-    if (mergeSearch) params.set("search", mergeSearch);
-    params.set("limit", "20");
-    const handle = setTimeout(() => {
-      fetch(`/api/v1/contacts?${params}`, {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.data) {
-            setMergeResults(
-              data.data.filter(
-                (c: { id: string }) => c.id !== id
-              )
-            );
-          }
-        })
-        .catch(() => {});
-    }, 250);
-    return () => clearTimeout(handle);
-  }, [mergeOpen, mergeSearch, id]);
+  const debouncedMergeSearch = useDebounce(mergeSearch, 250);
+  const mergeParams = new URLSearchParams();
+  if (debouncedMergeSearch) mergeParams.set("search", debouncedMergeSearch);
+  mergeParams.set("limit", "20");
+  const { data: mergeData } = useApi<{ data?: { id: string; name: string; email: string | null }[] }>(
+    mergeOpen ? `/api/v1/contacts?${mergeParams}` : null,
+    { keepPrevious: true, learn: false }
+  );
+  const mergeResults = useMemo(() => (mergeData?.data ?? []).filter((c) => c.id !== id), [mergeData, id]);
 
   // Fold the picked duplicate INTO the contact being viewed (this one survives).
   async function handleMerge(duplicateId: string, duplicateName: string) {
@@ -298,7 +323,6 @@ export default function ContactDetailLayout({ children }: { children: React.Reac
         toast.success("Duplicate combined into this contact");
         setMergeOpen(false);
         setMergeSearch("");
-        fetchContact();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(
@@ -311,38 +335,6 @@ export default function ContactDetailLayout({ children }: { children: React.Reac
       setMerging(false);
     }
   }
-
-  const fetchContact = useCallback(async () => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    try {
-      const res = await fetch(`/api/v1/contacts/${id}`, {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.contact) {
-        const c = data.contact as ContactDetail;
-        setContact(c);
-        setFormType(c.type);
-        setFormRevenueAccountId(c.defaultRevenueAccountId || "none");
-        setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
-        setFormTaxRateId(c.defaultTaxRateId || "none");
-        setFormTaxExempt(c.isTaxExempt);
-        setForm1099Vendor(c.is1099Vendor ?? false);
-        setFormCreditLimit(c.creditLimit != null ? centsToDecimal(c.creditLimit) : "");
-        setFormCurrencyCode(c.currencyCode || "");
-      }
-    } catch {
-      toast.error("Failed to load contact");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchContact();
-  }, [fetchContact]);
 
   const activeTab = pathname.endsWith("/activity") ? "activity"
     : pathname.endsWith("/statement") ? "statement"
@@ -376,22 +368,22 @@ export default function ContactDetailLayout({ children }: { children: React.Reac
         fetchContact,
         confirm,
         confirmDialog,
-        formType,
-        setFormType,
-        formRevenueAccountId,
-        setFormRevenueAccountId,
-        formExpenseAccountId,
-        setFormExpenseAccountId,
-        formTaxRateId,
-        setFormTaxRateId,
-        formTaxExempt,
-        setFormTaxExempt,
-        form1099Vendor,
-        setForm1099Vendor,
-        formCreditLimit,
-        setFormCreditLimit,
-        formCurrencyCode,
-        setFormCurrencyCode,
+        formType: form.type,
+        setFormType: setField("type"),
+        formRevenueAccountId: form.revenueAccountId,
+        setFormRevenueAccountId: setField("revenueAccountId"),
+        formExpenseAccountId: form.expenseAccountId,
+        setFormExpenseAccountId: setField("expenseAccountId"),
+        formTaxRateId: form.taxRateId,
+        setFormTaxRateId: setField("taxRateId"),
+        formTaxExempt: form.taxExempt,
+        setFormTaxExempt: setField("taxExempt"),
+        form1099Vendor: form.is1099Vendor,
+        setForm1099Vendor: setField("is1099Vendor"),
+        formCreditLimit: form.creditLimit,
+        setFormCreditLimit: setField("creditLimit"),
+        formCurrencyCode: form.currencyCode,
+        setFormCurrencyCode: setField("currencyCode"),
         saving,
         setSaving,
       }}

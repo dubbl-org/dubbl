@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { taxRate, taxComponent } from "@/lib/db/schema";
+import { compoundRate } from "@/lib/tax/compound";
 import { eq, and, ne } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -76,6 +77,8 @@ export async function PATCH(
 
     const body = await request.json();
     const { components, ...parsed } = updateSchema.parse(body);
+    // A compound rate charges the sum of its parts.
+    if (components && components.length > 0) parsed.rate = compoundRate(components);
 
     const existing = await db.query.taxRate.findFirst({
       where: and(

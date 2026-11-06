@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, DollarSign } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -11,6 +11,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { formatMoney } from "@/lib/money";
 import { ExportButton } from "@/components/dashboard/export-button";
+import { useApi } from "@/lib/query/use-api";
 
 interface InvoiceRow {
   id: string;
@@ -38,42 +39,19 @@ const columns: Column<InvoiceRow>[] = [
 
 export default function AgedReceivablesPage() {
   const today = new Date().toISOString().slice(0, 10);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [asAt, setAsAt] = useState(today);
-  const [buckets, setBuckets] = useState<AgingBucket[]>([]);
-  const [grandTotal, setGrandTotal] = useState(0);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ asAt });
-    fetch(`/api/v1/reports/aged-receivables?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setBuckets(data.buckets || []);
-        setGrandTotal(data.grandTotal || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [asAt]);
+  const { data, loading } = useApi<{ buckets?: AgingBucket[]; grandTotal?: number }>(
+    `/api/v1/reports/aged-receivables?${new URLSearchParams({ asAt })}`,
+    { keepPrevious: true }
+  );
+  const buckets = data?.buckets || [];
+  const grandTotal = data?.grandTotal || 0;
 
   const allInvoices = buckets.flatMap((b) =>
     b.invoices.map((inv) => ({ ...inv, bucket: b.label }))
   );
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -88,6 +66,7 @@ export default function AgedReceivablesPage() {
         <ExportButton
           data={allInvoices}
           columns={["invoiceNumber", "contactName", "dueDate", "daysOverdue", "amountDue", "bucket"]}
+          moneyColumns={["amountDue"]}
           filename="aged-receivables"
         />
       </PageHeader>
@@ -99,37 +78,33 @@ export default function AgedReceivablesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-            {buckets.map((b) => (
-              <StatCard
-                key={b.label}
-                title={b.label}
-                value={formatMoney(b.total)}
-                change={`${b.count} invoices`}
-                icon={DollarSign}
-              />
-            ))}
-          </div>
-
-          <div className="rounded-lg border bg-card p-3 sm:p-4 mt-4">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total owed to you</p>
-            <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
-          </div>
-
-          <div className="mt-4">
-            <DataTable
-              columns={columns}
-              data={allInvoices}
-              loading={loading}
-              emptyMessage="No outstanding receivables."
+      <ContentReveal>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          {buckets.map((b) => (
+            <StatCard
+              key={b.label}
+              title={b.label}
+              value={formatMoney(b.total)}
+              change={`${b.count} invoices`}
+              icon={DollarSign}
             />
-          </div>
-        </ContentReveal>
-      )}
+          ))}
+        </div>
+
+        <div className="rounded-lg border bg-card p-3 sm:p-4 mt-4">
+          <p className="text-sm font-medium text-muted-foreground mb-1">Total owed to you</p>
+          <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums truncate">{formatMoney(grandTotal)}</p>
+        </div>
+
+        <div className="mt-4">
+          <DataTable
+            columns={columns}
+            data={allInvoices}
+            loading={loading}
+            emptyMessage="No outstanding receivables."
+          />
+        </div>
+      </ContentReveal>
     </ContentReveal>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Plus, Trash2, Mail, Clock, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import {
   Table,
   TableBody,
@@ -99,53 +100,30 @@ const emptyForm: {
   customEmails: "",
 };
 
+const RULES_URL = "/api/v1/reminders";
+
 export default function RemindersPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [rules, setRules] = useState<ReminderRule[]>([]);
-  const [logs, setLogs] = useState<ReminderLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [logStatus, setLogStatus] = useState<string>("");
   const [logPage, setLogPage] = useState(1);
-  const [logTotal, setLogTotal] = useState(0);
   useDocumentTitle("Settings · Reminders");
+  const cache = useApiCache();
+  const { data: rulesData, loading } = useApi<{ data?: ReminderRule[] }>(RULES_URL);
+  const rules = rulesData?.data || [];
+  const logParams = new URLSearchParams({ page: String(logPage), limit: "10" });
+  if (logStatus) logParams.set("status", logStatus);
+  const { data: logsData } = useApi<{ data?: ReminderLog[]; total?: number }>(`/api/v1/reminders/logs?${logParams}`, { keepPrevious: true });
+  const logs = logsData?.data || [];
+  const logTotal = logsData?.total || 0;
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
-
-  const fetchRules = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/reminders", { headers: getHeaders() });
-      const data = await res.json();
-      setRules(data.data || []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchLogs = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(logPage), limit: "10" });
-    if (logStatus) params.set("status", logStatus);
-    const res = await fetch(`/api/v1/reminders/logs?${params}`, {
-      headers: getHeaders(),
-    });
-    const data = await res.json();
-    setLogs(data.data || []);
-    setLogTotal(data.total || 0);
-  }, [logPage, logStatus]);
-
-  useEffect(() => {
-    fetchRules();
-  }, [fetchRules]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
 
   function openCreate() {
     setEditingId(null);
@@ -209,7 +187,6 @@ export default function RemindersPage() {
         toast.success("Reminder rule created");
       }
       setSheetOpen(false);
-      await fetchRules();
     } catch {
       toast.error("Something went wrong");
     } finally {
@@ -228,7 +205,6 @@ export default function RemindersPage() {
           method: "DELETE",
           headers: getHeaders(),
         });
-        await fetchRules();
         toast.success("Reminder rule deleted");
       },
     });
@@ -241,9 +217,10 @@ export default function RemindersPage() {
       body: JSON.stringify({ enabled: !rule.enabled }),
     });
     if (res.ok) {
-      setRules((prev) =>
-        prev.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r))
-      );
+      cache.update<{ data?: ReminderRule[] }>(RULES_URL, (prev) => ({
+        ...prev,
+        data: prev.data?.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r)),
+      }));
     }
   }
 
@@ -267,7 +244,7 @@ export default function RemindersPage() {
             <div>
               <h2 className="text-lg font-semibold">Payment Reminders</h2>
               <p className="text-sm text-muted-foreground">
-                Configure automated dunning rules for overdue invoices and bills.
+                Configure automated dunning rules for overdue invoices and bills. Reminders go out from your own mail server if you set one up under Email sending, otherwise from dubbl with replies going to your organization&apos;s contact email.
               </p>
             </div>
             <Button size="sm" className="h-7 text-xs gap-1" onClick={openCreate}>
@@ -405,7 +382,10 @@ export default function RemindersPage() {
                           {log.reminderRule?.name || "-"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {log.recipientEmail}
+                          {log.recipientEmail || "No recipient"}
+                          {log.errorMessage && log.status !== "sent" && (
+                            <span className="block text-xs text-muted-foreground/80">{log.errorMessage}</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm truncate max-w-[200px]">
                           {log.subject}

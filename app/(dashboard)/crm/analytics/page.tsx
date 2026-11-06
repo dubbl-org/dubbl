@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { BarChart3, Target, TrendingUp, DollarSign } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface Analytics {
   totalDeals: number;
@@ -17,23 +17,13 @@ interface Analytics {
   wonValue: number;
   conversionRate: number;
   avgDealValue: number;
-  stageDistribution: Record<string, { count: number; value: number }>;
+  stageDistribution: Record<string, { name?: string; count: number; value: number }>;
+  lostReasons?: { reason: string; count: number; value: number }[];
 }
 
 export default function CRMAnalyticsPage() {
-  const [data, setData] = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<Analytics>("/api/v1/crm/analytics");
   useDocumentTitle("CRM · Analytics");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId") || "";
-    fetch("/api/v1/crm/analytics", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, []);
 
   if (loading) return <BrandLoader />;
   if (!data) return null;
@@ -100,15 +90,43 @@ export default function CRMAnalyticsPage() {
             <div className="space-y-2">
               {Object.entries(data.stageDistribution || {}).map(([stage, info]) => (
                 <div key={stage} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground capitalize">{stage.replace("_", " ")}</span>
+                  <span className="text-muted-foreground">{info.name || stage.replace(/_/g, " ")}</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{info.count} deals</span>
+                    <span className="text-xs text-muted-foreground">{info.count} {info.count === 1 ? "deal" : "deals"}</span>
                     <span className="font-mono text-xs font-medium tabular-nums">{formatMoney(info.value)}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="rounded-lg border bg-card p-5">
+          <h3 className="text-sm font-medium">Why deals were lost</h3>
+          <p className="text-xs text-muted-foreground mb-4">The reasons given when deals were marked lost, most common first.</p>
+          {(data.lostReasons ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No lost deals yet.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {(data.lostReasons ?? []).map((r) => {
+                const share = data.lostDeals > 0 ? Math.round((r.count / data.lostDeals) * 100) : 0;
+                return (
+                  <div key={r.reason} className="space-y-1">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate">{r.reason}</span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-muted-foreground">{r.count} {r.count === 1 ? "deal" : "deals"} · {share}%</span>
+                        <span className="font-mono text-xs font-medium tabular-nums">{formatMoney(r.value)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-red-400" style={{ width: `${share}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </ContentReveal>

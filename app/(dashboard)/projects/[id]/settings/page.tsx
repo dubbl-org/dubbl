@@ -22,10 +22,10 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { Section } from "@/components/dashboard/section";
 import { centsToDecimal } from "@/lib/money";
-import { useProject, PROJECT_COLORS } from "../project-context";
+import { useProject, PROJECT_COLORS, projectFetch, errorText } from "../project-context";
 
 export default function SettingsPage() {
-  const { project: proj, orgId, projectId, refresh } = useProject();
+  const { project: proj, orgId, projectId, canManage } = useProject();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -50,10 +50,9 @@ export default function SettingsPage() {
       const tagsRaw = (form.get("tags") as string || "").trim();
       const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
 
-      const res = await fetch(`/api/v1/projects/${projectId}`, {
+      await projectFetch(orgId, `/api/v1/projects/${projectId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
+        body: {
           name: form.get("name"),
           description: form.get("description") || null,
           contactId: contactId || null,
@@ -74,15 +73,13 @@ export default function SettingsPage() {
           enableMilestones: form.get("enableMilestones") === "on",
           enableNotes: form.get("enableNotes") === "on",
           enableBilling: form.get("enableBilling") === "on",
-        }),
+        },
       });
 
-      if (!res.ok) throw new Error("Failed to update");
       toast.success("Project updated");
       window.dispatchEvent(new Event("projects-changed"));
-      refresh();
-    } catch {
-      toast.error("Failed to update project");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to update project"));
     } finally {
       setSaving(false);
     }
@@ -91,26 +88,30 @@ export default function SettingsPage() {
   async function handleDelete() {
     const confirmed = await confirm({
       title: "Delete this project?",
-      description: "This action cannot be undone.",
-      confirmLabel: "Delete",
+      description: "The project moves to Trash with its tasks, time, milestones and notes. You can restore it from Settings > Trash. Invoices already created stay as they are.",
+      confirmLabel: "Move to Trash",
       destructive: true,
     });
     if (!confirmed) return;
     if (!orgId) return;
     setDeleting(true);
     try {
-      await fetch(`/api/v1/projects/${projectId}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": orgId },
-      });
-      toast.success("Project deleted");
+      await projectFetch(orgId, `/api/v1/projects/${projectId}`, { method: "DELETE" });
+      toast.success("Project moved to Trash");
       window.dispatchEvent(new Event("projects-changed"));
       router.push("/projects");
-    } finally { setDeleting(false); }
+    } catch (err) { toast.error(errorText(err, "Failed to delete project")); }
+    finally { setDeleting(false); }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10">
+      {!canManage && (
+        <div className="rounded-lg border bg-muted/40 px-4 py-3 text-[12px] text-muted-foreground">
+          Only project managers can change these settings.
+        </div>
+      )}
+      <fieldset disabled={!canManage} className="space-y-8 sm:space-y-10 disabled:opacity-80">
       <Section title="General" description="Basic project details and categorization.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
@@ -188,7 +189,11 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5"><Label className="text-xs">Budget</Label><CurrencyInput prefix="$" value={projBudget} onChange={setProjBudget} /></div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Budget</Label>
+            <CurrencyInput prefix="$" value={projBudget} onChange={setProjBudget} />
+            <p className="text-[11px] text-muted-foreground">The most you plan to bill the client. Compared with what has been invoiced.</p>
+          </div>
           <div className="space-y-1.5"><Label className="text-xs">Hourly Rate</Label><CurrencyInput prefix="$" value={projHourlyRate} onChange={setProjHourlyRate} /></div>
           <div className="space-y-1.5"><Label className="text-xs">Fixed Price</Label><CurrencyInput prefix="$" value={projFixedPrice} onChange={setProjFixedPrice} /></div>
         </div>
@@ -229,24 +234,27 @@ export default function SettingsPage() {
       <div className="h-px bg-border" />
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={saving} size="sm" className="bg-brand-600 hover:bg-brand-700">
+        <Button type="submit" disabled={saving || !canManage} size="sm" className="bg-brand-600 hover:bg-brand-700">
           {saving ? "Saving..." : "Save changes"}
         </Button>
       </div>
+      </fieldset>
 
+      {canManage && <>
       <div className="h-px bg-border" />
 
-      <Section title="Danger zone" description="Irreversible actions for this project.">
+      <Section title="Danger zone" description="Remove this project.">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/20">
           <div>
             <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete project</p>
-            <p className="text-[12px] text-muted-foreground">Permanently delete this project and all associated data.</p>
+            <p className="text-[12px] text-muted-foreground">Moves the project and its tasks, time and notes to Trash. You can restore it from Settings &gt; Trash.</p>
           </div>
           <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
             {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </Section>
+      </>}
       {confirmDialog}
     </form>
   );

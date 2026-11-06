@@ -3,8 +3,14 @@ import { pipeline } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { notDeleted, softDelete } from "@/lib/db/soft-delete";
-import { ok, notFound, handleError } from "@/lib/api/response";
+import { notDeleted } from "@/lib/db/soft-delete";
+import {
+  CRM_PERMISSION,
+  applyPipelineStages,
+  clearOtherDefaults,
+  deletePipelineMovingDeals,
+} from "@/lib/api/crm-deals";
+import { ok, notFound, handleError, validationError } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
 
@@ -22,7 +28,7 @@ export async function GET(
         eq(pipeline.organizationId, ctx.organizationId),
         notDeleted(pipeline.deletedAt)
       ),
-      with: { deals: true },
+      with: { deals: { where: (d, { isNull }) => isNull(d.deletedAt) } },
     });
 
     if (!p) return notFound("Pipeline");
@@ -45,7 +51,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:contacts");
+    requireRole(ctx, CRM_PERMISSION);
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
@@ -54,12 +60,26 @@ export async function PATCH(
       where: and(eq(pipeline.id, id), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)),
     });
     if (!existing) return notFound("Pipeline");
+    if (parsed.isDefault === false && existing.isDefault) {
+      return validationError("Set another pipeline as the default instead");
+    }
 
-    const [updated] = await db
-      .update(pipeline)
-      .set(parsed)
-      .where(and(eq(pipeline.id, id), eq(pipeline.organizationId, ctx.organizationId)))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const changes: Partial<typeof pipeline.$inferInsert> = {};
+      if (parsed.name !== undefined) changes.name = parsed.name;
+      if (parsed.isDefault !== undefined) changes.isDefault = parsed.isDefault;
+      if (parsed.stages !== undefined) {
+        // Keeps Won and Lost; deals in a removed stage move to the first stage.
+        changes.stages = (await applyPipelineStages(tx, ctx.organizationId, id, parsed.stages)).stages;
+      }
+      const [row] = await tx
+        .update(pipeline)
+        .set(changes)
+        .where(and(eq(pipeline.id, id), eq(pipeline.organizationId, ctx.organizationId)))
+        .returning();
+      if (row?.isDefault) await clearOtherDefaults(tx, ctx.organizationId, id);
+      return row;
+    });
 
     if (!updated) return notFound("Pipeline");
 
@@ -78,26 +98,21 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:contacts");
+    requireRole(ctx, CRM_PERMISSION);
 
-    const [deleted] = await db
-      .update(pipeline)
-      .set(softDelete())
-      .where(and(eq(pipeline.id, id), eq(pipeline.organizationId, ctx.organizationId)))
-      .returning();
-
-    if (!deleted) return notFound("Pipeline");
+    // Its deals move to the default pipeline (or the next one) so none are hidden.
+    const { pipeline: deleted, movedDeals, movedTo } = await deletePipelineMovingDeals(ctx, id);
 
     logAudit({
       ctx,
       action: "delete",
       entityType: "pipeline",
       entityId: id,
-      changes: deleted as Record<string, unknown>,
+      changes: { ...(deleted as Record<string, unknown>), movedDeals, movedTo: movedTo?.id ?? null },
       request,
     });
 
-    return ok({ success: true });
+    return ok({ success: true, movedDeals, movedTo });
   } catch (err) {
     return handleError(err);
   }

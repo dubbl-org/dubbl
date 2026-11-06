@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
+import { createCategory } from "@/lib/api/inventory-categories";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -56,15 +57,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
-
-    const [created] = await db
-      .insert(inventoryCategory)
-      .values({
-        organizationId: ctx.organizationId,
-        ...parsed,
-      })
-      .returning();
-
+    const created = await createCategory(ctx.organizationId, parsed);
     return NextResponse.json({ category: created }, { status: 201 });
   } catch (err) {
     return handleError(err);

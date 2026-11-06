@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 import { History } from "@/components/dashboard/assistant/history";
 import { DocumentsSidebar } from "@/components/dashboard/documents/browser/sidebar";
 import { STATIC_SUBNAV, findActiveHref, findModule, type SubnavSection } from "./nav";
@@ -18,28 +19,19 @@ interface ProjectListItem {
   color: string;
 }
 
+const EMPTY_PROJECTS: ProjectListItem[] = [];
+
 function useActiveProjects() {
-  const [projects, setProjects] = useState<ProjectListItem[]>([]);
+  // Shell-wide, not part of whichever page is open, so it isn't learned for prefetching
+  const { data, refetch } = useApi<{ data?: ProjectListItem[] }>("/api/v1/projects?status=active", { learn: false });
 
   useEffect(() => {
-    const load = () => {
-      const orgId = localStorage.getItem("activeOrgId");
-      if (!orgId) return;
-      fetch("/api/v1/projects?status=active", {
-        headers: { "x-organization-id": orgId },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.data) setProjects(data.data);
-        })
-        .catch(() => {});
-    };
-    load();
+    const load = () => void refetch();
     window.addEventListener("projects-changed", load);
     return () => window.removeEventListener("projects-changed", load);
-  }, []);
+  }, [refetch]);
 
-  return projects;
+  return data?.data ?? EMPTY_PROJECTS;
 }
 
 export function PanelNav({
@@ -135,8 +127,8 @@ export function ShellPanel() {
   const { open: openDrawer } = useCreateDrawer();
 
   return (
-    <aside className="hidden w-[232px] shrink-0 flex-col px-2.5 lg:flex">
-      <div className="flex h-[60px] shrink-0 items-center">
+    <aside data-shell="panel" className="hidden w-[232px] shrink-0 flex-col px-2.5 lg:flex">
+      <div data-shell="panel-header" className="flex h-[60px] shrink-0 items-center">
         <OrgSwitcher />
       </div>
       {mod?.key === "documents" ? (

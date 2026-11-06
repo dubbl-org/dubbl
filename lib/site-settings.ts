@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { siteSettings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isUnlimitedDeployment } from "@/lib/plans";
 
 type SiteSettingKey =
   | "registration_mode"
@@ -86,7 +87,16 @@ export async function getAllSiteSettings(): Promise<
   return result;
 }
 
-export function isSelfHostedUnlimited(): boolean {
-  // Synchronous check using env var directly for performance
-  return !process.env.STRIPE_SECRET_KEY;
+/**
+ * Whether every organization gets every feature with no plan limits. Follows
+ * the admin "Self-hosted unlimited mode" setting: "true" or "false" force it,
+ * "auto" (the default) turns it on when Stripe billing isn't configured. So an
+ * instance can set STRIPE_SECRET_KEY for card payments or the Stripe
+ * integration and still stay unlimited.
+ */
+export async function isSelfHostedUnlimited(): Promise<boolean> {
+  const mode = await getSiteSetting("self_hosted_unlimited");
+  if (mode === "true") return true;
+  if (mode === "false") return false;
+  return isUnlimitedDeployment();
 }

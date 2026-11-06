@@ -6,6 +6,11 @@ import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import {
+  TAGGABLE_ENTITY_TYPES,
+  getRecordTags,
+  taggableEntityExists,
+} from "@/lib/api/tags";
 
 /**
  * MCP tools for tags — flexible, color-coded labels an org applies to its
@@ -18,16 +23,8 @@ import type { AuthContext } from "@/lib/api/auth-context";
  * HTTP self-calls); org-scoped via the AuthContext.
  */
 
-// The entity kinds a tag can be attached to — mirrors the REST attach/detach
-// route enum exactly.
-const ENTITY_TYPES = [
-  "journal_entry",
-  "invoice",
-  "bill",
-  "expense",
-  "contact",
-  "project",
-] as const;
+// The entity kinds a tag can be attached to — shared with the REST routes.
+const ENTITY_TYPES = TAGGABLE_ENTITY_TYPES;
 
 export function registerTagTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -150,8 +147,28 @@ export function registerTagTools(server: McpServer, ctx: AuthContext) {
   );
 
   server.tool(
+    "list_record_tags",
+    "List the tags attached to one record (journal entry, invoice, bill, expense, contact, or project). Only the organization's non-deleted tags are returned, sorted by name. Returns the tags (id, name, color, description).",
+    {
+      entityType: z
+        .enum(ENTITY_TYPES)
+        .describe(
+          "The kind of record: journal_entry, invoice, bill, expense, contact, or project"
+        ),
+      entityId: z.string().uuid().describe("The UUID of the record"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const byEntity = await getRecordTags(ctx.organizationId, params.entityType, [
+          params.entityId,
+        ]);
+        return { tags: byEntity[params.entityId] ?? [] };
+      })
+  );
+
+  server.tool(
     "attach_tag",
-    "Attach a tag to a record (journal entry, invoice, bill, expense, contact, or project). The tag must belong to the caller's organization. Idempotent — attaching an already-attached tag is a no-op. Returns the created link (or null if it already existed).",
+    "Attach a tag to a record (journal entry, invoice, bill, expense, contact, or project). The tag and the record must belong to the caller's organization. Idempotent — attaching an already-attached tag is a no-op. Returns the created link (or null if it already existed).",
     {
       tagId: z.string().describe("The UUID of the tag to attach"),
       entityType: z
@@ -172,6 +189,9 @@ export function registerTagTools(server: McpServer, ctx: AuthContext) {
           ),
         });
         if (!t) throw new Error("Tag not found");
+        if (!(await taggableEntityExists(ctx.organizationId, params.entityType, params.entityId))) {
+          throw new Error("Record not found");
+        }
 
         const [created] = await db
           .insert(entityTag)

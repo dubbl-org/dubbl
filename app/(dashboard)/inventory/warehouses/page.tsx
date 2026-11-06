@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion, MotionConfig } from "motion/react";
 import {
   Warehouse,
@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Tabs,
   TabsList,
@@ -50,6 +51,7 @@ import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface WarehouseItem {
   id: string;
@@ -72,10 +74,8 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 export default function WarehousesPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
-  const [fetchKey, setFetchKey] = useState(0);
+  const { data, loading } = useApi<{ data?: WarehouseItem[] }>("/api/v1/warehouses");
+  const warehouses = data?.data || [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<WarehouseItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -93,44 +93,15 @@ export default function WarehousesPage() {
   const [formName, setFormName] = useState("");
   const [formCode, setFormCode] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formActive, setFormActive] = useState(true);
 
   const orgId =
     typeof window !== "undefined"
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  const fetchWarehouses = useCallback(async () => {
-    const id = localStorage.getItem("activeOrgId");
-    if (!id) return;
-    const isRefetch = !loading;
-    if (isRefetch) setRefetching(true);
-
-    try {
-      const res = await fetch("/api/v1/warehouses", {
-        headers: { "x-organization-id": id },
-      });
-      const data = await res.json();
-      setWarehouses(data.data || []);
-    } finally {
-      setLoading(false);
-      setRefetching(false);
-      setFetchKey((k) => k + 1);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchWarehouses();
-    const handler = () => fetchWarehouses();
-    window.addEventListener("refetch-warehouses", handler);
-    return () => window.removeEventListener("refetch-warehouses", handler);
-  }, [fetchWarehouses]);
-
-  // Re-fetch on filter/sort/search changes
-  useEffect(() => {
-    if (!loading) fetchWarehouses();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, sortBy, sortOrder, debouncedSearch]);
+  // Replays the reveal animation when the filters change
+  const fetchKey = `${statusFilter}:${sortBy}:${sortOrder}:${debouncedSearch}`;
 
   // Client-side filtering + sorting
   const filtered = warehouses
@@ -171,6 +142,7 @@ export default function WarehousesPage() {
     setFormName(warehouse.name);
     setFormCode(warehouse.code);
     setFormAddress(warehouse.address || "");
+    setFormActive(warehouse.isActive !== false);
     setSheetOpen(true);
   }
 
@@ -180,7 +152,12 @@ export default function WarehousesPage() {
     setSaving(true);
 
     try {
-      const payload = { name: formName, code: formCode, address: formAddress || null };
+      const payload = {
+        name: formName,
+        code: formCode,
+        address: formAddress || null,
+        ...(editing ? { isActive: formActive } : {}),
+      };
 
       if (editing) {
         const res = await fetch(`/api/v1/warehouses/${editing.id}`, {
@@ -214,7 +191,6 @@ export default function WarehousesPage() {
 
       setSheetOpen(false);
       setEditing(null);
-      await fetchWarehouses();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -228,7 +204,7 @@ export default function WarehousesPage() {
     const confirmed = await confirm({
       title: `Delete "${warehouse.name}"?`,
       description:
-        "This warehouse will be permanently removed. This action cannot be undone.",
+        "The location moves to the trash. Only a location that holds no stock and has no open transfers can be deleted.",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -244,7 +220,6 @@ export default function WarehousesPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to delete warehouse");
       }
-      await fetchWarehouses();
       toast.success("Warehouse deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete");
@@ -267,7 +242,6 @@ export default function WarehousesPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to set default");
       }
-      await fetchWarehouses();
       toast.success(`"${warehouse.name}" set as default`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to set default");
@@ -564,7 +538,7 @@ export default function WarehousesPage() {
       </div>
 
       {/* Warehouse cards */}
-      {refetching || pendingSearch ? (
+      {pendingSearch ? (
         <div className="flex items-center justify-center py-20">
           <div className="brand-loader" aria-label="Loading">
             <div className="brand-loader-circle brand-loader-circle-1" />
@@ -734,6 +708,15 @@ export default function WarehousesPage() {
                 placeholder="e.g. 123 Storage Ln, City"
               />
             </div>
+            {editing && (
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <Label htmlFor="wh-active">Active</Label>
+                  <p className="text-[11px] text-muted-foreground">Inactive locations stay in your history but can&apos;t be the default.</p>
+                </div>
+                <Switch id="wh-active" checked={formActive} onCheckedChange={setFormActive} />
+              </div>
+            )}
           </form>
           <SheetFooter>
             <Button

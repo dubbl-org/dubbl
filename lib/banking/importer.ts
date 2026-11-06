@@ -9,7 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { decimalToCents } from "@/lib/money";
 import { notDeleted } from "@/lib/db/soft-delete";
-import { applyBankRulesToTransaction, loadActiveBankRules } from "@/lib/api/bank-rules";
+import { applyBankRulesToAccount } from "@/lib/api/bank-rules";
 
 export type BankImportFormat = typeof bankImportFormatEnum.enumValues[number];
 
@@ -80,6 +80,8 @@ export interface CommitImportResult extends ImportPreviewResult {
   imported: number;
   duplicateCount: number;
   importId: string;
+  /** What the org's bank rules did to the new lines (see applyBankRulesToAccount). */
+  rules: { applied: number; reconciled: number; split: number; skipped: number };
 }
 
 export async function previewBankStatementImport(
@@ -124,7 +126,9 @@ export async function previewBankStatementImport(
 export async function commitBankStatementImport(
   organizationId: string,
   bankAccountId: string,
-  request: ImportPreviewRequest
+  request: ImportPreviewRequest,
+  /** The importing user; needed for rules that post (categorize automatically / split). */
+  userId?: string
 ): Promise<CommitImportResult> {
   const account = await db.query.bankAccount.findFirst({
     where: and(
@@ -176,20 +180,11 @@ export async function commitBankStatementImport(
     parsed.openingBalance ??
     account.balance - rowsToInsert.reduce((sum, row) => sum + row.tx.amount, 0);
 
-  // Load the org's active bank rules once so newly imported transactions are
-  // auto-categorized as a suggestion (status stays 'unreconciled' unless the
-  // matched rule has autoReconcile=true).
-  const activeRules = await loadActiveBankRules(organizationId);
-
   const insertedRows = rowsToInsert.map(({ tx, dedupeHash }) => {
     runningBalance =
       tx.balance != null
         ? tx.balance
         : runningBalance + tx.amount;
-
-    const assignment = activeRules.length
-      ? applyBankRulesToTransaction(activeRules, tx)
-      : null;
 
     return {
       bankAccountId,
@@ -199,9 +194,7 @@ export async function commitBankStatementImport(
       reference: tx.reference || null,
       amount: tx.amount,
       balance: tx.balance ?? runningBalance,
-      status: (assignment?.reconcile ? "reconciled" : "unreconciled") as
-        | "reconciled"
-        | "unreconciled",
+      status: "unreconciled" as const,
       importId: importRow.id,
       sourceType: "statement_import",
       externalTransactionId: tx.externalTransactionId || null,
@@ -212,15 +205,22 @@ export async function commitBankStatementImport(
       pending: tx.pending ?? false,
       rawPayload: tx.raw,
       dedupeHash,
-      accountId: assignment?.accountId ?? null,
-      contactId: assignment?.contactId ?? null,
-      taxRateId: assignment?.taxRateId ?? null,
     };
   });
 
   if (insertedRows.length > 0) {
     await db.insert(bankTransaction).values(insertedRows);
   }
+
+  // Run the org's bank rules over the new lines, the same way Apply rules
+  // does: matches get their category filled in, and rules that categorize
+  // automatically (or split) post the entry and move the line to Done.
+  const rules =
+    insertedRows.length > 0
+      ? await applyBankRulesToAccount(organizationId, bankAccountId, userId, {
+          importId: importRow.id,
+        })
+      : { applied: 0, reconciled: 0, split: 0, skipped: 0 };
 
   const finalBalance =
     parsed.closingBalance ??
@@ -249,6 +249,7 @@ export async function commitBankStatementImport(
     imported: insertedRows.length,
     duplicateCount: preview.duplicates.length,
     importId: importRow.id,
+    rules,
   };
 }
 

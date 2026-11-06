@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { Logo } from "@/components/shared/logo";
+
+const noSubscribe = () => () => {};
 
 export function OrgLoader({ children }: { children: React.ReactNode }) {
   const FADE_DURATION_MS = 400;
   const [state, setState] = useState<"loading" | "ready" | "fading">("loading");
+  // Signed in here before: open the app straight away and check the org behind it.
+  // Only a first visit waits on the splash.
+  const known = useSyncExternalStore(noSubscribe, () => !!localStorage.getItem("activeOrgId"), () => false);
 
   useEffect(() => {
     let isMounted = true;
@@ -42,6 +47,7 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
             window.location.href = "/onboarding";
             return;
           }
+          if (orgId) return;
         } else {
           // User has no orgs at all, redirect to onboarding
           window.location.href = "/onboarding";
@@ -50,7 +56,7 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
         startFadeOut();
       })
       .catch(() => {
-        startFadeOut();
+        if (!orgId) startFadeOut();
       });
 
     return () => {
@@ -61,7 +67,7 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {state !== "ready" && (
+      {state !== "ready" && !known && (
         <div
           className={`org-loader-overlay ${state === "fading" ? "org-loader-fade-out" : ""}`}
         >
@@ -73,7 +79,7 @@ export function OrgLoader({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-      {state === "ready" && children}
+      {(state === "ready" || known) && children}
     </>
   );
 }

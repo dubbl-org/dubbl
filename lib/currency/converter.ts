@@ -16,7 +16,7 @@ export class MissingExchangeRateError extends Error {
   ) {
     super(
       `No exchange rate for ${from}→${to} on ${date}. Add one under ` +
-        `Settings → Currencies (rates also sync automatically each day).`
+        `Tax > Currencies (/tax/currencies); rates also sync automatically each day.`
     );
     this.name = "MissingExchangeRateError";
   }

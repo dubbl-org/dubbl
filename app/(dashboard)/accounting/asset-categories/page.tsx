@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Plus, Layers, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,9 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { useApi } from "@/lib/query/use-api";
 import { ContentReveal } from "@/components/ui/content-reveal";
+import { DEPRECIATION_METHODS, DEPRECIATION_CONVENTIONS, methodName, methodOption, CONVENTION_HINT } from "@/lib/fixed-assets/labels";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface AssetCategory {
@@ -45,37 +47,10 @@ interface AssetCategory {
   isActive: boolean;
 }
 
-// ── Plain-language option labels (end users aren't accountants) ──────────────
-const METHOD_OPTIONS: { value: string; label: string }[] = [
-  { value: "straight_line", label: "Even amount each period (straight line)" },
-  { value: "declining_balance", label: "Faster early on (declining balance)" },
-  { value: "units_of_production", label: "Based on usage (units of production)" },
-  { value: "sum_of_years_digits", label: "Front-loaded (sum of years' digits)" },
-];
-
-const CONVENTION_OPTIONS: { value: string; label: string }[] = [
-  { value: "full_month", label: "Start of the purchase month" },
-  { value: "mid_month", label: "Middle of the purchase month" },
-  { value: "half_year", label: "Half a year in the first year" },
-  { value: "mid_quarter", label: "Middle of the purchase quarter" },
-  { value: "pro_rata_days", label: "Day-by-day from purchase" },
-  { value: "full_at_purchase", label: "All from the purchase date" },
-];
-
-function methodShort(value: string): string {
-  switch (value) {
-    case "straight_line":
-      return "Straight line";
-    case "declining_balance":
-      return "Declining balance";
-    case "units_of_production":
-      return "Units of production";
-    case "sum_of_years_digits":
-      return "Sum of years' digits";
-    default:
-      return value;
-  }
-}
+// ── Option labels, shared with the other fixed-asset screens ────────────────
+const METHOD_OPTIONS = DEPRECIATION_METHODS.map((m) => ({ value: m.value, label: methodOption(m.value) }));
+const CONVENTION_OPTIONS = DEPRECIATION_CONVENTIONS;
+const methodShort = methodName;
 
 // ── Form state ───────────────────────────────────────────────────────────────
 interface FormState {
@@ -132,35 +107,14 @@ export default function AssetCategoriesPage() {
   const orgId =
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const [categories, setCategories] = useState<AssetCategory[]>([]);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [refetching, setRefetching] = useState(false);
+  const { data, loading: initialLoad } = useApi<{ data?: AssetCategory[] }>(`/api/v1/asset-categories?limit=200`);
+  const categories = data?.data || [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    if (!orgId) return;
-    setRefetching(true);
-    fetch(`/api/v1/asset-categories?limit=200`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setCategories(data.data || []);
-      })
-      .finally(() => {
-        setInitialLoad(false);
-        setRefetching(false);
-      });
-  }, [orgId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const openCreate = useCallback(() => {
     setEditingId(null);
@@ -234,13 +188,12 @@ export default function AssetCategoriesPage() {
         return;
       }
       setDialogOpen(false);
-      load();
     } catch {
       setError("Could not save the template. Please try again.");
     } finally {
       setSaving(false);
     }
-  }, [orgId, form, editingId, load]);
+  }, [orgId, form, editingId]);
 
   const columns: Column<AssetCategory>[] = [
     {
@@ -341,9 +294,7 @@ export default function AssetCategoriesPage() {
 
       <div className="h-px bg-border" />
 
-      {refetching ? (
-        <BrandLoader className="h-48" />
-      ) : categories.length === 0 ? (
+      {categories.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 text-center">
           <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
             <Layers className="size-5 text-muted-foreground" />
@@ -395,8 +346,8 @@ export default function AssetCategoriesPage() {
               />
             </div>
 
-            {/* Method + convention */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* Method + convention (full width: the method names are long) */}
+            <div className="grid gap-4">
               <div className="space-y-1.5">
                 <Label>How it loses value</Label>
                 <Select
@@ -418,7 +369,7 @@ export default function AssetCategoriesPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>When it starts counting</Label>
+                <Label title={CONVENTION_HINT}>The first month</Label>
                 <Select
                   value={form.defaultConvention}
                   onValueChange={(v) =>
@@ -490,7 +441,8 @@ export default function AssetCategoriesPage() {
                   }
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Percentage of the remaining value written off each year.
+                  Share of what&apos;s left written off each year. Copied onto new
+                  assets; leave blank for double the straight-line rate.
                 </p>
               </div>
             )}

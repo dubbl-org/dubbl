@@ -6,6 +6,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextEntryNumber } from "@/lib/api/journal-automation";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -48,7 +49,7 @@ export function registerOpeningBalanceTools(
 
   server.tool(
     "set_opening_balances",
-    "Set (replace) the organization's opening balances. Voids any existing posted opening-balance entry, then posts a new journal entry (sourceType 'opening_balance') with one line per balance. Total debits MUST equal total credits, and the totals must be non-zero. All amounts are in integer cents (e.g. $12.50 = 1250). Returns the newly created posted entry with its lines.",
+    "Set (replace) the organization's opening balances. Voids any existing posted opening-balance entry, then posts a new journal entry (sourceType 'opening_balance') with one line per balance. Total debits MUST equal total credits, and the totals must be non-zero. Fails if the date (or the date of the entry being replaced) is in a locked period or closed financial year. All amounts are in integer cents (e.g. $12.50 = 1250). Returns the newly created posted entry with its lines.",
     {
       date: z
         .string()
@@ -107,6 +108,10 @@ export function registerOpeningBalanceTools(
             eq(journalEntry.status, "posted")
           ),
         });
+
+        // The new entry's date, and the old entry being voided, must be open.
+        await assertNotLocked(ctx.organizationId, params.date, ctx);
+        if (existingEntry) await assertNotLocked(ctx.organizationId, existingEntry.date, ctx);
 
         const full = await db.transaction(async (tx) => {
           if (existingEntry) {

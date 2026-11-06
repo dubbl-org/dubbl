@@ -10,11 +10,12 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  sku: z.string().optional(),
-  purchasePrice: z.number().int().default(0),
-  salePrice: z.number().int().default(0),
-  quantityOnHand: z.number().int().default(0),
-  options: z.record(z.string(), z.string()),
+  sku: z.string().nullable().optional(),
+  purchasePrice: z.number().int().min(0).default(0),
+  salePrice: z.number().int().min(0).default(0),
+  quantityOnHand: z.number().int().min(0).default(0),
+  // e.g. { "Color": "Red", "Size": "Large" }; optional.
+  options: z.record(z.string(), z.string()).default({}),
 });
 
 export async function GET(

@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ErrorState } from "@/components/dashboard/error-state";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApiCache, useApiRecords } from "@/lib/query/use-api";
 import {
   CATEGORIES,
   DAY_GROUPS,
@@ -39,8 +40,7 @@ import { PreferencesSheet } from "./preferences-sheet";
 
 type Filter = "all" | "unread" | CategoryKey;
 
-const PAGE = 100;
-const MAX_PAGES = 10;
+const LIST_URL = "/api/v1/notifications";
 const UNDO_MS = 5000;
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -63,34 +63,26 @@ async function call<T = unknown>(url: string, init?: { method?: string; body?: u
   return res.json() as Promise<T>;
 }
 
-interface ListResponse {
-  data?: InboxNotification[];
-  pagination?: { total?: number; totalPages?: number };
-}
-
 async function sendBulk(ids: string[], action: "read" | "unread" | "delete", keepalive = false) {
   for (let i = 0; i < ids.length; i += 500) {
     await call("/api/v1/notifications/bulk", { method: "POST", body: { ids: ids.slice(i, i + 500), action }, keepalive });
   }
 }
 
-function byNewest(a: InboxNotification, b: InboxNotification) {
-  return b.createdAt.localeCompare(a.createdAt);
-}
-
 /* ------------------------------------------------------------------ */
 /*  Inbox                                                              */
 /* ------------------------------------------------------------------ */
 
-export function NotificationsInbox() {
+/** `openPreferences` starts with the preferences panel open. */
+export function NotificationsInbox({ openPreferences = false }: { openPreferences?: boolean } = {}) {
   const router = useRouter();
 
   // Data
-  const [items, setItems] = useState<InboxNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [truncated, setTruncated] = useState(false);
-  const [version, setVersion] = useState(0);
+  const { rows, truncated, data, loading, error: loadError, refetch } = useApiRecords<InboxNotification>(LIST_URL);
+  const error = loadError && !data ? "We couldn't load your notifications. Check your connection and try again." : null;
+  // Removed rows stay hidden through the undo window (and any refresh that lands meanwhile)
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const items = useMemo(() => (hidden.size === 0 ? rows : rows.filter((r) => !hidden.has(r.id))), [rows, hidden]);
   const [intro, setIntro] = useState(true);
   const [now, setNow] = useState(() => new Date());
 
@@ -102,46 +94,28 @@ export function NotificationsInbox() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Read while looking at "Unread": they stay put until the filter changes, so rows don't jump away
   const [kept, setKept] = useState<Set<string>>(new Set());
-  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(openPreferences);
   const searchRef = useRef<HTMLInputElement>(null);
   const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; ids: string[] }>());
 
   /* ----------------------------- load ----------------------------- */
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const url = (page: number) => `/api/v1/notifications?limit=${PAGE}&page=${page}`;
-        const first = await call<ListResponse>(url(1));
-        const pages = Math.min(first.pagination?.totalPages ?? 1, MAX_PAGES);
-        const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => call<ListResponse>(url(i + 2))));
-        if (cancelled) return;
-        const rows = [first, ...rest].flatMap((p) => p.data ?? []);
-        // Rows waiting on an undoable removal stay hidden
-        const hidden = new Set([...pending.current.values()].flatMap((p) => p.ids));
-        setItems(rows.filter((r) => !hidden.has(r.id)));
-        setTruncated((first.pagination?.total ?? rows.length) > rows.length);
-        setError(null);
-      } catch {
-        if (!cancelled) setError("We couldn't load your notifications. Check your connection and try again.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [version]);
+  // Optimistic changes go straight into the cached pages; the next refresh confirms them
+  const cache = useApiCache();
+  const patchCache = useCallback(
+    (fn: (list: InboxNotification[]) => InboxNotification[]) => cache.updateRows<InboxNotification>(LIST_URL, fn),
+    [cache]
+  );
+  const setReadAt = useCallback(
+    (readAt: Map<string, string | null>) => patchCache((list) => list.map((n) => (readAt.has(n.id) ? { ...n, readAt: readAt.get(n.id) ?? null } : n))),
+    [patchCache]
+  );
+  const dropFromCache = useCallback((ids: string[]) => {
+    const idSet = new Set(ids);
+    patchCache((list) => list.filter((n) => !idSet.has(n.id)));
+  }, [patchCache]);
 
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
-  const retry = () => {
-    setLoading(true);
-    setError(null);
-    reload();
-  };
+  const reload = useCallback(() => void refetch(), [refetch]);
 
   // Rows slide in once, on first load; after that changes are instant
   useEffect(() => {
@@ -163,6 +137,7 @@ export function NotificationsInbox() {
       for (const [key, p] of map) {
         clearTimeout(p.timer);
         sendBulk(p.ids, "delete", true).catch(() => {});
+        dropFromCache(p.ids);
         map.delete(key);
       }
     };
@@ -171,7 +146,7 @@ export function NotificationsInbox() {
       window.removeEventListener("pagehide", flush);
       flush();
     };
-  }, []);
+  }, [dropFromCache]);
 
   /* ---------------------------- derive ---------------------------- */
 
@@ -236,31 +211,31 @@ export function NotificationsInbox() {
       const before = new Map(items.filter((n) => idSet.has(n.id) && Boolean(n.readAt) !== read).map((n) => [n.id, n.readAt]));
       if (before.size === 0) return;
       const stamp = new Date().toISOString();
-      setItems((prev) => prev.map((n) => (before.has(n.id) ? { ...n, readAt: read ? stamp : null } : n)));
+      setReadAt(new Map([...before.keys()].map((id) => [id, read ? stamp : null])));
       if (read && filter === "unread") setKept((k) => new Set([...k, ...before.keys()]));
       try {
         const changed = [...before.keys()];
         if (changed.length === 1) await call(`/api/v1/notifications/${changed[0]}/read`, { method: read ? "POST" : "DELETE" });
         else await sendBulk(changed, read ? "read" : "unread");
       } catch {
-        setItems((prev) => prev.map((n) => (before.has(n.id) ? { ...n, readAt: before.get(n.id) ?? null } : n)));
+        setReadAt(before);
         toast.error(read ? "Couldn't mark as read. Try again." : "Couldn't mark as unread. Try again.");
       }
     },
-    [items, filter]
+    [items, filter, setReadAt]
   );
 
   const markAllRead = async () => {
     const before = new Map(items.filter((n) => !n.readAt).map((n) => [n.id, n.readAt]));
     if (before.size === 0) return;
     const stamp = new Date().toISOString();
-    setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: stamp })));
+    setReadAt(new Map([...before.keys()].map((id) => [id, stamp])));
     if (filter === "unread") setKept((k) => new Set([...k, ...before.keys()]));
     try {
       await call("/api/v1/notifications/read-all", { method: "POST" });
       toast.success(`Marked ${before.size} as read`);
     } catch {
-      setItems((prev) => prev.map((n) => (before.has(n.id) ? { ...n, readAt: null } : n)));
+      setReadAt(before);
       toast.error("Couldn't mark everything as read. Try again.");
     }
   };
@@ -277,16 +252,17 @@ export function NotificationsInbox() {
         const next = flat.slice(idx + 1).find((n) => !idSet.has(n.id)) ?? flat.slice(0, idx).reverse().find((n) => !idSet.has(n.id));
         setCursor(next?.id ?? null);
       }
-      setItems((prev) => prev.filter((n) => !idSet.has(n.id)));
+      setHidden((prev) => new Set([...prev, ...idSet]));
       setSelected((prev) => new Set([...prev].filter((id) => !idSet.has(id))));
 
       const key = removed[0].id;
-      const restore = () => setItems((prev) => [...prev.filter((n) => !idSet.has(n.id)), ...removed].sort(byNewest));
+      const restore = () => setHidden((prev) => new Set([...prev].filter((id) => !idSet.has(id))));
       const commit = async () => {
         pending.current.delete(key);
         try {
           if (removed.length === 1) await call(`/api/v1/notifications/${removed[0].id}`, { method: "DELETE" });
           else await sendBulk(removed.map((n) => n.id), "delete");
+          dropFromCache(removed.map((n) => n.id));
         } catch {
           restore();
           toast.error("Couldn't remove that. It's back in your inbox.");
@@ -308,7 +284,7 @@ export function NotificationsInbox() {
         },
       });
     },
-    [items, cursor, flat]
+    [items, cursor, flat, dropFromCache]
   );
 
   const open = useCallback(
@@ -548,7 +524,7 @@ export function NotificationsInbox() {
           {/* List */}
           <div className="max-h-[max(440px,calc(100svh-282px))] overflow-y-auto overscroll-contain" aria-label="Notifications">
             {error ? (
-              <ErrorState message={error} onRetry={retry} />
+              <ErrorState message={error} onRetry={reload} />
             ) : loading ? (
               <ListSkeleton />
             ) : flat.length === 0 ? (

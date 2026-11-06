@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useApi } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,15 +25,6 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface SyncLogEntry {
-  id: string;
-  eventType: string;
-  stripeEventId: string | null;
-  status: string;
-  errorMessage: string | null;
-  createdAt: string;
-}
 
 interface Account {
   id: string;
@@ -76,49 +68,22 @@ function orgHeaders(extra?: Record<string, string>) {
 }
 
 export default function StripeIntegrationPage() {
-  const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
-  const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { data: statusData, error: statusError, loading, refetch: refetchStatus } = useApi<{ connected?: boolean; integrations?: IntegrationItem[] }>("/api/v1/integrations/stripe/status");
+  const connected = statusData?.connected ?? false;
+  const integrations = statusData?.integrations || [];
   const [connecting, setConnecting] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccountItem[]>([]);
+  // Non-critical
+  const { data: accJson } = useApi<{ data?: Account[]; accounts?: Account[] }>("/api/v1/accounts");
+  const { data: bankJson } = useApi<{ data?: BankAccountItem[]; bankAccounts?: BankAccountItem[] }>("/api/v1/bank-accounts");
+  const accounts = accJson?.data || accJson?.accounts || [];
+  const bankAccounts = bankJson?.data || bankJson?.bankAccounts || [];
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/integrations/stripe/status", {
-        headers: orgHeaders(),
-      });
-      const json = await res.json();
-      setConnected(json.connected ?? false);
-      setIntegrations(json.integrations || []);
-    } catch {
-      toast.error("Failed to load Stripe integration status");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchAccounts = useCallback(async () => {
-    try {
-      const [accRes, bankRes] = await Promise.all([
-        fetch("/api/v1/accounts", { headers: orgHeaders() }),
-        fetch("/api/v1/bank-accounts", { headers: orgHeaders() }),
-      ]);
-      const accJson = await accRes.json();
-      const bankJson = await bankRes.json();
-      setAccounts(accJson.data || accJson.accounts || []);
-      setBankAccounts(bankJson.data || bankJson.bankAccounts || []);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
+  const statusFailed = !!statusError && !statusData;
   useEffect(() => {
-    fetchStatus();
-    fetchAccounts();
-  }, [fetchStatus, fetchAccounts]);
+    if (statusFailed) toast.error("Failed to load Stripe integration status");
+  }, [statusFailed]);
 
   // Check for URL params on mount
   useEffect(() => {
@@ -170,7 +135,7 @@ export default function StripeIntegrationPage() {
       });
       if (res.ok) {
         toast.success("Sync started");
-        setTimeout(fetchStatus, 3000);
+        setTimeout(() => void refetchStatus(), 3000);
       } else {
         toast.error("Failed to start sync");
       }
@@ -192,7 +157,6 @@ export default function StripeIntegrationPage() {
       });
       if (res.ok) {
         toast.success("Stripe account disconnected");
-        fetchStatus();
       } else {
         toast.error("Failed to disconnect");
       }
@@ -212,7 +176,6 @@ export default function StripeIntegrationPage() {
       });
       if (res.ok) {
         toast.success("Settings updated");
-        fetchStatus();
       } else {
         toast.error("Failed to update settings");
       }

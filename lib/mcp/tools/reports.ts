@@ -15,10 +15,12 @@ import {
   organization,
   payment,
   paymentAllocation,
+  tag,
 } from "@/lib/db/schema";
 import { eq, and, sql, isNull, ne, gte, lte, inArray, asc } from "drizzle-orm";
 import { centsToDecimal } from "@/lib/money";
 import { wrapTool } from "@/lib/mcp/errors";
+import { buildCashFlow } from "@/lib/reports/cash-flow";
 import type { AuthContext } from "@/lib/api/auth-context";
 import type { Statement } from "@/lib/reports/statement-export";
 import {
@@ -265,7 +267,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "profit_and_loss",
-    "Generate a profit and loss (income statement) report for a date range. Shows revenue and expense accounts with totals. Amounts are in integer cents. Supports cash vs accrual basis, an optional cost-center or project dimension filter, and an optional comparative period (compareFrom/compareTo).",
+    "Generate a profit and loss (income statement) report for a date range. Shows revenue and expense accounts with totals. Amounts are in integer cents. Supports cash vs accrual basis, an optional cost-center or project dimension filter, an optional tag filter (tagId), and an optional comparative period (compareFrom/compareTo).",
     {
       startDate: z
         .string()
@@ -279,7 +281,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .enum(["accrual", "cash"])
         .optional()
         .describe(
-          "Reporting basis: 'accrual' (default) counts all posted entries; 'cash' counts only cash/payment-realized movement."
+          "Reporting basis: 'accrual' (default) counts all posted entries; 'cash' counts invoices and bills when they are paid (pro rata to each payment, on the payment date) plus bank and other cash entries."
         ),
       costCenterId: z
         .string()
@@ -292,6 +294,13 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .optional()
         .describe(
           "Filter to lines tagged with this project (UUID). Pass 'none' to match lines with no project. Ignored if costCenterId is set."
+        ),
+      tagId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+          "Only count postings of records carrying this tag (UUID from list_tags): journal entries, invoices, bills and expenses tagged with it (including their voids and payments), records of contacts tagged with it, and lines on projects tagged with it. Combines with the cost-center/project filter."
         ),
       compareFrom: z
         .string()
@@ -362,12 +371,27 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
           };
         };
 
+        let tagName: string | undefined;
+        if (params.tagId) {
+          const found = await db.query.tag.findFirst({
+            where: and(
+              eq(tag.id, params.tagId),
+              eq(tag.organizationId, ctx.organizationId),
+              isNull(tag.deletedAt)
+            ),
+            columns: { name: true },
+          });
+          if (!found) throw new Error("Tag not found");
+          tagName = found.name;
+        }
+
         const queryOpts = {
           basis,
           accountTypes: ["revenue", "expense"] as AccountAggregate["type"][],
           ...(dim
             ? { dimension: dim.dimension, dimensionValue: dim.dimensionValue }
             : {}),
+          ...(params.tagId ? { tagId: params.tagId } : {}),
         };
 
         const primaryAggs = await aggregateByDateRange(
@@ -402,6 +426,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
                 dimensionValue: dim.dimensionValue,
               }
             : {}),
+          ...(params.tagId ? { tagId: params.tagId, tagName } : {}),
           revenue: primary.revenue,
           totalRevenue: primary.totalRevenue,
           expenses: primary.expenses,
@@ -713,7 +738,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "cash_flow_statement",
-    "Generate a cash flow statement using the indirect method. Shows operating, investing, and financing activities with opening/closing cash balances. Amounts in integer cents.",
+    "Generate a cash flow statement for a date range (same figures as the Cash Flow report in the app). Indirect method (default): net income, depreciation added back, and changes in receivables, payables, inventory and other current items; investing = fixed-asset purchases and sales; financing = loan and equity movements. Direct method: money received from customers less money paid for costs. Returns opening/closing cash, each section with its items and total, and a reconciliation against the actual movement on the cash and bank accounts (difference 0 = ties out). All amounts are integer cents; inflows positive, outflows negative.",
     {
       startDate: z
         .string()
@@ -721,178 +746,25 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
       endDate: z
         .string()
         .describe("End date (YYYY-MM-DD)"),
+      method: z
+        .enum(["indirect", "direct"])
+        .optional()
+        .describe("'indirect' (default) or 'direct'."),
+      basis: z
+        .enum(["accrual", "cash"])
+        .optional()
+        .describe(
+          "Reporting basis: 'accrual' (default) or 'cash' (invoices and bills count when paid, pro rata to each payment, on the payment date)."
+        ),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const { startDate, endDate } = params;
-
-        // Helper to get account balance delta in a period
-        async function getBalanceDelta(
-          accountTypes: string[],
-          subTypes?: string[]
-        ): Promise<{ accountId: string; code: string; name: string; delta: number }[]> {
-          const conditions = [
-            eq(journalEntry.organizationId, ctx.organizationId),
-            eq(journalEntry.status, "posted"),
-            isNull(journalEntry.deletedAt),
-            gte(journalEntry.date, startDate),
-            lte(journalEntry.date, endDate),
-            sql`${chartAccount.type} IN (${sql.join(accountTypes.map(t => sql`${t}`), sql`, `)})`,
-          ];
-
-          if (subTypes && subTypes.length > 0) {
-            conditions.push(
-              sql`${chartAccount.subType} IN (${sql.join(subTypes.map(s => sql`${s}`), sql`, `)})`
-            );
-          }
-
-          const rows = await db
-            .select({
-              accountId: chartAccount.id,
-              code: chartAccount.code,
-              name: chartAccount.name,
-              type: chartAccount.type,
-              debit: sql<number>`coalesce(sum(${journalLine.debitAmount}), 0)`,
-              credit: sql<number>`coalesce(sum(${journalLine.creditAmount}), 0)`,
-            })
-            .from(journalLine)
-            .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
-            .innerJoin(chartAccount, eq(journalLine.accountId, chartAccount.id))
-            .where(and(...conditions))
-            .groupBy(chartAccount.id, chartAccount.code, chartAccount.name, chartAccount.type);
-
-          return rows.map((r) => {
-            const isDebitNormal = ["asset", "expense"].includes(r.type);
-            const delta = isDebitNormal
-              ? Number(r.debit) - Number(r.credit)
-              : Number(r.credit) - Number(r.debit);
-            return { accountId: r.accountId, code: r.code, name: r.name, delta };
-          });
-        }
-
-        // Get net income (revenue - expenses)
-        const revenueAccounts = await getBalanceDelta(["revenue"]);
-        const expenseAccounts = await getBalanceDelta(["expense"]);
-        const totalRevenue = revenueAccounts.reduce((s, a) => s + a.delta, 0);
-        const totalExpenses = expenseAccounts.reduce((s, a) => s + a.delta, 0);
-        const netIncome = totalRevenue - totalExpenses;
-
-        // Depreciation add-back
-        const [depResult] = await db
-          .select({
-            total: sql<number>`coalesce(sum(${journalLine.debitAmount}), 0)`,
-          })
-          .from(journalLine)
-          .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
-          .where(
-            and(
-              eq(journalEntry.organizationId, ctx.organizationId),
-              eq(journalEntry.status, "posted"),
-              isNull(journalEntry.deletedAt),
-              eq(journalEntry.sourceType, "depreciation"),
-              gte(journalEntry.date, startDate),
-              lte(journalEntry.date, endDate)
-            )
-          );
-        const depreciation = Number(depResult?.total ?? 0);
-
-        // Working capital changes (current assets and current liabilities)
-        const arChanges = await getBalanceDelta(["asset"], ["accounts_receivable"]);
-        const apChanges = await getBalanceDelta(["liability"], ["accounts_payable", "current_liability"]);
-        const inventoryChanges = await getBalanceDelta(["asset"], ["inventory"]);
-
-        const arDelta = arChanges.reduce((s, a) => s + a.delta, 0);
-        const apDelta = apChanges.reduce((s, a) => s + a.delta, 0);
-        const inventoryDelta = inventoryChanges.reduce((s, a) => s + a.delta, 0);
-
-        const operatingActivities = {
-          netIncome,
-          depreciation,
-          workingCapitalChanges: {
-            accountsReceivable: -arDelta, // Increase in AR reduces cash
-            accountsPayable: apDelta, // Increase in AP increases cash
-            inventory: -inventoryDelta, // Increase in inventory reduces cash
-          },
-          total: netIncome + depreciation - arDelta + apDelta - inventoryDelta,
-        };
-
-        // Investing activities: fixed asset changes
-        const fixedAssetChanges = await getBalanceDelta(["asset"], ["fixed_asset", "property_plant_equipment"]);
-        const investingTotal = -fixedAssetChanges.reduce((s, a) => s + a.delta, 0);
-
-        const investingActivities = {
-          items: fixedAssetChanges.map((a) => ({
-            name: a.name,
-            amount: -a.delta, // Asset increase = cash outflow
-          })),
-          total: investingTotal,
-        };
-
-        // Financing activities: loan payments + equity changes
-        const [loanResult] = await db
-          .select({
-            total: sql<number>`coalesce(sum(${journalLine.creditAmount}) - sum(${journalLine.debitAmount}), 0)`,
-          })
-          .from(journalLine)
-          .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
-          .where(
-            and(
-              eq(journalEntry.organizationId, ctx.organizationId),
-              eq(journalEntry.status, "posted"),
-              isNull(journalEntry.deletedAt),
-              eq(journalEntry.sourceType, "loan_payment"),
-              gte(journalEntry.date, startDate),
-              lte(journalEntry.date, endDate)
-            )
-          );
-
-        const equityChanges = await getBalanceDelta(["equity"]);
-        const equityDelta = equityChanges.reduce((s, a) => s + a.delta, 0);
-        const loanPayments = Number(loanResult?.total ?? 0);
-
-        const financingActivities = {
-          loanPayments,
-          equityChanges: equityDelta,
-          total: loanPayments + equityDelta,
-        };
-
-        // Cash balances
-        const cashSubTypes = ["cash", "bank"];
-
-        // Opening cash balance (all cash account entries before startDate)
-        const [openingResult] = await db
-          .select({
-            debit: sql<number>`coalesce(sum(${journalLine.debitAmount}), 0)`,
-            credit: sql<number>`coalesce(sum(${journalLine.creditAmount}), 0)`,
-          })
-          .from(journalLine)
-          .innerJoin(journalEntry, eq(journalLine.journalEntryId, journalEntry.id))
-          .innerJoin(chartAccount, eq(journalLine.accountId, chartAccount.id))
-          .where(
-            and(
-              eq(journalEntry.organizationId, ctx.organizationId),
-              eq(journalEntry.status, "posted"),
-              isNull(journalEntry.deletedAt),
-              sql`${journalEntry.date} < ${startDate}`,
-              eq(chartAccount.type, "asset"),
-              sql`${chartAccount.subType} IN (${sql.join(cashSubTypes.map(s => sql`${s}`), sql`, `)})`
-            )
-          );
-
-        const openingCash = Number(openingResult?.debit ?? 0) - Number(openingResult?.credit ?? 0);
-        const netCashChange = operatingActivities.total + investingActivities.total + financingActivities.total;
-        const closingCash = openingCash + netCashChange;
-
-        return {
-          startDate,
-          endDate,
-          openingCashBalance: openingCash,
-          operatingActivities,
-          investingActivities,
-          financingActivities,
-          netCashChange,
-          closingCashBalance: closingCash,
-        };
+        const cf = await buildCashFlow(
+          ctx.organizationId,
+          { startDate: params.startDate, endDate: params.endDate },
+          { method: params.method ?? "indirect", basis: params.basis ?? "accrual" }
+        );
+        return cf;
       })
   );
 
@@ -1271,7 +1143,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .enum(["accrual", "cash"])
         .optional()
         .describe(
-          "Reporting basis: 'accrual' (default) or 'cash' (cash/payment-realized movement only)."
+          "Reporting basis: 'accrual' (default) or 'cash' (invoices and bills count when paid, pro rata to each payment, on the payment date; bank and other cash entries on their own date)."
         ),
       startDate: z
         .string()
@@ -1507,7 +1379,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .enum(["accrual", "cash"])
         .optional()
         .describe(
-          "Reporting basis: 'accrual' (default) or 'cash' (cash/payment-realized movement only)."
+          "Reporting basis: 'accrual' (default) or 'cash' (invoices and bills count when paid, pro rata to each payment, on the payment date; bank and other cash entries on their own date)."
         ),
     },
     (params) =>
@@ -1522,7 +1394,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         openingAsAt.setDate(openingAsAt.getDate() - 1);
         const openingAsAtStr = openingAsAt.toISOString().slice(0, 10);
 
-        const [pl, balancesAsAt, openingBalances] = await Promise.all([
+        const [pl, balancesAsAt, openingBalances, allBalancesAsAt] = await Promise.all([
           aggregateByDateRange(
             ctx.organizationId,
             { startDate, endDate },
@@ -1537,6 +1409,8 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
             basis,
             accountTypes: ["asset"],
           }),
+          // Every account, so the trial balance ties out (mirrors the REST pack).
+          aggregateAsAt(ctx.organizationId, endDate, { basis }),
         ]);
 
         const org = await db.query.organization.findFirst({
@@ -1622,7 +1496,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         };
 
         // Trial Balance: re-derive debit/credit columns from natural-sign balance.
-        const tbRows = balancesAsAt
+        const tbRows = allBalancesAsAt
           .filter((a) => a.balance !== 0)
           .map((a) => {
             const debitNormal = a.type === "asset" || a.type === "expense";
@@ -1717,7 +1591,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .enum(["accrual", "cash"])
         .optional()
         .describe(
-          "Reporting basis: 'accrual' (default) or 'cash' (cash/payment-realized movement only)."
+          "Reporting basis: 'accrual' (default) or 'cash' (invoices and bills count when paid, pro rata to each payment, on the payment date; bank and other cash entries on their own date)."
         ),
     },
     (params) =>

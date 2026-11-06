@@ -13,6 +13,9 @@ const updateSchema = z.object({
   federalAllowances: z.number().int().min(0).optional(),
   stateAllowances: z.number().int().min(0).optional(),
   additionalWithholding: z.number().int().min(0).optional(),
+  additionalStateWithholding: z.number().int().min(0).optional(),
+  stateCode: z.string().trim().max(10).nullable().optional(),
+  localCode: z.string().trim().max(20).nullable().optional(),
   exempt: z.boolean().optional(),
 });
 
@@ -61,8 +64,24 @@ export async function PUT(
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
 
+    const emp = await db.query.payrollEmployee.findFirst({
+      where: and(
+        eq(payrollEmployee.id, id),
+        eq(payrollEmployee.organizationId, ctx.organizationId),
+        notDeleted(payrollEmployee.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!emp) return notFound("Employee");
+
     const body = await request.json();
-    const parsed = updateSchema.parse(body);
+    const raw = updateSchema.parse(body);
+    // Jurisdiction codes match tax bracket jurisdictions case-insensitively.
+    const parsed = {
+      ...raw,
+      ...(raw.stateCode !== undefined ? { stateCode: raw.stateCode ? raw.stateCode.toUpperCase() : null } : {}),
+      ...(raw.localCode !== undefined ? { localCode: raw.localCode ? raw.localCode.toUpperCase() : null } : {}),
+    };
 
     let config = await db.query.employeeTaxConfig.findFirst({
       where: eq(employeeTaxConfig.employeeId, id),

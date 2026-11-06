@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, Search, Target, X } from "lucide-react";
@@ -20,6 +20,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApis } from "@/lib/query/use-api";
 
 interface Budget {
   id: string;
@@ -77,69 +78,34 @@ function getCurrentPeriod(periods: PeriodBreakdown[]): PeriodBreakdown | undefin
 export default function BudgetsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<Record<string, BudgetReport>>({});
+  const { data, loading } = useApi<{ data?: Budget[] }>("/api/v1/budgets?limit=100");
+  const budgets = useMemo(() => data?.data ?? [], [data]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [loadingReports, setLoadingReports] = useState(false);
 
   useDocumentTitle("Accounting \u00B7 Budgets");
 
-  const fetchData = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    setLoading(true);
-    fetch("/api/v1/budgets?limit=100", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setBudgets(data.data);
-          setLoading(false);
-
-          // Fetch reports in the background after list is shown
-          setLoadingReports(true);
-          const active = (data.data as Budget[]).filter((b) => b.isActive).slice(0, 10);
-          Promise.all(
-            active.map((b) =>
-              fetch(`/api/v1/reports/budget-vs-actual?budgetId=${b.id}`, {
-                headers: { "x-organization-id": orgId },
-              })
-                .then((r) => r.json())
-                .then((d) => [b.id, {
-                  totalBudgeted: d.totalBudgeted as number,
-                  totalActual: d.totalActual as number,
-                  daysElapsed: d.daysElapsed as number,
-                  daysRemaining: d.daysRemaining as number,
-                  totalDays: d.totalDays as number,
-                  comparisons: (d.comparisons || []) as LineComparison[],
-                }] as const)
-                .catch(() => null)
-            )
-          ).then((results) => {
-            const map: Record<string, BudgetReport> = {};
-            for (const r of results) {
-              if (r) map[r[0]] = r[1];
-            }
-            setReports(map);
-            setLoadingReports(false);
-          });
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData();
-    window.addEventListener("budgets-changed", fetchData);
-    return () => window.removeEventListener("budgets-changed", fetchData);
-  }, [fetchData]);
+  // Reports load in the background after the list is shown
+  const activeIds = useMemo(() => budgets.filter((b) => b.isActive).slice(0, 10).map((b) => b.id), [budgets]);
+  const reportResults = useApis<Record<string, unknown>>(activeIds.map((id) => `/api/v1/reports/budget-vs-actual?budgetId=${id}`));
+  const loadingReports = reportResults.loading;
+  const reports = useMemo(() => {
+    const map: Record<string, BudgetReport> = {};
+    activeIds.forEach((id, i) => {
+      const d = reportResults.data[i];
+      if (!d) return;
+      map[id] = {
+        totalBudgeted: d.totalBudgeted as number,
+        totalActual: d.totalActual as number,
+        daysElapsed: d.daysElapsed as number,
+        daysRemaining: d.daysRemaining as number,
+        totalDays: d.totalDays as number,
+        comparisons: (d.comparisons || []) as LineComparison[],
+      };
+    });
+    return map;
+  }, [activeIds, reportResults]);
 
   if (loading) return <BrandLoader />;
 

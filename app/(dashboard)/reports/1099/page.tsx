@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FileText, AlertTriangle } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -18,6 +18,7 @@ import { ExportButton } from "@/components/dashboard/export-button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { BackToReports, ReportHelp } from "../_components";
+import { useApi } from "@/lib/query/use-api";
 
 interface Vendor1099 {
   contactId: string;
@@ -41,36 +42,11 @@ interface Report1099 {
 
 export default function Form1099Page() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(now.getFullYear() - 1);
-  const [data, setData] = useState<Report1099 | null>(null);
+  const { data: report, loading } = useApi<Report1099>(`/api/v1/reports/1099?year=${year}`, { keepPrevious: true });
+  const data = report?.vendors ? report : null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetch(`/api/v1/reports/1099?year=${year}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.vendors) setData(d);
-        else setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [year]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2, now.getFullYear() - 3];
 
@@ -86,6 +62,7 @@ export default function Form1099Page() {
           <ExportButton
             data={data.vendors}
             columns={["name", "taxIdentifier", "totalPaid", "paymentCount", "reportable"]}
+            moneyColumns={["totalPaid"]}
             filename={`1099-${year}`}
           />
         )}
@@ -112,9 +89,7 @@ export default function Form1099Page() {
         ))}
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !data || data.vendors.length === 0 ? (
+      {!data || data.vendors.length === 0 ? (
         <ContentReveal>
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
             <div className="flex size-12 items-center justify-center rounded-lg bg-muted">

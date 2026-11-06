@@ -4,11 +4,12 @@ import { entityTag, tag } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
+import { TAGGABLE_ENTITY_TYPES } from "@/lib/api/tags";
 import { z } from "zod";
 
 const schema = z.object({
   tagId: z.string().uuid(),
-  entityType: z.enum(["journal_entry", "invoice", "bill", "expense", "contact", "project"]),
+  entityType: z.enum(TAGGABLE_ENTITY_TYPES),
   entityId: z.string().uuid(),
 });
 

@@ -9,14 +9,18 @@ import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
+// Blank optional text fields arrive as "" from forms; store them as null
+const blankToNull = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? null : v;
+
 const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  email: z.string().email().nullable().optional(),
-  company: z.string().nullable().optional(),
-  taxId: z.string().nullable().optional(),
-  hourlyRate: z.number().int().nullable().optional(),
+  name: z.string().trim().min(1).optional(),
+  email: z.preprocess(blankToNull, z.string().trim().email().nullable().optional()),
+  company: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
+  taxId: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
+  hourlyRate: z.number().int().min(0).nullable().optional(), // cents
   currency: currencyCodeSchema.optional(),
-  bankAccountNumber: z.string().nullable().optional(),
+  bankAccountNumber: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
   isActive: z.boolean().optional(),
 });
 
@@ -62,7 +66,8 @@ export async function PATCH(
       .set({ ...parsed, updatedAt: new Date() })
       .where(and(
         eq(contractor.id, id),
-        eq(contractor.organizationId, ctx.organizationId)
+        eq(contractor.organizationId, ctx.organizationId),
+        notDeleted(contractor.deletedAt)
       ))
       .returning();
 

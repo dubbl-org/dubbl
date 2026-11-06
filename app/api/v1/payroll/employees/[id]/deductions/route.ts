@@ -1,9 +1,9 @@
 import { db } from "@/lib/db";
-import { employeeDeduction, payrollEmployee } from "@/lib/db/schema";
+import { employeeDeduction, payrollEmployee, deductionType } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { handleError, ok, created, notFound } from "@/lib/api/response";
+import { handleError, ok, created, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
@@ -11,8 +11,8 @@ import { z } from "zod";
 const createSchema = z.object({
   deductionTypeId: z.string().uuid(),
   timing: z.enum(["recurring", "one_time"]).optional(),
-  amount: z.number().int().optional(),
-  percent: z.number().optional(),
+  amount: z.number().int().min(0).optional(),
+  percent: z.number().min(0).max(100).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
@@ -60,6 +60,28 @@ export async function POST(
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+
+    const emp = await db.query.payrollEmployee.findFirst({
+      where: and(
+        eq(payrollEmployee.id, id),
+        eq(payrollEmployee.organizationId, ctx.organizationId),
+        notDeleted(payrollEmployee.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!emp) return notFound("Employee");
+    const type = await db.query.deductionType.findFirst({
+      where: and(
+        eq(deductionType.id, parsed.deductionTypeId),
+        eq(deductionType.organizationId, ctx.organizationId),
+        notDeleted(deductionType.deletedAt)
+      ),
+      columns: { id: true },
+    });
+    if (!type) return notFound("Deduction type");
+    if (parsed.amount != null && parsed.percent != null) {
+      return validationError("Use either a fixed amount or a percentage, not both");
+    }
 
     const [ded] = await db
       .insert(employeeDeduction)

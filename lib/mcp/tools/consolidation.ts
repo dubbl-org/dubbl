@@ -13,6 +13,9 @@ import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { computeConsolidatedReport } from "@/lib/api/consolidation-report";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkConsolidation } from "@/lib/api/check-limit";
+import { organization } from "@/lib/db/schema";
+import { currencyCodeSchema } from "@/lib/currency/zod";
 
 // Load a consolidation group owned by the current org (parentOrgId == ctx.org),
 // with its members + their organizations. Throws if not found / not owned.
@@ -173,6 +176,7 @@ export function registerConsolidationTools(server: McpServer, ctx: AuthContext) 
         if (existing) {
           throw new Error("Organization is already a member of this group");
         }
+        await checkConsolidation(ctx.organizationId, group.id);
 
         const [added] = await db
           .insert(consolidationGroupMember)
@@ -326,6 +330,74 @@ export function registerConsolidationTools(server: McpServer, ctx: AuthContext) 
           .where(eq(consolidationEliminationRule.id, rule.id));
 
         return { success: true, deletedRuleId: rule.id };
+      })
+  );
+
+  server.tool(
+    "create_consolidation_group",
+    "Create a consolidation group owned by this organization (a set of businesses reported on together). Add members afterwards with add_consolidation_member; this organization can be a member of its own group. Returns { group }.",
+    {
+      name: z.string().min(1).describe("Group name, e.g. 'Acme Group'."),
+      presentationCurrency: currencyCodeSchema
+        .optional()
+        .describe("ISO 4217 currency the combined reports are shown in, e.g. 'USD'. Defaults to this organization's base currency."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        await checkConsolidation(ctx.organizationId);
+        const org = await db.query.organization.findFirst({
+          where: eq(organization.id, ctx.organizationId),
+          columns: { defaultCurrency: true },
+        });
+        const [group] = await db
+          .insert(consolidationGroup)
+          .values({
+            parentOrgId: ctx.organizationId,
+            name: params.name,
+            presentationCurrency: params.presentationCurrency ?? org?.defaultCurrency ?? "USD",
+          })
+          .returning();
+        return { group };
+      })
+  );
+
+  server.tool(
+    "update_consolidation_group",
+    "Rename a consolidation group or change its presentation currency (the currency every member is translated into for the combined reports). Only provided fields change. Returns { group }.",
+    {
+      groupId: z.string().describe("UUID of the consolidation group."),
+      name: z.string().min(1).optional().describe("New group name."),
+      presentationCurrency: currencyCodeSchema
+        .optional()
+        .describe("New ISO 4217 presentation currency, e.g. 'EUR'."),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const group = await loadOwnedGroup(ctx, params.groupId);
+        const updates: Partial<typeof consolidationGroup.$inferInsert> = { updatedAt: new Date() };
+        if (params.name !== undefined) updates.name = params.name;
+        if (params.presentationCurrency !== undefined) updates.presentationCurrency = params.presentationCurrency;
+        const [updated] = await db
+          .update(consolidationGroup)
+          .set(updates)
+          .where(eq(consolidationGroup.id, group.id))
+          .returning();
+        return { group: updated };
+      })
+  );
+
+  server.tool(
+    "delete_consolidation_group",
+    "Delete a consolidation group owned by this organization (soft delete). The member businesses and their books are not changed. Returns { success: true }.",
+    { groupId: z.string().describe("UUID of the consolidation group to delete.") },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const group = await loadOwnedGroup(ctx, params.groupId);
+        await db
+          .update(consolidationGroup)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(eq(consolidationGroup.id, group.id));
+        return { success: true };
       })
   );
 }

@@ -40,21 +40,29 @@ import {
   inventoryItem,
   inventoryMovement,
   billPurchaseOrder,
+  billPurchaseOrderLine,
+  bill as billTable,
+  billLine as billLineTable,
 } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, ne } from "drizzle-orm";
 import {
   getNextEntryNumber,
   ensureControlAccount,
   findAccountByCode,
   resolveBaseRate,
   toBaseLines,
+  reverseJournalEntry,
 } from "@/lib/api/journal-automation";
 // Reuse the shared three-way-match engine + settings reader from the
 // procurement helper (owned by the PO/GRN agent) so tolerance semantics stay
 // consistent across the codebase.
 import {
+  entriesStillToReverse,
   getProcurementSettings,
   threeWayMatch,
+  derivePurchaseOrderStatus,
+  allocateBillToPurchaseOrderLines,
+  releaseBilledQuantities,
   type MatchLineInput,
 } from "@/lib/api/procurement";
 
@@ -346,6 +354,8 @@ export interface InventoryRevaluation {
 export async function postGrniClearingEntry(
   ctx: ProcurementContext,
   data: {
+    /** The bill's id, stored as the entry's sourceId so a void can find it. */
+    billId?: string;
     billNumber: string;
     date: string;
     currencyCode?: string;
@@ -377,6 +387,7 @@ export async function postGrniClearingEntry(
       reference: data.billNumber,
       status: "posted",
       sourceType: "bill_grni",
+      sourceId: data.billId ?? null,
       postedAt: new Date(),
       createdBy: ctx.userId,
     })
@@ -496,8 +507,16 @@ export async function applyProcurementSideEffects(
   matched: MatchedLine[],
   grniEntryId: string | null,
   revaluations: InventoryRevaluation[],
-  tx: Tx
+  tx: Tx,
+  options: {
+    /** The bill being posted; what it adds to PO lines is recorded against it. */
+    billId?: string;
+    /** POs this bill was linked to at creation; their billed quantity is already counted. */
+    countedPurchaseOrderIds?: Set<string>;
+  } = {}
 ): Promise<void> {
+  const countedPurchaseOrderIds = options.countedPurchaseOrderIds ?? new Set<string>();
+  const touchedPurchaseOrderIds = new Set<string>();
   // Apply inventory revaluations decided (and posted to the GL) by
   // postGrniClearingEntry — book value moves by exactly the GL Inventory debit.
   for (const rv of revaluations) {
@@ -546,11 +565,19 @@ export async function applyProcurementSideEffects(
             eq(purchaseOrder.organizationId, ctx.organizationId)
           )
         );
-      if (po) {
+      if (po && !countedPurchaseOrderIds.has(po.line.purchaseOrderId)) {
         await tx
           .update(purchaseOrderLine)
           .set({ quantityBilled: po.line.quantityBilled + m.quantityBilledX100 })
           .where(eq(purchaseOrderLine.id, m.purchaseOrderLineId));
+        if (options.billId && m.quantityBilledX100 > 0) {
+          await tx.insert(billPurchaseOrderLine).values({
+            billId: options.billId,
+            purchaseOrderLineId: m.purchaseOrderLineId,
+            quantity: m.quantityBilledX100,
+          });
+        }
+        touchedPurchaseOrderIds.add(po.line.purchaseOrderId);
       }
     }
 
@@ -576,6 +603,37 @@ export async function applyProcurementSideEffects(
       }
     }
   }
+
+  for (const poId of touchedPurchaseOrderIds) {
+    await refreshPurchaseOrderStatus(ctx.organizationId, poId, tx);
+  }
+}
+
+/**
+ * Recompute a purchase order's status from its lines' received and billed
+ * quantities (sent, partial, received, closed). Void POs are left alone, and a
+ * draft PO with nothing received or billed stays a draft.
+ */
+export async function refreshPurchaseOrderStatus(
+  organizationId: string,
+  purchaseOrderId: string,
+  tx: DbOrTx = db
+): Promise<void> {
+  const po = await tx.query.purchaseOrder.findFirst({
+    where: and(
+      eq(purchaseOrder.id, purchaseOrderId),
+      eq(purchaseOrder.organizationId, organizationId)
+    ),
+    with: { lines: true },
+  });
+  if (!po || po.status === "void") return;
+  const next = derivePurchaseOrderStatus(po.lines);
+  if (next === "sent" && po.status === "draft") return;
+  if (next === po.status) return;
+  await tx
+    .update(purchaseOrder)
+    .set({ status: next, updatedAt: new Date() })
+    .where(eq(purchaseOrder.id, purchaseOrderId));
 }
 
 /**
@@ -597,6 +655,8 @@ export async function applyProcurementSideEffects(
 export async function postBillReceipt(
   ctx: ProcurementContext,
   bill: {
+    /** The bill's id; used to skip PO billed quantities already counted when it was linked. */
+    id?: string;
     billNumber: string;
     issueDate: string;
     currencyCode?: string;
@@ -706,6 +766,7 @@ export async function postBillReceipt(
       const posted = await postGrniClearingEntry(
         ctx,
         {
+          billId: bill.id,
           billNumber: bill.billNumber,
           date: bill.issueDate,
           currencyCode: bill.currencyCode,
@@ -714,12 +775,22 @@ export async function postBillReceipt(
         tx
       );
       grniEntryId = posted.entryId;
+      const linkedPos = bill.id
+        ? await tx
+            .select({ purchaseOrderId: billPurchaseOrder.purchaseOrderId })
+            .from(billPurchaseOrder)
+            .where(eq(billPurchaseOrder.billId, bill.id))
+        : [];
       await applyProcurementSideEffects(
         ctx,
         resolution.matched,
         grniEntryId,
         posted.revaluations,
-        tx
+        tx,
+        {
+          billId: bill.id,
+          countedPurchaseOrderIds: new Set(linkedPos.map((r) => r.purchaseOrderId)),
+        }
       );
     }
   });
@@ -727,7 +798,13 @@ export async function postBillReceipt(
   return { entryId: entry?.id ?? null, grniEntryId, warnings };
 }
 
-/** Link a bill to one or more purchase orders via the join table (idempotent). */
+/**
+ * Link a bill to one or more purchase orders via the join table (idempotent).
+ * For each newly linked PO, the bill's lines are matched to the PO's lines
+ * (goods receipt line, then stock item, then description) and the PO lines'
+ * billed quantity goes up, so the PO moves to "partial" or "closed". Purchase
+ * orders from another organization, or void ones, are ignored.
+ */
 export async function linkBillToPurchaseOrders(
   billId: string,
   purchaseOrderIds: string[],
@@ -735,8 +812,329 @@ export async function linkBillToPurchaseOrders(
 ): Promise<void> {
   const unique = Array.from(new Set(purchaseOrderIds.filter(Boolean)));
   if (unique.length === 0) return;
-  await tx
+  const target = await tx.query.bill.findFirst({
+    where: eq(billTable.id, billId),
+    columns: { id: true, organizationId: true },
+  });
+  if (!target) return;
+  const pos = await tx.query.purchaseOrder.findMany({
+    where: and(
+      inArray(purchaseOrder.id, unique),
+      eq(purchaseOrder.organizationId, target.organizationId)
+    ),
+    with: { lines: true },
+  });
+  const valid = pos.filter((po) => po.status !== "void");
+  if (valid.length === 0) return;
+  const inserted = await tx
     .insert(billPurchaseOrder)
-    .values(unique.map((purchaseOrderId) => ({ billId, purchaseOrderId })))
-    .onConflictDoNothing();
+    .values(valid.map((po) => ({ billId, purchaseOrderId: po.id })))
+    .onConflictDoNothing()
+    .returning({ purchaseOrderId: billPurchaseOrder.purchaseOrderId });
+  if (inserted.length === 0) return;
+
+  const lines = await tx
+    .select({
+      quantity: billLineTable.quantity,
+      description: billLineTable.description,
+      inventoryItemId: billLineTable.inventoryItemId,
+      purchaseOrderLineId: goodsReceiptLine.purchaseOrderLineId,
+    })
+    .from(billLineTable)
+    .leftJoin(goodsReceiptLine, eq(billLineTable.goodsReceiptLineId, goodsReceiptLine.id))
+    .where(eq(billLineTable.billId, billId));
+
+  // A bill line is billed against at most one PO line, so share the pool.
+  let remaining = lines;
+  for (const { purchaseOrderId } of inserted) {
+    const po = valid.find((p) => p.id === purchaseOrderId);
+    if (!po || remaining.length === 0) continue;
+    const allocation = allocateBillToPurchaseOrderLines(remaining, po.lines);
+    for (const poLine of po.lines) {
+      const add = allocation.get(poLine.id) ?? 0;
+      if (add <= 0) continue;
+      await tx
+        .update(purchaseOrderLine)
+        .set({ quantityBilled: poLine.quantityBilled + add })
+        .where(eq(purchaseOrderLine.id, poLine.id));
+      await tx
+        .insert(billPurchaseOrderLine)
+        .values({ billId, purchaseOrderLineId: poLine.id, quantity: add });
+    }
+    const poLineIds = new Set(po.lines.map((l) => l.id));
+    remaining = remaining.filter(
+      (l) => !(l.purchaseOrderLineId && poLineIds.has(l.purchaseOrderLineId))
+    );
+    await refreshPurchaseOrderStatus(target.organizationId, po.id, tx);
+  }
+}
+
+/**
+ * Give back to each purchase order line exactly the billed quantity this bill
+ * counted against it (recorded in bill_purchase_order_line), then recompute
+ * the affected POs' status. Used when a bill is voided or deleted, and before
+ * re-counting a draft bill whose lines changed. Safe to call twice.
+ */
+export async function releaseBillPurchaseOrderQuantities(
+  organizationId: string,
+  billId: string,
+  tx: DbOrTx = db
+): Promise<void> {
+  const counted = await tx
+    .select({
+      purchaseOrderLineId: billPurchaseOrderLine.purchaseOrderLineId,
+      quantity: billPurchaseOrderLine.quantity,
+    })
+    .from(billPurchaseOrderLine)
+    .where(eq(billPurchaseOrderLine.billId, billId));
+  if (counted.length === 0) return;
+
+  const poLines = await tx
+    .select({
+      id: purchaseOrderLine.id,
+      purchaseOrderId: purchaseOrderLine.purchaseOrderId,
+      quantityBilled: purchaseOrderLine.quantityBilled,
+    })
+    .from(purchaseOrderLine)
+    .innerJoin(purchaseOrder, eq(purchaseOrderLine.purchaseOrderId, purchaseOrder.id))
+    .where(
+      and(
+        inArray(purchaseOrderLine.id, Array.from(new Set(counted.map((c) => c.purchaseOrderLineId)))),
+        eq(purchaseOrder.organizationId, organizationId)
+      )
+    );
+
+  const next = releaseBilledQuantities(poLines, counted);
+  for (const [lineId, quantityBilled] of next) {
+    await tx
+      .update(purchaseOrderLine)
+      .set({ quantityBilled })
+      .where(eq(purchaseOrderLine.id, lineId));
+  }
+  await tx.delete(billPurchaseOrderLine).where(eq(billPurchaseOrderLine.billId, billId));
+
+  for (const poId of new Set(poLines.map((l) => l.purchaseOrderId))) {
+    await refreshPurchaseOrderStatus(organizationId, poId, tx);
+  }
+}
+
+/**
+ * Re-count a draft bill against its linked purchase orders after its lines
+ * changed: release what it counted before, then match the new lines again.
+ */
+export async function recountBillPurchaseOrders(
+  organizationId: string,
+  billId: string,
+  tx: DbOrTx = db
+): Promise<void> {
+  await releaseBillPurchaseOrderQuantities(organizationId, billId, tx);
+  const links = await tx
+    .select({ purchaseOrderId: billPurchaseOrder.purchaseOrderId })
+    .from(billPurchaseOrder)
+    .where(eq(billPurchaseOrder.billId, billId));
+  if (links.length === 0) return;
+  await tx.delete(billPurchaseOrder).where(eq(billPurchaseOrder.billId, billId));
+  await linkBillToPurchaseOrders(
+    billId,
+    links.map((l) => l.purchaseOrderId),
+    tx
+  );
+}
+
+/**
+ * The GRNI clearing / price variance entries a bill posted when its lines were
+ * matched to goods receipts, and not yet reversed. New entries carry the bill's
+ * id as sourceId. Older ones (sourceId empty) are found through the goods
+ * receipt lines the bill points at, which were stamped with the clearing entry,
+ * and must carry the bill's number as reference.
+ */
+export async function findBillGrniEntries(
+  organizationId: string,
+  target: { id: string; billNumber: string },
+  lines: { goodsReceiptLineId: string | null }[],
+  exec: DbOrTx = db
+): Promise<{ id: string; date: string }[]> {
+  const byBill = await exec
+    .select({ id: journalEntry.id, date: journalEntry.date })
+    .from(journalEntry)
+    .where(
+      and(
+        eq(journalEntry.organizationId, organizationId),
+        eq(journalEntry.sourceType, "bill_grni"),
+        eq(journalEntry.sourceId, target.id)
+      )
+    );
+
+  const grnLineIds = lines.map((l) => l.goodsReceiptLineId).filter((v): v is string => !!v);
+  const legacy = grnLineIds.length
+    ? await exec
+        .selectDistinct({ id: journalEntry.id, date: journalEntry.date })
+        .from(goodsReceiptLine)
+        .innerJoin(journalEntry, eq(goodsReceiptLine.journalEntryId, journalEntry.id))
+        .where(
+          and(
+            inArray(goodsReceiptLine.id, grnLineIds),
+            eq(journalEntry.organizationId, organizationId),
+            eq(journalEntry.sourceType, "bill_grni"),
+            isNull(journalEntry.sourceId),
+            eq(journalEntry.reference, target.billNumber)
+          )
+        )
+    : [];
+
+  const candidates = [...byBill, ...legacy];
+  if (candidates.length === 0) return [];
+  const reversed = await exec
+    .select({ id: journalEntry.reversesEntryId })
+    .from(journalEntry)
+    .where(
+      and(
+        eq(journalEntry.organizationId, organizationId),
+        inArray(journalEntry.reversesEntryId, candidates.map((e) => e.id))
+      )
+    );
+  return entriesStillToReverse(candidates, reversed.map((r) => r.id));
+}
+
+/**
+ * Undo what matching a bill to goods receipts posted, when the bill is voided:
+ * reverse each GRNI clearing / price variance entry (so GRNI and AP go back to
+ * where they were after the receipt), take any inventory revaluation back out
+ * of the stock item's value, and put the goods receipts back to "received"
+ * when no other live bill still bills them. Runs inside the caller's
+ * transaction; the caller checks the period lock on the entries' dates first.
+ */
+export async function reverseBillGrniPostings(
+  ctx: ProcurementContext,
+  target: { id: string; billNumber: string; issueDate: string },
+  lines: { goodsReceiptLineId: string | null }[],
+  tx: Tx
+): Promise<void> {
+  const entries = await findBillGrniEntries(ctx.organizationId, target, lines, tx);
+
+  for (const entry of entries) {
+    const reversal = await reverseJournalEntry(
+      { organizationId: ctx.organizationId, userId: ctx.userId },
+      {
+        entryId: entry.id,
+        date: entry.date,
+        description: `Void bill ${target.billNumber} (GRNI clearing)`,
+        reference: target.billNumber,
+        sourceType: "bill_void",
+        sourceId: target.id,
+      },
+      tx
+    );
+
+    // Take the price variance back out of on-hand stock value, mirroring the
+    // inventory debit/credit the reversal just undid in the GL.
+    const revals = await tx
+      .select()
+      .from(inventoryMovement)
+      .where(
+        and(
+          eq(inventoryMovement.organizationId, ctx.organizationId),
+          eq(inventoryMovement.journalEntryId, entry.id),
+          eq(inventoryMovement.referenceType, "purchase_price_variance")
+        )
+      );
+    for (const mv of revals) {
+      if (!mv.value) continue;
+      const item = await tx.query.inventoryItem.findFirst({
+        where: and(
+          eq(inventoryItem.id, mv.inventoryItemId),
+          eq(inventoryItem.organizationId, ctx.organizationId)
+        ),
+      });
+      if (!item) continue;
+      const newValue = item.totalValue - mv.value;
+      await tx
+        .update(inventoryItem)
+        .set({
+          totalValue: newValue,
+          averageCost:
+            item.quantityOnHand > 0 ? Math.round(newValue / item.quantityOnHand) : item.averageCost,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryItem.id, item.id));
+      await tx.insert(inventoryMovement).values({
+        organizationId: ctx.organizationId,
+        inventoryItemId: item.id,
+        warehouseId: mv.warehouseId,
+        type: "adjustment",
+        quantity: 0,
+        previousQuantity: item.quantityOnHand,
+        newQuantity: item.quantityOnHand,
+        unitCost: 0,
+        value: -mv.value,
+        referenceType: "bill_void",
+        referenceId: target.id,
+        journalEntryId: reversal?.id ?? null,
+        createdBy: ctx.userId,
+      });
+    }
+  }
+
+  // Goods receipt lines: point stock lines back at their receipt entry, and
+  // reopen receipts no other live bill is billing.
+  const grnLineIds = lines.map((l) => l.goodsReceiptLineId).filter((v): v is string => !!v);
+  if (grnLineIds.length === 0) return;
+  const grnLines = await tx
+    .select({ line: goodsReceiptLine, receipt: goodsReceipt })
+    .from(goodsReceiptLine)
+    .innerJoin(goodsReceipt, eq(goodsReceiptLine.goodsReceiptId, goodsReceipt.id))
+    .where(
+      and(
+        inArray(goodsReceiptLine.id, grnLineIds),
+        eq(goodsReceipt.organizationId, ctx.organizationId)
+      )
+    );
+  const reversedIds = new Set(entries.map((e) => e.id));
+  const receipts = new Map(grnLines.map((g) => [g.receipt.id, g.receipt]));
+  for (const receipt of receipts.values()) {
+    const receiptEntry = await tx.query.journalEntry.findFirst({
+      where: and(
+        eq(journalEntry.organizationId, ctx.organizationId),
+        eq(journalEntry.sourceType, "goods_receipt"),
+        eq(journalEntry.reference, receipt.receiptNumber)
+      ),
+      columns: { id: true },
+    });
+    for (const g of grnLines) {
+      if (g.receipt.id !== receipt.id) continue;
+      if (!g.line.journalEntryId || !reversedIds.has(g.line.journalEntryId)) continue;
+      await tx
+        .update(goodsReceiptLine)
+        .set({ journalEntryId: g.line.inventoryItemId ? receiptEntry?.id ?? null : null })
+        .where(eq(goodsReceiptLine.id, g.line.id));
+    }
+
+    const allLineIds = (
+      await tx
+        .select({ id: goodsReceiptLine.id })
+        .from(goodsReceiptLine)
+        .where(eq(goodsReceiptLine.goodsReceiptId, receipt.id))
+    ).map((r) => r.id);
+    const stillBilled = await tx
+      .select({ id: billLineTable.id })
+      .from(billLineTable)
+      .innerJoin(billTable, eq(billLineTable.billId, billTable.id))
+      .where(
+        and(
+          inArray(billLineTable.goodsReceiptLineId, allLineIds),
+          ne(billTable.id, target.id),
+          ne(billTable.status, "void"),
+          ne(billTable.status, "draft"),
+          ne(billTable.status, "pending_approval"),
+          isNull(billTable.deletedAt)
+        )
+      )
+      .limit(1);
+    if (stillBilled.length === 0 && receipt.status === "billed") {
+      await tx
+        .update(goodsReceipt)
+        .set({ status: "received", updatedAt: new Date() })
+        .where(eq(goodsReceipt.id, receipt.id));
+    }
+  }
 }

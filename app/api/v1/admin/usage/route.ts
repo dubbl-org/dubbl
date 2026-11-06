@@ -6,8 +6,6 @@ import {
   journalEntry,
   contact,
   invoice,
-  bankAccount,
-  project,
   document,
   attachment,
   member,
@@ -90,7 +88,6 @@ export async function GET(request: Request) {
 
     const orgDetails: Record<string, {
       plan: string;
-      storagePlan: string;
       status: string;
       managedBy: string;
     }> = {};
@@ -102,7 +99,6 @@ export async function GET(request: Request) {
       for (const s of subs) {
         orgDetails[s.organizationId] = {
           plan: s.plan,
-          storagePlan: s.storagePlan,
           status: s.status,
           managedBy: s.managedBy,
         };

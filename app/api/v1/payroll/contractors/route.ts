@@ -10,14 +10,18 @@ import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
+// Blank optional text fields arrive as "" or null from forms; store them as null
+const blankToNull = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? null : v;
+
 const createSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional(),
-  company: z.string().optional(),
-  taxId: z.string().optional(),
-  hourlyRate: z.number().int().optional(),
+  name: z.string().trim().min(1),
+  email: z.preprocess(blankToNull, z.string().trim().email().nullable().optional()),
+  company: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
+  taxId: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
+  hourlyRate: z.number().int().min(0).nullable().optional(), // cents
   currency: currencyCodeSchema.optional(),
-  bankAccountNumber: z.string().optional(),
+  bankAccountNumber: z.preprocess(blankToNull, z.string().trim().nullable().optional()),
 });
 
 export async function GET(request: Request) {

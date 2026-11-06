@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inventoryItem, inventoryMovement, journalEntry, journalLine } from "@/lib/db/schema";
+import { inventoryItem, inventoryMovement } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
-import {
-  createInventoryAdjustmentJournalEntry,
-  ensureControlAccount,
-  getNextEntryNumber,
-  resolveBaseRate,
-} from "@/lib/api/journal-automation";
+import { createInventoryAdjustmentJournalEntry } from "@/lib/api/journal-automation";
+import { assertInventoryPeriodOpen, postInventoryValueChange, todayIso } from "@/lib/api/inventory-ops";
 import type { ValuedItem } from "@/lib/api/inventory-valuation";
 import { z } from "zod";
 
@@ -34,6 +30,8 @@ import { z } from "zod";
  *                   `newTotalValue`. Posts the delta between Inventory 1300 and
  *                   Inventory Write-Down 5020 (decrease: DR 5020 / CR 1300;
  *                   increase: DR 1300 / CR 5020). Writes a qty-0 movement.
+ *                   The MCP adjust_inventory_stock tool posts the same way
+ *                   (both use postInventoryValueChange).
  */
 const adjustSchema = z.discriminatedUnion("adjustmentType", [
   z.object({
@@ -87,7 +85,8 @@ export async function POST(
 
     if (!existing) return notFound("Inventory item");
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
+    await assertInventoryPeriodOpen(ctx.organizationId, today, ctx);
 
     if (parsed.adjustmentType === "quantity") {
       const newQuantity = existing.quantityOnHand + parsed.adjustment;
@@ -142,7 +141,6 @@ export async function POST(
     }
 
     // --- Value-only adjustments (write_down / revaluation): qty UNCHANGED. ---
-    const qty = existing.quantityOnHand;
     const prevValue = existing.totalValue;
 
     // valueDelta is the SIGNED change to the book value (negative = decrease).
@@ -170,98 +168,15 @@ export async function POST(
       });
     }
 
-    const newValue = prevValue + valueDelta;
-    // Keep averageCost consistent with the carrying value at the same quantity.
-    const newAvgCost = qty > 0 ? Math.round(newValue / qty) : 0;
-
-    const result = await db.transaction(async (tx) => {
-      const { base } = await resolveBaseRate(ctx.organizationId, undefined, today);
-      const invAcct =
-        (existing.inventoryAccountId ? { id: existing.inventoryAccountId } : null) ??
-        (await ensureControlAccount(ctx.organizationId, "inventory", base, tx));
-      const writeDownAcct = await ensureControlAccount(
-        ctx.organizationId,
-        "inventoryWriteDown",
-        base,
-        tx
-      );
-      if (!invAcct || !writeDownAcct) {
-        throw new Error("Could not resolve inventory accounts for adjustment");
-      }
-
-      // Apply the valuation change to the item (quantity unchanged).
-      await tx
-        .update(inventoryItem)
-        .set({ totalValue: newValue, averageCost: newAvgCost, updatedAt: new Date() })
-        .where(eq(inventoryItem.id, id));
-
-      const amount = Math.abs(valueDelta);
-      const decrease = valueDelta < 0;
-      const label =
-        parsed.adjustmentType === "write_down"
-          ? "Inventory write-down"
-          : "Inventory revaluation";
-      const description = `${label}${parsed.reason ? ` — ${parsed.reason}` : ""}`;
-
-      // Movement: qty 0, value = signed value delta, unitCost 0.
-      const [movement] = await tx
-        .insert(inventoryMovement)
-        .values({
-          organizationId: ctx.organizationId,
-          inventoryItemId: id,
-          type: "adjustment",
-          quantity: 0,
-          previousQuantity: qty,
-          newQuantity: qty,
-          unitCost: 0,
-          value: valueDelta,
-          reason: description,
-          referenceType: parsed.adjustmentType,
-          referenceId: null,
-          createdBy: ctx.userId,
-        })
-        .returning();
-
-      const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
-      const [entry] = await tx
-        .insert(journalEntry)
-        .values({
-          organizationId: ctx.organizationId,
-          entryNumber,
-          date: today,
-          description,
-          reference: parsed.adjustmentType === "write_down" ? "INV-WD" : "INV-REVAL",
-          status: "posted",
-          sourceType:
-            parsed.adjustmentType === "write_down"
-              ? "inventory_write_down"
-              : "inventory_revaluation",
-          postedAt: new Date(),
-          createdBy: ctx.userId,
-        })
-        .returning();
-
-      // Decrease in value: DR Write-Down 5020 / CR Inventory 1300.
-      // Increase in value (revaluation up): DR Inventory 1300 / CR Write-Down 5020.
-      await tx.insert(journalLine).values(
-        decrease
-          ? [
-              { journalEntryId: entry.id, accountId: writeDownAcct.id, description: label, debitAmount: amount, creditAmount: 0, currencyCode: base },
-              { journalEntryId: entry.id, accountId: invAcct.id, description: label, debitAmount: 0, creditAmount: amount, currencyCode: base },
-            ]
-          : [
-              { journalEntryId: entry.id, accountId: invAcct.id, description: label, debitAmount: amount, creditAmount: 0, currencyCode: base },
-              { journalEntryId: entry.id, accountId: writeDownAcct.id, description: label, debitAmount: 0, creditAmount: amount, currencyCode: base },
-            ]
-      );
-
-      await tx
-        .update(inventoryMovement)
-        .set({ journalEntryId: entry.id })
-        .where(eq(inventoryMovement.id, movement.id));
-
-      return { movementId: movement.id, entryId: entry.id };
+    // Same posting as the MCP tool: down DR 5020 / CR Inventory, up the reverse.
+    const result = await postInventoryValueChange(ctx, {
+      itemId: id,
+      valueDelta,
+      kind: parsed.adjustmentType,
+      reason: parsed.reason,
+      date: today,
     });
+    const newValue = result.newValue;
 
     const updated = await db.query.inventoryItem.findFirst({ where: eq(inventoryItem.id, id) });
     const movement = await db.query.inventoryMovement.findFirst({

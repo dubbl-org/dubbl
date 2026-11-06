@@ -5,65 +5,33 @@ import {
   payrollEmployee,
   payrollRun,
   payrollItem,
-  payrollItemTaxBreakdown,
-  payrollItemEmployerTax,
   payrollSettings,
-  employeeDeduction,
   employeeLeaveBalance,
   payslip,
-  timesheet,
-  taxFormGeneration,
-  taxForm,
   payrollTaxPayment,
-  contractor,
-  contractorPayment,
   chartAccount,
   journalEntry,
   journalLine,
   member,
   auditLog,
 } from "@/lib/db/schema";
-import { eq, and, desc, sql, gte, lte, lt, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
-import { postPayrollRun } from "@/lib/api/payroll-posting";
-import {
-  computeEmployeeWithholding,
-  getEmployeeYtdWage,
-  type TaxBreakdownLine,
-  type EmployerTaxLine,
-} from "@/lib/api/payroll-withholding";
+import { generateTaxForms } from "@/lib/api/tax-form-builder";
+import { buildRegularRunItems, insertPayItems, sumRunTotals } from "@/lib/api/payroll-run-builder";
+import { processPayrollRun } from "@/lib/api/payroll-run-actions";
+import { generateRunPayslips } from "@/lib/api/payslips";
+import { syncLeaveBalances } from "@/lib/api/leave-balances";
+import { incomeTaxAccountCode } from "@/lib/api/payroll-tax-liabilities";
 import {
   getNextEntryNumber,
   findAccountByCode,
   ensureAccountByCode,
 } from "@/lib/api/journal-automation";
-import { getExchangeRate, convertAmount } from "@/lib/currency/converter";
 import type { AuthContext } from "@/lib/api/auth-context";
-
-type PayrollItemColumnType =
-  | "regular_salary"
-  | "hourly_pay"
-  | "overtime"
-  | "milestone_bonus"
-  | "project_bonus"
-  | "commission"
-  | "deduction"
-  | "reimbursement";
-
-/** Per-pay-period gross for an annual salary at the given frequency. */
-function calculateGrossPay(annualSalary: number, payFrequency: string): number {
-  switch (payFrequency) {
-    case "weekly":
-      return Math.round(annualSalary / 52);
-    case "biweekly":
-      return Math.round(annualSalary / 26);
-    case "monthly":
-    default:
-      return Math.round(annualSalary / 12);
-  }
-}
+import { checkEmployeeLimit } from "@/lib/api/check-limit";
 
 export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
   // ─── Employees ────────────────────────────────────────────────────
@@ -178,6 +146,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:payroll");
+        await checkEmployeeLimit(ctx.organizationId);
 
         const [created] = await db
           .insert(payrollEmployee)
@@ -271,7 +240,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_payroll_run",
-    "Create a draft regular payroll run for a pay period. Auto-generates a pay item for every active salaried/hourly employee: gross pay is derived from salary/frequency (or approved timesheet hours for hourly), then the withholding engine computes income tax + employee FICA (and employer-side FICA/FUTA/SUTA) using each employee's tax config and the org's bracket schedule (falling back to the employee's flat taxRate when no brackets exist). Persists the run, items, and per-jurisdiction tax breakdowns. All amounts are integer cents. The run is created in 'draft' status and NOT yet posted to the ledger — call process_payroll_run to post and complete it. Returns the created run.",
+    "Create a draft regular payroll run for a pay period. Auto-generates a pay item for every active salaried/hourly employee employed in the period: salaried gross = salary / pay periods (less approved unpaid leave); hourly gross = hours on approved timesheets dated in the period, with overtime above the weekly threshold (payroll settings) and shift premiums, or standard hours (40 a week) when there is no approved timesheet. Each employee's assigned deductions are withheld (pre-tax ones lower taxable pay), then income tax (federal, plus state/local when brackets exist for the employee's state/local code; flat taxRate fallback when no federal brackets) and employee FICA, plus employer FICA/FUTA/SUTA. Persists the run, items and per-item tax, employer-tax and deduction lines. All amounts are integer cents; totalDeductions includes tax. The run is 'draft' and NOT yet posted: call process_payroll_run to post and complete it. Returns the created run.",
     {
       payPeriodStart: z.string().min(1).describe("Pay period start date (YYYY-MM-DD)"),
       payPeriodEnd: z.string().min(1).describe("Pay period end date (YYYY-MM-DD)"),
@@ -285,209 +254,19 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:payroll");
 
-        const employees = await db.query.payrollEmployee.findMany({
-          where: and(
-            eq(payrollEmployee.organizationId, ctx.organizationId),
-            eq(payrollEmployee.isActive, true),
-            notDeleted(payrollEmployee.deletedAt)
-          ),
-        });
-        if (employees.length === 0) throw new Error("No active employees found");
-
-        const settings = await db.query.payrollSettings.findFirst({
-          where: eq(payrollSettings.organizationId, ctx.organizationId),
-        });
-
-        const overtimeThreshold = settings?.overtimeThresholdHours ?? 40;
-        const overtimeMultiplier = settings?.overtimeMultiplier ?? 1.5;
-        const defaultCurrency = settings?.defaultCurrency ?? "USD";
-
-        // Pre-fetch FX rates for any non-default employee currencies.
-        const fxRateCache = new Map<string, number>();
-        for (const emp of employees) {
-          const empCurrency = emp.currency ?? defaultCurrency;
-          if (empCurrency !== defaultCurrency && !fxRateCache.has(empCurrency)) {
-            const rate = await getExchangeRate(
-              ctx.organizationId,
-              empCurrency,
-              defaultCurrency,
-              params.payPeriodEnd
-            );
-            if (rate != null) fxRateCache.set(empCurrency, rate);
-          }
+        if (params.payPeriodEnd < params.payPeriodStart) {
+          throw new Error("The pay period end must be on or after its start");
         }
-
-        let totalGross = 0;
-        let totalDeductions = 0;
-        let totalNet = 0;
-
-        const items: Array<{
-          employeeId: string;
-          type: PayrollItemColumnType;
-          description: string | null;
-          grossAmount: number;
-          taxAmount: number;
-          deductions: number;
-          netAmount: number;
-          overtimeHours: number | null;
-          overtimeAmount: number | null;
-          preTaxDeductions: number;
-          postTaxDeductions: number;
-          timesheetId: string | null;
-          currency: string;
-          fxRate: number;
-          taxBreakdown: TaxBreakdownLine[];
-          employerTaxBreakdown: EmployerTaxLine[];
-        }> = [];
-
-        for (const emp of employees) {
-          let grossAmount = 0;
-          let itemType: PayrollItemColumnType = "regular_salary";
-          let description: string | null = null;
-          let otHours: number | null = null;
-          let otAmount: number | null = null;
-          let linkedTimesheetId: string | null = null;
-
-          switch (emp.compensationType) {
-            case "hourly": {
-              if (!emp.hourlyRate) continue;
-              const approvedTimesheets = await db.query.timesheet.findMany({
-                where: and(
-                  eq(timesheet.employeeId, emp.id),
-                  eq(timesheet.status, "approved"),
-                  lte(timesheet.periodStart, params.payPeriodEnd),
-                  gte(timesheet.periodEnd, params.payPeriodStart)
-                ),
-                with: { entries: true },
-              });
-
-              let totalHours = 0;
-              if (approvedTimesheets.length > 0) {
-                for (const ts of approvedTimesheets) {
-                  for (const entry of ts.entries) totalHours += entry.hours;
-                }
-                linkedTimesheetId = approvedTimesheets[0].id;
-              } else {
-                totalHours =
-                  emp.payFrequency === "weekly"
-                    ? 40
-                    : emp.payFrequency === "biweekly"
-                      ? 80
-                      : 173;
-              }
-
-              let regularHours = totalHours;
-              let overtimeHrs = 0;
-              if (totalHours > overtimeThreshold) {
-                regularHours = overtimeThreshold;
-                overtimeHrs = totalHours - overtimeThreshold;
-              }
-
-              const regularAmount = Math.round(emp.hourlyRate * regularHours);
-              const overtimeAmt = Math.round(emp.hourlyRate * overtimeMultiplier * overtimeHrs);
-              grossAmount = regularAmount + overtimeAmt;
-
-              if (overtimeHrs > 0) {
-                otHours = overtimeHrs;
-                otAmount = overtimeAmt;
-                description = `${regularHours}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr + ${overtimeHrs}h OT @ ${((emp.hourlyRate * overtimeMultiplier) / 100).toFixed(2)}/hr`;
-              } else {
-                description = `${totalHours}h @ ${(emp.hourlyRate / 100).toFixed(2)}/hr`;
-              }
-              itemType = "hourly_pay";
-              break;
-            }
-            case "milestone":
-            case "commission":
-              // Paid only when milestones/commissions are recorded.
-              continue;
-            case "salary":
-            default: {
-              grossAmount = calculateGrossPay(emp.salary, emp.payFrequency);
-              itemType = "regular_salary";
-              break;
-            }
-          }
-
-          const empDeductions = await db.query.employeeDeduction.findMany({
-            where: and(
-              eq(employeeDeduction.employeeId, emp.id),
-              eq(employeeDeduction.isActive, true),
-              notDeleted(employeeDeduction.deletedAt)
-            ),
-            with: { deductionType: true },
-          });
-
-          let preTaxDeductionTotal = 0;
-          let postTaxDeductionTotal = 0;
-          for (const ded of empDeductions) {
-            if (!ded.deductionType?.isActive) continue;
-            let dedAmount = 0;
-            if (ded.amount != null) dedAmount = ded.amount;
-            else if (ded.percent != null) dedAmount = Math.round((grossAmount * ded.percent) / 100);
-            else if (ded.deductionType.defaultAmount != null) dedAmount = ded.deductionType.defaultAmount;
-            else if (ded.deductionType.defaultPercent != null)
-              dedAmount = Math.round((grossAmount * ded.deductionType.defaultPercent) / 100);
-            if (dedAmount <= 0) continue;
-            if (ded.deductionType.category === "pre_tax") preTaxDeductionTotal += dedAmount;
-            else postTaxDeductionTotal += dedAmount;
-          }
-
-          const taxableIncome = Math.max(0, grossAmount - preTaxDeductionTotal);
-
-          const ytdWage = await getEmployeeYtdWage(ctx.organizationId, emp.id, params.payPeriodStart);
-          const withholding = await computeEmployeeWithholding(
-            ctx.organizationId,
-            emp,
-            settings ?? undefined,
-            taxableIncome,
-            ytdWage,
-            params.payPeriodStart
-          );
-          const taxAmount = withholding.totalTax;
-
-          const totalItemDeductions = taxAmount + preTaxDeductionTotal + postTaxDeductionTotal;
-          const netAmount = grossAmount - totalItemDeductions;
-
-          const empCurrency = emp.currency ?? defaultCurrency;
-          let fxRate = 1;
-          if (empCurrency !== defaultCurrency) {
-            const rateInt = fxRateCache.get(empCurrency);
-            if (rateInt != null) fxRate = rateInt / 1_000_000;
-          }
-
-          if (empCurrency === defaultCurrency) {
-            totalGross += grossAmount;
-            totalDeductions += totalItemDeductions;
-            totalNet += netAmount;
-          } else {
-            const rateInt = fxRateCache.get(empCurrency) ?? 1_000_000;
-            totalGross += convertAmount(grossAmount, rateInt);
-            totalDeductions += convertAmount(totalItemDeductions, rateInt);
-            totalNet += convertAmount(netAmount, rateInt);
-          }
-
-          items.push({
-            employeeId: emp.id,
-            type: itemType,
-            description,
-            grossAmount,
-            taxAmount,
-            deductions: totalItemDeductions,
-            netAmount,
-            overtimeHours: otHours,
-            overtimeAmount: otAmount,
-            preTaxDeductions: preTaxDeductionTotal,
-            postTaxDeductions: postTaxDeductionTotal,
-            timesheetId: linkedTimesheetId,
-            currency: empCurrency,
-            fxRate,
-            taxBreakdown: withholding.breakdown,
-            employerTaxBreakdown: withholding.employerBreakdown,
-          });
-        }
-
+        // Same calculation as the REST route: see lib/api/payroll-run-builder.
+        const { items, employeeCount } = await buildRegularRunItems(
+          ctx.organizationId,
+          params.payPeriodStart,
+          params.payPeriodEnd
+        );
+        if (employeeCount === 0) throw new Error("No active employees found");
         if (items.length === 0) throw new Error("No payable employees found for this period");
+
+        const { totalGross, totalDeductions, totalNet } = sumRunTotals(items.map((i) => i.columns));
 
         const run = await db.transaction(async (tx) => {
           const [createdRun] = await tx
@@ -502,29 +281,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
               totalNet,
             })
             .returning();
-
-          const insertedItems = await tx
-            .insert(payrollItem)
-            .values(
-              items.map((item) => {
-                const { taxBreakdown, employerTaxBreakdown, ...columns } = item;
-                void taxBreakdown;
-                void employerTaxBreakdown;
-                return { payrollRunId: createdRun.id, ...columns };
-              })
-            )
-            .returning({ id: payrollItem.id });
-
-          const taxRows: (typeof payrollItemTaxBreakdown.$inferInsert)[] = [];
-          const employerRows: (typeof payrollItemEmployerTax.$inferInsert)[] = [];
-          items.forEach((item, idx) => {
-            const payrollItemId = insertedItems[idx].id;
-            for (const line of item.taxBreakdown) taxRows.push({ payrollItemId, ...line });
-            for (const line of item.employerTaxBreakdown) employerRows.push({ payrollItemId, ...line });
-          });
-          if (taxRows.length > 0) await tx.insert(payrollItemTaxBreakdown).values(taxRows);
-          if (employerRows.length > 0) await tx.insert(payrollItemEmployerTax).values(employerRows);
-
+          await insertPayItems(tx, createdRun.id, items);
           return createdRun;
         });
 
@@ -543,7 +300,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "process_payroll_run",
-    "Process (post) a draft payroll run: posts ONE balanced journal entry (DR gross wages 5100 + employer payroll taxes 5120; CR income-tax-payable 2220, payroll-taxes-payable 2235, pension/benefits 2245, etc.; CR net pay to the bank account) and marks the run 'completed', atomically. The withholding split is driven from the per-item tax breakdowns. Stamps payrollRun.journalEntryId. Amounts are integer cents. Returns the run and the posted journalEntryId.",
+    "Process (finish and post) a draft payroll run: posts ONE balanced journal entry (DR gross wages 5100 + employer payroll taxes 5120; CR income tax payable 2220, payroll taxes payable 2235, pension & benefits 2245, other deductions 2236; CR take-home pay to the bank account, or Wages Payable 2310 when accrued) and marks the run 'completed', atomically, then refreshes leave balances. Refused when the org has an active approval chain and the run isn't signed off (unless auto-approve is on), or when the period end is in a locked period. Amounts are integer cents. Returns the run and the posted journalEntryId.",
     {
       payRunId: z.string().describe("UUID of the draft payroll run to process"),
       accrued: z
@@ -556,44 +313,17 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:payroll");
 
-        const run = await db.query.payrollRun.findFirst({
-          where: and(
-            eq(payrollRun.id, params.payRunId),
-            eq(payrollRun.organizationId, ctx.organizationId),
-            notDeleted(payrollRun.deletedAt)
-          ),
-        });
-        if (!run) throw new Error("Payroll run not found");
-
-        const isApprovedPendingRun =
-          run.status === "pending_approval" && run.approvalStatus === "approved";
-        if (run.status !== "draft" && !isApprovedPendingRun) {
-          throw new Error("Only draft payroll runs can be processed");
-        }
-
-        const updated = await db.transaction(async (tx) => {
-          const journalEntryId = await postPayrollRun(
-            { organizationId: ctx.organizationId, userId: ctx.userId },
-            run.id,
-            tx,
-            { accrued: params.accrued }
-          );
-
-          const [row] = await tx
-            .update(payrollRun)
-            .set({ status: "completed", processedAt: new Date() })
-            .where(eq(payrollRun.id, run.id))
-            .returning();
-
-          return { ...row, journalEntryId };
-        });
+        // Same rules as the REST route: drafts only, sign-off required when an
+        // approval chain is active (unless auto-approve is on), period lock.
+        const { items: _items, ...updated } = await processPayrollRun(ctx, params.payRunId, { accrued: params.accrued });
+        void _items;
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
           userId: ctx.userId,
           action: "process_payroll_run",
           entityType: "payroll_run",
-          entityId: run.id,
+          entityId: params.payRunId,
           changes: { journalEntryId: updated.journalEntryId },
         });
 
@@ -603,7 +333,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "generate_payslips",
-    "Generate payslips for every item in a COMPLETED payroll run, computing each employee's year-to-date gross/net/tax (in integer cents) across all completed runs up to this period. Call after process_payroll_run. Returns the number of payslips generated.",
+    "Generate payslips for a COMPLETED payroll run: one per pay item that doesn't have one yet (safe to call twice, no duplicates). Each payslip has the itemised taxes and deductions and the employee's year-to-date gross/net/tax for the calendar year (integer cents). Call after process_payroll_run. Returns { count: created, alreadyGenerated }.",
     {
       payRunId: z.string().describe("UUID of the completed payroll run to generate payslips for"),
     },
@@ -611,62 +341,44 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:payroll");
 
-        const run = await db.query.payrollRun.findFirst({
-          where: and(
-            eq(payrollRun.id, params.payRunId),
-            eq(payrollRun.organizationId, ctx.organizationId),
-            notDeleted(payrollRun.deletedAt)
-          ),
-          with: { items: true },
-        });
-        if (!run) throw new Error("Payroll run not found");
-        if (run.status !== "completed") throw new Error("Can only generate payslips for completed runs");
-
-        const payslips: (typeof payslip.$inferInsert)[] = [];
-        for (const item of run.items) {
-          const [ytd] = await db
-            .select({
-              ytdGross: sql<number>`coalesce(sum(${payrollItem.grossAmount}), 0)`.mapWith(Number),
-              ytdNet: sql<number>`coalesce(sum(${payrollItem.netAmount}), 0)`.mapWith(Number),
-              ytdTax: sql<number>`coalesce(sum(${payrollItem.taxAmount}), 0)`.mapWith(Number),
-            })
-            .from(payrollItem)
-            .innerJoin(payrollRun, eq(payrollItem.payrollRunId, payrollRun.id))
-            .where(
-              and(
-                eq(payrollItem.employeeId, item.employeeId),
-                eq(payrollRun.status, "completed"),
-                eq(payrollRun.organizationId, ctx.organizationId),
-                lte(payrollRun.payPeriodEnd, run.payPeriodEnd)
-              )
-            );
-
-          payslips.push({
-            payrollRunId: run.id,
-            employeeId: item.employeeId,
-            payrollItemId: item.id,
-            grossAmount: item.grossAmount,
-            netAmount: item.netAmount,
-            taxAmount: item.taxAmount,
-            deductionsBreakdown: [],
-            ytdGross: ytd?.ytdGross || 0,
-            ytdNet: ytd?.ytdNet || 0,
-            ytdTax: ytd?.ytdTax || 0,
-          });
-        }
-
-        if (payslips.length > 0) await db.insert(payslip).values(payslips);
+        const result = await generateRunPayslips(ctx.organizationId, params.payRunId);
 
         await db.insert(auditLog).values({
           organizationId: ctx.organizationId,
           userId: ctx.userId,
           action: "generate_payslips",
           entityType: "payroll_run",
-          entityId: run.id,
-          changes: { count: payslips.length },
+          entityId: params.payRunId,
+          changes: { count: result.count },
         });
 
-        return { count: payslips.length };
+        return result;
+      })
+  );
+
+  server.tool(
+    "get_payslip_pdf",
+    "Render one payslip as a PDF using the organization's default Payslip document template (logo, accent colour, header/footer text, notes; Show Tax Breakdown lists each tax separately). Returns the PDF base64-encoded with its filename and MIME type, plus the API download URL. Amounts printed are converted from integer cents.",
+    {
+      payslipId: z.string().describe("UUID of the payslip (from list_payslips)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:payroll");
+        const { loadPayslipPdfData } = await import("@/lib/documents/payslip-pdf");
+        const { getDefaultTemplate, loadOrgInfo } = await import("@/lib/documents/templates");
+        const { renderPayslipPdf } = await import("@/lib/documents/pdf-renderer");
+        const loaded = await loadPayslipPdfData(params.payslipId, ctx.organizationId);
+        if (!loaded) throw new Error("Payslip not found");
+        const template = (await getDefaultTemplate(ctx.organizationId, "payslip")) || {};
+        const pdf = await renderPayslipPdf(loaded.slip, await loadOrgInfo(ctx.organizationId), template);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        return {
+          filename: loaded.fileName,
+          mimeType: "application/pdf",
+          base64: Buffer.from(pdf).toString("base64"),
+          downloadUrl: `${baseUrl}/api/v1/payroll/payslips/${params.payslipId}/pdf?format=pdf`,
+        };
       })
   );
 
@@ -777,7 +489,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
   // ─── Leave ────────────────────────────────────────────────────────
   server.tool(
     "get_employee_leave_balances",
-    "Get an employee's leave/PTO balances by policy. Balances are in hours (balance = available, usedHours = taken) for the policy year. Returns one entry per leave policy the employee accrues against.",
+    "Get an employee's leave/PTO balances for the current year, one per active leave policy. Balances are recalculated first: carried over + accrued so far (per the policy's method and rate) − approved leave, capped at the policy max. Hours (balance = available, usedHours = approved leave taken).",
     {
       employeeId: z.string().describe("UUID of the payroll employee"),
     },
@@ -794,8 +506,12 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
         });
         if (!emp) throw new Error("Employee not found");
 
+        await syncLeaveBalances(ctx.organizationId, { employeeIds: [emp.id] });
         const balances = await db.query.employeeLeaveBalance.findMany({
-          where: eq(employeeLeaveBalance.employeeId, params.employeeId),
+          where: and(
+            eq(employeeLeaveBalance.employeeId, params.employeeId),
+            eq(employeeLeaveBalance.year, new Date().getFullYear())
+          ),
           with: { policy: true },
         });
 
@@ -816,7 +532,7 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
   // ─── Tax Forms ────────────────────────────────────────────────────
   server.tool(
     "generate_tax_forms",
-    "Generate year-end tax forms for a tax year. formType 'w2' produces one W-2 per employee from completed payroll runs (wages/tax in integer cents). formType '1099_nec' produces a 1099-NEC for each contractor paid at least $600 (60000 cents) of 'paid' payments in the year. Creates a tax-form-generation batch plus the individual forms. Returns the generation record and the count of forms generated.",
+    "Generate year-end tax forms for a tax year. formType 'w2' produces one W-2 per employee from completed (not void or deleted) payroll runs whose pay period ends in the year: Box 1 = gross minus pre-tax deductions; Box 2/4/6 and state/local Boxes 16-19 from the actual withholding; Box 3 capped at the Social Security wage base; Box 12/14 from itemized deductions. formType '1099_nec' produces a 1099-NEC for each contractor paid at least $600 (60000 cents) of 'paid' payments in the year. '1099_misc' is not supported yet. Generating the same form type and year again replaces the previous batch. All amounts in integer cents. Returns the generation record, formsGenerated and replacedPrevious.",
     {
       taxYear: z.number().int().min(2020).max(2099).describe("Tax year (e.g. 2026)"),
       formType: z
@@ -826,132 +542,8 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:payroll");
-
-        const mem = await db.query.member.findFirst({
-          where: and(
-            eq(member.organizationId, ctx.organizationId),
-            eq(member.userId, ctx.userId)
-          ),
-        });
-
-        const [generation] = await db
-          .insert(taxFormGeneration)
-          .values({
-            organizationId: ctx.organizationId,
-            taxYear: params.taxYear,
-            formType: params.formType,
-            status: "draft",
-            createdBy: mem?.id || null,
-          })
-          .returning();
-
-        const yearStart = `${params.taxYear}-01-01`;
-        const yearEnd = `${params.taxYear + 1}-01-01`;
-        const forms: (typeof taxForm.$inferSelect)[] = [];
-
-        if (params.formType === "1099_nec") {
-          const contractorTotals = await db
-            .select({
-              contractorId: contractorPayment.contractorId,
-              totalAmount: sql<number>`COALESCE(SUM(${contractorPayment.amount}), 0)`.mapWith(Number),
-            })
-            .from(contractorPayment)
-            .innerJoin(contractor, eq(contractorPayment.contractorId, contractor.id))
-            .where(
-              and(
-                eq(contractor.organizationId, ctx.organizationId),
-                eq(contractorPayment.status, "paid"),
-                gte(contractorPayment.paidAt, new Date(yearStart)),
-                lt(contractorPayment.paidAt, new Date(yearEnd))
-              )
-            )
-            .groupBy(contractorPayment.contractorId);
-
-          for (const ct of contractorTotals) {
-            if (ct.totalAmount < 60000) continue;
-            const c = await db.query.contractor.findFirst({ where: eq(contractor.id, ct.contractorId) });
-            if (!c) continue;
-            const [form] = await db
-              .insert(taxForm)
-              .values({
-                generationId: generation.id,
-                recipientType: "contractor",
-                recipientId: c.id,
-                recipientName: c.name,
-                recipientTaxId: c.taxId,
-                formType: "1099_nec",
-                taxYear: params.taxYear,
-                formData: {
-                  box1_nonemployee_compensation: ct.totalAmount,
-                  recipient_company: c.company,
-                  recipient_email: c.email,
-                },
-                status: "generated",
-              })
-              .returning();
-            forms.push(form);
-          }
-        } else if (params.formType === "w2") {
-          const employeeTotals = await db
-            .select({
-              employeeId: payrollItem.employeeId,
-              totalGross: sql<number>`COALESCE(SUM(${payrollItem.grossAmount}), 0)`.mapWith(Number),
-              totalTax: sql<number>`COALESCE(SUM(${payrollItem.taxAmount}), 0)`.mapWith(Number),
-              totalNet: sql<number>`COALESCE(SUM(${payrollItem.netAmount}), 0)`.mapWith(Number),
-            })
-            .from(payrollItem)
-            .innerJoin(payrollRun, eq(payrollItem.payrollRunId, payrollRun.id))
-            .where(
-              and(
-                eq(payrollRun.organizationId, ctx.organizationId),
-                eq(payrollRun.status, "completed"),
-                gte(payrollRun.payPeriodStart, yearStart),
-                lt(payrollRun.payPeriodEnd, yearEnd)
-              )
-            )
-            .groupBy(payrollItem.employeeId);
-
-          for (const et of employeeTotals) {
-            const emp = await db.query.payrollEmployee.findFirst({
-              where: eq(payrollEmployee.id, et.employeeId),
-            });
-            if (!emp) continue;
-            const [form] = await db
-              .insert(taxForm)
-              .values({
-                generationId: generation.id,
-                recipientType: "employee",
-                recipientId: emp.id,
-                recipientName: emp.name,
-                recipientTaxId: null,
-                formType: "w2",
-                taxYear: params.taxYear,
-                formData: {
-                  box1_wages: et.totalGross,
-                  box2_federal_tax: et.totalTax,
-                  box3_ss_wages: et.totalGross,
-                  box4_ss_tax: Math.round(et.totalGross * 0.062),
-                  box5_medicare_wages: et.totalGross,
-                  box6_medicare_tax: Math.round(et.totalGross * 0.0145),
-                  employee_email: emp.email,
-                  employee_number: emp.employeeNumber,
-                },
-                status: "generated",
-              })
-              .returning();
-            forms.push(form);
-          }
-        }
-
-        await db
-          .update(taxFormGeneration)
-          .set({ status: "generated", generatedAt: new Date() })
-          .where(eq(taxFormGeneration.id, generation.id));
-
-        return {
-          generation: { ...generation, status: "generated" },
-          formsGenerated: forms.length,
-        };
+        // Same calculation as POST /api/v1/payroll/tax-forms/generate
+        return generateTaxForms(ctx, params);
       })
   );
 
@@ -1002,7 +594,14 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
           kind.includes("suta") ||
           kind.includes("940") ||
           kind.includes("unemployment");
-        const liabilityCode = isPayrollTax ? "2235" : "2220";
+        const remittanceSettings = await db.query.payrollSettings.findFirst({
+          where: eq(payrollSettings.organizationId, ctx.organizationId),
+        });
+        // Income tax clears the account payroll runs credit it to (the payroll
+        // settings' income-tax account when one is set, else 2220).
+        const liabilityCode = isPayrollTax
+          ? "2235"
+          : incomeTaxAccountCode(remittanceSettings?.taxPayableAccountCode);
 
         // Connect the payroll liability account on demand — an org that hasn't
         // run a payroll yet won't have it — so a remittance never dead-ends. The
@@ -1012,9 +611,6 @@ export function registerPayrollTools(server: McpServer, ctx: AuthContext) {
           "2235": "Payroll Taxes Payable",
           "2245": "Pension & Benefits Payable",
         };
-        const remittanceSettings = await db.query.payrollSettings.findFirst({
-          where: eq(payrollSettings.organizationId, ctx.organizationId),
-        });
         const baseCurrency = remittanceSettings?.defaultCurrency ?? "USD";
         const liabilityAccount =
           (await findAccountByCode(ctx.organizationId, liabilityCode)) ??

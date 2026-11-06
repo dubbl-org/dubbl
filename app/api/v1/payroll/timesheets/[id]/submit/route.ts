@@ -25,11 +25,14 @@ export async function POST(
     });
 
     if (!ts) return notFound("Timesheet");
-    if (ts.status !== "draft") return validationError("Only draft timesheets can be submitted");
+    if (ts.status !== "draft" && ts.status !== "rejected") {
+      return validationError("Only draft or sent-back timesheets can be submitted");
+    }
+    if (ts.totalHours <= 0) return validationError("Add the hours worked before submitting");
 
     const [updated] = await db
       .update(timesheet)
-      .set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "submitted", submittedAt: new Date(), rejectionReason: null, updatedAt: new Date() })
       .where(eq(timesheet.id, id))
       .returning();
 

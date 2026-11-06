@@ -86,8 +86,8 @@ S3_ENDPOINT=https://s3.amazonaws.com
 ### Database Setup
 
 ```bash
-# Push schema to database
-pnpm db:push
+# Create the tables from the migration files
+pnpm db:migrate
 
 # Seed with demo data (optional)
 pnpm db:seed

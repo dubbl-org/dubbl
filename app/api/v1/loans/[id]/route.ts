@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { loan, loanSchedule } from "@/lib/db/schema";
+import { loan, loanSchedule, bankAccount } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -12,6 +12,9 @@ import { z } from "zod";
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   status: z.enum(["active", "paid_off", "defaulted"]).optional(),
+  // The bank account repayments come out of ("Paid into" when the loan was
+  // received). Needed before a payment can be recorded.
+  bankAccountId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(
@@ -70,6 +73,16 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = patchSchema.parse(body);
+
+    if (parsed.bankAccountId) {
+      const bank = await db.query.bankAccount.findFirst({
+        where: and(
+          eq(bankAccount.id, parsed.bankAccountId),
+          eq(bankAccount.organizationId, ctx.organizationId)
+        ),
+      });
+      if (!bank) return validationError("Bank account not found");
+    }
 
     const [updated] = await db
       .update(loan)

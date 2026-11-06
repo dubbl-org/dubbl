@@ -9,21 +9,45 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, isNull, notInArray, sql } from "drizzle-orm";
 import { sendEmail } from "./smtp-client";
+import { sendPlatformEmail } from "./resend-client";
+import { documentsFromAddress } from "./senders";
 import { renderTemplate } from "./template-engine";
 import { formatMoney } from "@/lib/money";
+import { checkEmailLimit } from "@/lib/api/check-limit";
+import { notifySafely, notifySystemAlert } from "@/lib/notifications/events";
 
-export async function processReminders(orgId: string) {
-  // Check email config exists and is verified
+/**
+ * How reminder emails go out for an org: through its own mail server when it's
+ * set up and verified, otherwise through dubbl's shared sender (like invoice
+ * emails), with replies going to the organization's contact email.
+ */
+export async function reminderMailer(orgId: string, replyTo?: string | null) {
   const config = await db.query.emailConfig.findFirst({
     where: eq(emailConfig.organizationId, orgId),
   });
-  if (!config || !config.isVerified) return { sent: 0, failed: 0, skipped: 0 };
+  const smtp = config?.isVerified ? config : null;
+  return async (message: { to: string; subject: string; html: string }) => {
+    if (smtp) {
+      await sendEmail(smtp, message);
+      return;
+    }
+    await checkEmailLimit(orgId);
+    await sendPlatformEmail({
+      ...message,
+      from: documentsFromAddress(),
+      replyTo: replyTo || undefined,
+    });
+  };
+}
 
+export async function processReminders(orgId: string) {
   // Get org for name
   const org = await db.query.organization.findFirst({
     where: eq(organization.id, orgId),
   });
   if (!org) return { sent: 0, failed: 0, skipped: 0 };
+
+  const send = await reminderMailer(orgId, org.contactEmail);
 
   // Get enabled rules
   const rules = await db.query.reminderRule.findMany({
@@ -104,11 +128,6 @@ export async function processReminders(orgId: string) {
         recipients.push(...(rule.customEmails as string[]));
       }
 
-      if (recipients.length === 0) {
-        skipped++;
-        continue;
-      }
-
       // Render templates
       const docNumber =
         "invoiceNumber" in doc
@@ -124,7 +143,40 @@ export async function processReminders(orgId: string) {
       };
 
       const subject = renderTemplate(rule.subjectTemplate, vars);
-      const html = renderTemplate(rule.bodyTemplate, vars);
+      const body = renderTemplate(rule.bodyTemplate, vars);
+      // Plain-text templates keep their line breaks in the HTML email.
+      const html = /<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\r?\n/g, "<br>");
+
+      if (recipients.length === 0) {
+        // Nobody to send to: record the skip once so it shows in the Reminder
+        // Log ("Skipped") with the reason, instead of silently doing nothing.
+        const alreadyLogged = await db.query.reminderLog.findFirst({
+          where: and(
+            eq(reminderLog.reminderRuleId, rule.id),
+            eq(reminderLog.documentId, doc.id),
+            eq(reminderLog.status, "skipped")
+          ),
+        });
+        if (!alreadyLogged) {
+          await db.insert(reminderLog).values({
+            organizationId: orgId,
+            reminderRuleId: rule.id,
+            documentType: rule.documentType,
+            documentId: doc.id,
+            recipientEmail: "",
+            subject,
+            status: "skipped",
+            errorMessage:
+              rule.recipientType === "contact_persons"
+                ? "None of this contact's people has an email address"
+                : rule.recipientType === "custom"
+                  ? "The rule has no email addresses to send to"
+                  : "This contact has no email address",
+          });
+        }
+        skipped++;
+        continue;
+      }
 
       // Track whether any reminder actually went out for this document so we
       // bump the invoice's dunning (escalation) stage exactly once per run, not
@@ -132,7 +184,7 @@ export async function processReminders(orgId: string) {
       let remindedThisDoc = false;
       for (const recipient of recipients) {
         try {
-          await sendEmail(config, { to: recipient, subject, html });
+          await send({ to: recipient, subject, html });
           await db.insert(reminderLog).values({
             organizationId: orgId,
             reminderRuleId: rule.id,
@@ -171,6 +223,15 @@ export async function processReminders(orgId: string) {
           );
       }
     }
+  }
+
+  if (failed > 0) {
+    await notifySafely(
+      notifySystemAlert(orgId, {
+        title: "Some payment reminders weren't sent",
+        body: `${failed} reminder email${failed === 1 ? "" : "s"} failed. Open Settings > Reminders and check the Reminder Log for the reason.`,
+      })
+    );
   }
 
   return { sent, failed, skipped };

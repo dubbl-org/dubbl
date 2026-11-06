@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, inArray, isNull, ne, gte, lte, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -20,6 +21,8 @@ import { findMatches, type MatchCandidate } from "@/lib/banking/reconciliation-m
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
 
 // ---------------------------------------------------------------------------
 // Confidence scoring for "find existing record" candidates (payments, posted
@@ -671,7 +674,11 @@ export async function POST(
       const newAmountDue = found.total - newAmountPaid;
       const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
-      const { created } = await db.transaction(async (tx) => {
+      await assertNotLocked(ctx.organizationId, paymentDate, ctx);
+
+      await assertNotLocked(ctx.organizationId, paymentDate, ctx);
+
+    const { created } = await db.transaction(async (tx) => {
         const [created] = await tx
           .insert(payment)
           .values({
@@ -688,6 +695,7 @@ export async function POST(
             createdBy: ctx.userId,
           })
           .returning();
+        emitPaymentReceived(ctx.organizationId, [created.id]);
 
         await tx.insert(paymentAllocation).values({
           paymentId: created.id,
@@ -746,6 +754,8 @@ export async function POST(
         changes: { invoiceId: documentId, paymentId: created.id, amount: parsed.amount },
       });
 
+      await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
+
       return NextResponse.json({
         payment: { id: created.id, paymentNumber },
         invoiceStatus: newStatus,
@@ -779,6 +789,8 @@ export async function POST(
     const newAmountDue = found.amountDue - parsed.amount;
     const newStatus = newAmountDue <= 0 ? "paid" : "partial";
 
+    await assertNotLocked(ctx.organizationId, paymentDate, ctx);
+
     const { created } = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(payment)
@@ -796,6 +808,7 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      emitPaymentReceived(ctx.organizationId, [created.id]);
 
       await tx.insert(paymentAllocation).values({
         paymentId: created.id,

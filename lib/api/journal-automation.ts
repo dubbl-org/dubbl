@@ -1,12 +1,15 @@
 import { db } from "@/lib/db";
-import { journalEntry, journalLine, organization, taxRate, inventoryItem, inventoryMovement, bankAccount as bankAccountTable } from "@/lib/db/schema";
+import { journalEntry, journalLine, organization, taxRate, taxComponent, inventoryItem, inventoryMovement, bankAccount as bankAccountTable } from "@/lib/db/schema";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { recordInventoryReceipt, recordInventoryIssue, type ValuedItem } from "./inventory-valuation";
 import { getExchangeRate, convertAmount, MissingExchangeRateError } from "@/lib/currency/converter";
 import { convertLinesToBase, realizedSettlementLegs } from "@/lib/currency/convert-entry";
 import type { SettlementRole } from "@/lib/currency/convert-entry";
 import { ensureAccountForCode, findAccountForCode } from "./account-roles";
+import { resolveBillPostingLines, journalImbalance } from "./bill-lines";
 import { ensureBankLedgerAccount } from "./bank-ledger";
+import { emitJournalPosted } from "@/lib/webhooks/events";
+import { splitCompoundTax, type CompoundPart } from "@/lib/tax/compound";
 
 interface JournalAutomationContext {
   organizationId: string;
@@ -235,6 +238,10 @@ export function splitGrossTax(
  * than one entry inside a single db.transaction — otherwise the read hits the
  * pool (not the uncommitted tx) and every entry in the tx gets the SAME number,
  * violating the (organizationId, entryNumber) unique index.
+ *
+ * Every posting path takes its number here, so this is also where the
+ * `journal.posted` webhook is queued: after the request it fires for the entry
+ * that got this number, only if it committed with status "posted".
  */
 export async function getNextEntryNumber(
   organizationId: string,
@@ -244,7 +251,9 @@ export async function getNextEntryNumber(
     .select({ max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)` })
     .from(journalEntry)
     .where(eq(journalEntry.organizationId, organizationId));
-  return (maxResult?.max || 0) + 1;
+  const entryNumber = (maxResult?.max || 0) + 1;
+  emitJournalPosted(organizationId, { entryNumber });
+  return entryNumber;
 }
 
 /**
@@ -322,6 +331,119 @@ export async function reverseJournalEntry(
 }
 
 /**
+ * Compound tax rates (e.g. GST + PST) whose parts post to their own ledger
+ * accounts. Splits each line's tax between the rate's parts by part rate
+ * (lib/tax/compound) and returns what goes to each part account. Tax on parts
+ * without an account, and on lines without a compound rate, is left for the
+ * caller's default tax account (`total` is what was routed away from it).
+ */
+async function compoundTaxRouting(
+  lines: { taxRateId?: string | null; taxAmount: number }[],
+  exec: DbOrTx = db
+): Promise<{ byAccount: Map<string, number>; total: number }> {
+  const byAccount = new Map<string, number>();
+  const ids = [...new Set(lines.map((l) => l.taxRateId).filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return { byAccount, total: 0 };
+  const parts = await exec
+    .select({ taxRateId: taxComponent.taxRateId, rate: taxComponent.rate, accountId: taxComponent.accountId })
+    .from(taxComponent)
+    .where(inArray(taxComponent.taxRateId, ids));
+  const partsByRate = new Map<string, CompoundPart[]>();
+  for (const p of parts) {
+    partsByRate.set(p.taxRateId, [...(partsByRate.get(p.taxRateId) ?? []), { rate: p.rate, accountId: p.accountId }]);
+  }
+  let total = 0;
+  for (const line of lines) {
+    const ratePart = line.taxRateId ? partsByRate.get(line.taxRateId) : undefined;
+    if (!ratePart || !ratePart.some((p) => p.accountId) || !line.taxAmount) continue;
+    for (const split of splitCompoundTax(line.taxAmount, ratePart)) {
+      if (!split.accountId || split.amount === 0) continue;
+      byAccount.set(split.accountId, (byAccount.get(split.accountId) ?? 0) + split.amount);
+      total += split.amount;
+    }
+  }
+  return { byAccount, total };
+}
+
+/**
+ * Does tax collected on sales go to Sales Tax Payable (2230) rather than
+ * Output VAT (2200)? Yes for US sales tax: an organization on the US sales tax
+ * regime (or in the US with no regime set), or any rate of kind sales_tax_us.
+ * Pure, so it is unit tested.
+ */
+export function isUsSalesTax(org: { taxRegime?: string | null; countryCode?: string | null } | null | undefined, rateKind?: string | null): boolean {
+  if (rateKind === "sales_tax_us") return true;
+  if (!org) return false;
+  if (org.taxRegime) return org.taxRegime === "us_sales_tax";
+  return (org.countryCode ?? "").toUpperCase() === "US";
+}
+
+/** isUsSalesTax for an organization by id (no rate kind). */
+export async function orgIsUsSalesTax(organizationId: string, exec: DbOrTx = db): Promise<boolean> {
+  const org = await exec.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { taxRegime: true, countryCode: true },
+  });
+  return isUsSalesTax(org);
+}
+
+/**
+ * Where the tax collected on a sales document posts. Compound-rate parts with
+ * their own account go there; US sales tax goes to Sales Tax Payable (2230);
+ * everything else to Output VAT / GST Payable (2200). `taxTotal` is the
+ * document's tax; any tax not carried on a line (legacy callers) goes to the
+ * default account. Returns positive amounts per account, integer cents.
+ */
+export async function routeOutputTax(
+  organizationId: string,
+  lines: { taxRateId?: string | null; taxAmount: number }[],
+  taxTotal: number,
+  exec: DbOrTx = db
+): Promise<{ accountId: string; amount: number }[]> {
+  if (taxTotal <= 0) return [];
+  const routed = await compoundTaxRouting(lines, exec);
+  const org = await exec.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true, taxRegime: true, countryCode: true },
+  });
+  const base = org?.defaultCurrency ?? "USD";
+  const usOrg = isUsSalesTax(org);
+
+  // Lines on a sales_tax_us rate post to 2230 even in a non-US org; compound
+  // rates with part accounts were routed above.
+  let usTax = 0;
+  if (!usOrg) {
+    const ids = [...new Set(lines.map((l) => l.taxRateId).filter((id): id is string => Boolean(id)))];
+    if (ids.length > 0) {
+      const kinds = await exec
+        .select({ id: taxRate.id, kind: taxRate.kind })
+        .from(taxRate)
+        .where(inArray(taxRate.id, ids));
+      const compoundIds = new Set(
+        (await exec.select({ id: taxComponent.taxRateId }).from(taxComponent).where(and(inArray(taxComponent.taxRateId, ids), sql`${taxComponent.accountId} is not null`))).map((r) => r.id)
+      );
+      const usRates = new Set(kinds.filter((k) => k.kind === "sales_tax_us" && !compoundIds.has(k.id)).map((k) => k.id));
+      usTax = lines.reduce((sum, l) => sum + (l.taxRateId && usRates.has(l.taxRateId) ? l.taxAmount : 0), 0);
+    }
+  }
+
+  const out: { accountId: string; amount: number }[] = [];
+  for (const [accountId, amount] of routed.byAccount) if (amount > 0) out.push({ accountId, amount });
+  const rest = taxTotal - routed.total;
+  const toSalesTax = usOrg ? rest : Math.min(Math.max(usTax, 0), rest);
+  const toOutputVat = rest - toSalesTax;
+  if (toSalesTax > 0) {
+    const a = await ensureControlAccount(organizationId, "salesTaxPayable", base, exec);
+    if (a) out.push({ accountId: a.id, amount: toSalesTax });
+  }
+  if (toOutputVat > 0) {
+    const a = await ensureControlAccount(organizationId, "outputVat", base, exec);
+    if (a) out.push({ accountId: a.id, amount: toOutputVat });
+  }
+  return out;
+}
+
+/**
  * Create journal entry when an invoice is sent/approved.
  * DR Accounts Receivable (asset)
  * CR Revenue (per line account)
@@ -334,7 +456,9 @@ export async function createInvoiceJournalEntry(
     total: number;
     taxTotal: number;
     subtotal: number;
-    lines: { accountId: string | null; amount: number; taxAmount: number }[];
+    // taxRateId (optional): a compound rate's parts with their own account get
+    // their share of the line's tax; everything else goes to Output VAT 2200.
+    lines: { accountId: string | null; amount: number; taxAmount: number; taxRateId?: string | null }[];
     date: string;
     currencyCode?: string;
   },
@@ -380,18 +504,16 @@ export async function createInvoiceJournalEntry(
     }
   }
 
-  // CR Tax Liability if any
-  if (invoiceData.taxTotal > 0) {
-    const taxAccount = await findAccountByCode(ctx.organizationId, "2200", exec);
-    if (taxAccount) {
-      lines.push({
-        journalEntryId: entry.id,
-        accountId: taxAccount.id,
-        description: `Tax on ${invoiceData.invoiceNumber}`,
-        debitAmount: 0,
-        creditAmount: invoiceData.taxTotal,
-      });
-    }
+  // CR Tax Liability if any: compound-rate parts with their own account,
+  // US sales tax to Sales Tax Payable 2230, the rest to Output VAT 2200.
+  for (const t of await routeOutputTax(ctx.organizationId, invoiceData.lines, invoiceData.taxTotal, exec)) {
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: t.accountId,
+      description: `Tax on ${invoiceData.invoiceNumber}`,
+      debitAmount: 0,
+      creditAmount: t.amount,
+    });
   }
 
   // DR Accounts Receivable for the sum of the offsetting credit legs, so the
@@ -466,17 +588,38 @@ export async function createBillJournalEntry(
     currencyCode?: string;
   }
 ) {
-  const entryNumber = await getNextEntryNumber(ctx.organizationId);
-  const apAccount = await findAccountByCode(ctx.organizationId, "2100");
-
-  if (!apAccount) return null;
-
   // Base currency, for any control accounts we create on demand below.
   const { base } = await resolveBaseRate(
     ctx.organizationId,
     billData.currencyCode,
     billData.date
   );
+
+  // Accounts Payable is created on demand like the other control accounts, so
+  // a chart without it can't leave a bill "in your books" with no entry.
+  const apAccount = await ensureAccountByCode(
+    ctx.organizationId,
+    { code: "2100", name: "Accounts Payable - Trade", type: "liability", subType: "current" },
+    base
+  );
+  if (!apAccount) return null;
+
+  // Every non-zero line posts somewhere. A line with no account (none picked,
+  // no supplier default, not a stock line) goes to Miscellaneous Expense, so
+  // the cost isn't dropped while AP is credited for the whole bill.
+  const needsFallback = billData.lines.some((l) => !l.accountId && l.amount !== 0);
+  const fallbackAccountId = needsFallback
+    ? (
+        await ensureAccountByCode(
+          ctx.organizationId,
+          { code: "5990", name: "Miscellaneous Expense", type: "expense", subType: "operating" },
+          base
+        )
+      )?.id ?? null
+    : null;
+  const postingLines = resolveBillPostingLines(billData.lines, fallbackAccountId);
+
+  const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
   const [entry] = await db
     .insert(journalEntry)
@@ -501,6 +644,7 @@ export async function createBillJournalEntry(
   let recoverableToInputVat = 0; // accumulates per-line recoverable slices
   let reverseChargeOutputVat = 0; // accumulates self-accounted output VAT
   let perLineTaxHandled = 0; // sum of taxAmount handled on a per-line basis
+  const routedInputTax = new Map<string, number>(); // compound-rate parts with their own account
 
   // Lazily resolved control accounts (only created when actually needed).
   let inputVatAccountId: string | null = null;
@@ -522,8 +666,18 @@ export async function createBillJournalEntry(
   // Track the first posted expense line so the legacy remainder path (below) can
   // fold any irrecoverable slice of leftover tax back into a real cost line.
   let firstExpenseLineIndex: number | null = null;
-  for (const line of billData.lines) {
-    if (!line.accountId || line.amount <= 0) continue;
+  for (const line of postingLines) {
+    // A negative line (a discount or credit on the bill) reduces its account.
+    if (line.amount < 0) {
+      lines.push({
+        journalEntryId: entry.id,
+        accountId: line.accountId,
+        description: `Bill ${billData.billNumber}`,
+        debitAmount: 0,
+        creditAmount: -line.amount,
+      });
+      continue;
+    }
 
     let expenseDebit = line.amount;
 
@@ -560,7 +714,13 @@ export async function createBillJournalEntry(
             (line.taxAmount * rateRow.recoverablePercent) / 10000
           );
           const absorbedTax = line.taxAmount - recoverableTax;
-          recoverableToInputVat += recoverableTax;
+          // Compound rate: parts with their own account take their share of
+          // the recoverable tax; the rest goes to Input VAT 1500.
+          const routed = await compoundTaxRouting([{ taxRateId: line.taxRateId, taxAmount: recoverableTax }]);
+          for (const [accountId, amount] of routed.byAccount) {
+            routedInputTax.set(accountId, (routedInputTax.get(accountId) ?? 0) + amount);
+          }
+          recoverableToInputVat += recoverableTax - routed.total;
           expenseDebit += absorbedTax;
           perLineTaxHandled += line.taxAmount;
         }
@@ -639,9 +799,19 @@ export async function createBillJournalEntry(
     }
   }
 
-  // CR Output VAT for reverse-charge self-accounting (net-zero cash leg). Track
-  // the amount actually posted so the AP leg only nets off VAT that hit the GL.
-  let outputVatCredited = 0;
+  // DR the compound-rate parts that post to their own account.
+  for (const [accountId, amount] of routedInputTax) {
+    if (amount <= 0) continue;
+    lines.push({
+      journalEntryId: entry.id,
+      accountId,
+      description: `Tax on ${billData.billNumber}`,
+      debitAmount: amount,
+      creditAmount: 0,
+    });
+  }
+
+  // CR Output VAT for reverse-charge self-accounting (net-zero cash leg).
   if (reverseChargeOutputVat > 0) {
     const outId = await getOutputVat();
     if (outId) {
@@ -652,35 +822,38 @@ export async function createBillJournalEntry(
         debitAmount: 0,
         creditAmount: reverseChargeOutputVat,
       });
-      outputVatCredited = reverseChargeOutputVat;
     }
   }
 
-  // CR Accounts Payable for the sum of the offsetting debit legs LESS the
-  // reverse-charge output-VAT credit actually posted, so the entry balances in
-  // document currency even if a line lacks an account or a tax account is
-  // missing — otherwise FX conversion would scale the imbalance. Reverse charge
-  // is paid net, so its self-accounted output VAT must not inflate AP.
-  const totalDebits = lines.reduce((s, l) => s + (l.debitAmount ?? 0), 0);
-  const apTotal = totalDebits - outputVatCredited;
-  if (apTotal > 0) {
-    lines.push({
-      journalEntryId: entry.id,
-      accountId: apAccount.id,
-      description: `Bill ${billData.billNumber}`,
-      debitAmount: 0,
-      creditAmount: apTotal,
-    });
-
-    await postLinesOrCleanup(entry.id, async () => {
-      const { currency, rate } = await resolveBaseRate(
-        ctx.organizationId,
-        billData.currencyCode,
-        billData.date
-      );
-      await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
-    });
+  // CR Accounts Payable for the debit legs LESS every credit leg posted above
+  // (reverse-charge output VAT, negative lines), so the entry balances in
+  // document currency (otherwise FX conversion would scale an imbalance).
+  // Reverse charge is paid net, so its self-accounted output VAT must not
+  // inflate AP. Every non-zero line posts (see resolveBillPostingLines), so AP
+  // equals what the bill says is owed.
+  const apTotal = journalImbalance(lines);
+  if (apTotal <= 0) {
+    // Nothing owed (an all-zero bill): don't leave an empty posted header.
+    await db.delete(journalEntry).where(eq(journalEntry.id, entry.id));
+    if (apTotal < 0) throw new Error(`Bill ${billData.billNumber} credits more than it charges, so it can't be posted as a bill.`);
+    return null;
   }
+  lines.push({
+    journalEntryId: entry.id,
+    accountId: apAccount.id,
+    description: `Bill ${billData.billNumber}`,
+    debitAmount: 0,
+    creditAmount: apTotal,
+  });
+
+  await postLinesOrCleanup(entry.id, async () => {
+    const { currency, rate } = await resolveBaseRate(
+      ctx.organizationId,
+      billData.currencyCode,
+      billData.date
+    );
+    await db.insert(journalLine).values(toBaseLines(lines, currency, rate));
+  });
 
   return entry;
 }
@@ -698,7 +871,8 @@ export async function createCreditNoteJournalEntry(
     creditNoteNumber: string;
     total: number;
     taxTotal: number;
-    lines: { accountId: string | null; amount: number; taxAmount: number }[];
+    // taxRateId (optional): see createInvoiceJournalEntry.
+    lines: { accountId: string | null; amount: number; taxAmount: number; taxRateId?: string | null }[];
     date: string;
     currencyCode?: string;
   },
@@ -742,18 +916,16 @@ export async function createCreditNoteJournalEntry(
     }
   }
 
-  // DR Tax Liability (reverse of invoice CR tax)
-  if (data.taxTotal > 0) {
-    const taxAccount = await findAccountByCode(ctx.organizationId, "2200", exec);
-    if (taxAccount) {
-      lines.push({
-        journalEntryId: entry.id,
-        accountId: taxAccount.id,
-        description: `Tax on ${data.creditNoteNumber}`,
-        debitAmount: data.taxTotal,
-        creditAmount: 0,
-      });
-    }
+  // DR Tax Liability (reverse of invoice CR tax), routed the same way as the
+  // invoice (compound parts, US sales tax 2230, else Output VAT 2200).
+  for (const t of await routeOutputTax(ctx.organizationId, data.lines, data.taxTotal, exec)) {
+    lines.push({
+      journalEntryId: entry.id,
+      accountId: t.accountId,
+      description: `Tax on ${data.creditNoteNumber}`,
+      debitAmount: t.amount,
+      creditAmount: 0,
+    });
   }
 
   // CR Accounts Receivable for the sum of the offsetting debit legs (revenue +
@@ -800,7 +972,9 @@ export async function createDebitNoteJournalEntry(
     debitNoteNumber: string;
     total: number;
     taxTotal: number;
-    lines: { accountId: string | null; amount: number; taxAmount: number }[];
+    // taxRateId (optional): a compound rate's parts with their own account
+    // get their share of the line's tax; the rest reverses Input VAT 1500.
+    lines: { accountId: string | null; amount: number; taxAmount: number; taxRateId?: string | null }[];
     date: string;
     // Optional document currency. When supplied (and foreign), the entry is
     // posted in base currency; defaults to the org base currency.
@@ -841,16 +1015,29 @@ export async function createDebitNoteJournalEntry(
     }
   }
 
-  // CR Tax Input (reverse of bill DR tax)
+  // CR Tax Input (reverse of bill DR tax), compound-rate parts with their own
+  // account first.
   if (data.taxTotal > 0) {
+    const routed = await compoundTaxRouting(data.lines);
+    for (const [accountId, amount] of routed.byAccount) {
+      if (amount <= 0) continue;
+      lines.push({
+        journalEntryId: entry.id,
+        accountId,
+        description: `Tax on ${data.debitNoteNumber}`,
+        debitAmount: 0,
+        creditAmount: amount,
+      });
+    }
     const taxInputAccount = await findAccountByCode(ctx.organizationId, "1500");
-    if (taxInputAccount) {
+    const rest = data.taxTotal - routed.total;
+    if (taxInputAccount && rest > 0) {
       lines.push({
         journalEntryId: entry.id,
         accountId: taxInputAccount.id,
         description: `Tax on ${data.debitNoteNumber}`,
         debitAmount: 0,
-        creditAmount: data.taxTotal,
+        creditAmount: rest,
       });
     }
   }
@@ -1216,7 +1403,7 @@ export async function createCategorizationJournalEntry(
     const net = abs - tax;
     const control = await ensureControlAccount(
       ctx.organizationId,
-      isUsSalesTax ? "salesTaxPayable" : "outputVat",
+      isUsSalesTax || (await orgIsUsSalesTax(ctx.organizationId, tx)) ? "salesTaxPayable" : "outputVat",
       base,
       tx
     );
@@ -1636,6 +1823,10 @@ export async function createVatReturnClearingJournalEntry(
     // the legacy accrual recompute.
     outputBalance?: number;
     inputBalance?: number;
+    // Optional split of outputBalance across the accounts holding tax
+    // collected (Output VAT 2200 and US Sales Tax Payable 2230). Must add up to
+    // outputBalance. Omit to clear everything from Output VAT 2200.
+    outputSplit?: { accountId: string; amount: number }[];
   },
   tx: Tx
 ) {
@@ -1707,13 +1898,18 @@ export async function createVatReturnClearingJournalEntry(
 
   // Zero the output VAT liability: DR if it was a credit balance, CR if it
   // somehow carried a net debit balance (e.g. credit notes exceeded sales).
-  if (outputBalance !== 0) {
+  const outputParts =
+    data.outputSplit && data.outputSplit.reduce((sum, p) => sum + p.amount, 0) === outputBalance
+      ? data.outputSplit
+      : [{ accountId: outputAcct.id, amount: outputBalance }];
+  for (const part of outputParts) {
+    if (part.amount === 0) continue;
     lines.push({
       journalEntryId: entry.id,
-      accountId: outputAcct.id,
+      accountId: part.accountId,
       description: "Clear output VAT",
-      debitAmount: outputBalance > 0 ? outputBalance : 0,
-      creditAmount: outputBalance < 0 ? -outputBalance : 0,
+      debitAmount: part.amount > 0 ? part.amount : 0,
+      creditAmount: part.amount < 0 ? -part.amount : 0,
       currencyCode: base,
     });
   }

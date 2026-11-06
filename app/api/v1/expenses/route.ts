@@ -13,6 +13,8 @@ import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { emitExpenseCreated } from "@/lib/webhooks/events";
 
 const itemSchema = z
   .object({
@@ -74,7 +76,7 @@ export async function GET(request: Request) {
       orderBy: desc(expenseClaim.createdAt),
       limit,
       offset,
-      with: { submittedByUser: true },
+      with: { submittedByUser: { columns: { id: true, name: true, email: true, image: true } } },
     });
 
     const [countResult] = await db
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
       parsed.currencyCode,
       undefined
     );
+    await checkMultiCurrency(ctx.organizationId, currencyCode);
 
     // Check period lock for each item date
     for (const item of parsed.items) {
@@ -143,6 +146,7 @@ export async function POST(request: Request) {
         currencyCode,
       })
       .returning();
+    emitExpenseCreated(ctx.organizationId, [created.id]);
 
     await db.insert(expenseItem).values(
       processedItems.map((item) => ({

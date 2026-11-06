@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  approvalRequest,
-  approvalWorkflowStep,
-  member,
-} from "@/lib/db/schema";
+import { approvalRequest } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
@@ -18,6 +14,7 @@ export async function GET(request: Request) {
     const entityType = url.searchParams.get("entityType");
     const status = url.searchParams.get("status");
     const approverId = url.searchParams.get("approverId");
+    const entityId = url.searchParams.get("entityId");
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(approvalRequest.organizationId, ctx.organizationId),
@@ -30,6 +27,10 @@ export async function GET(request: Request) {
           entityType as (typeof approvalRequest.entityType.enumValues)[number]
         )
       );
+    }
+
+    if (entityId) {
+      conditions.push(eq(approvalRequest.entityId, entityId));
     }
 
     if (status) {

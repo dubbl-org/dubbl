@@ -11,7 +11,9 @@ import { parseMoney } from "@/lib/import-export/transformers";
 import { preProcessEntries } from "@/lib/import-export/pre-process";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import type { SourceSystem } from "@/lib/import-export/types";
+import { validateImportRows } from "@/lib/import-export/validate-rows";
 import { z } from "zod";
+import { emitJournalPosted } from "@/lib/webhooks/events";
 
 const rowSchema = z.object({
   entryNumber: z.coerce.string().optional(),
@@ -39,16 +41,18 @@ export async function POST(request: Request) {
     const source = (rawParsed.source || "custom") as SourceSystem;
     const post = rawParsed.post;
     const transformedRows = preProcessEntries(rawParsed.rows, source);
+    // Validate row by row: bad rows are reported, the rest still import.
+    const checked = validateImportRows(transformedRows, rowSchema);
     const parsed = {
       fileName: rawParsed.fileName,
-      rows: transformedRows.map(r => rowSchema.parse(r)),
+      rows: checked.rows,
     };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
       type: "entries",
       fileName: parsed.fileName,
-      totalRows: parsed.rows.length,
+      totalRows: transformedRows.length,
       status: "processing",
       createdBy: ctx.userId,
     }).returning();
@@ -73,8 +77,8 @@ export async function POST(request: Request) {
     let nextEntryNumber = (maxResult?.max ?? 0) + 1;
 
     let processedRows = 0;
-    let errorRows = 0;
-    const errorDetails: Array<{ row: number; error: string }> = [];
+    let errorRows = checked.invalid.length;
+    const errorDetails: Array<{ row: number; error: string }> = [...checked.invalid];
     let rowIndex = 0;
 
     for (const [, groupRows] of entryGroups) {
@@ -153,6 +157,7 @@ export async function POST(request: Request) {
         await db.insert(journalLine).values(
           lines.map(l => ({ journalEntryId: created.id, ...l }))
         );
+        if (post) emitJournalPosted(ctx.organizationId, { id: created.id });
         processedRows++;
       } catch (err) {
         errorRows++;
@@ -164,7 +169,7 @@ export async function POST(request: Request) {
       processedRows,
       errorRows,
       errorDetails: errorDetails.length > 0 ? errorDetails : null,
-      status: errorRows === entryGroups.size ? "failed" : "completed",
+      status: processedRows === 0 ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id));
 

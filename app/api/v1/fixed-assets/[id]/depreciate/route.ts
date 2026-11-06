@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  fixedAsset,
-  depreciationEntry,
-  journalEntry,
-  journalLine,
-} from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { fixedAsset } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
-import { calculateMonthlyDepreciation } from "@/lib/fixed-assets/depreciation";
+import { postAssetDepreciation } from "@/lib/fixed-assets/post-depreciation";
 
+/**
+ * Record this month's depreciation for one asset (the Record value drop
+ * button). Uses the same shared path as the bulk run and the nightly job: one
+ * charge per calendar month, and the date must not be locked.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -40,15 +40,6 @@ export async function POST(
       );
     }
 
-    // periodIndex MUST be the count of depreciation entries already booked for
-    // this asset (never derived from accumulated/monthly — that breaks for
-    // declining-balance, SYD and any uneven schedule).
-    const [priorCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(depreciationEntry)
-      .where(eq(depreciationEntry.fixedAssetId, asset.id));
-    const periodIndex = Number(priorCount?.count ?? 0);
-
     // Units-of-production assets need a usage reading for the period; optional
     // for time-based methods.
     let unitsThisPeriod: number | undefined;
@@ -60,117 +51,34 @@ export async function POST(
       // no JSON body — fine for time-based methods
     }
 
+    if (asset.depreciationMethod === "units_of_production" && !unitsThisPeriod) {
+      return NextResponse.json(
+        { error: "Enter how many units were used this period" },
+        { status: 400 }
+      );
+    }
+
     const today = new Date().toISOString().split("T")[0];
+    const result = await postAssetDepreciation(asset, { date: today, unitsThisPeriod, ctx });
 
-    const amount = calculateMonthlyDepreciation({
-      purchasePrice: asset.purchasePrice,
-      residualValue: asset.residualValue,
-      usefulLifeMonths: asset.usefulLifeMonths,
-      depreciationMethod: asset.depreciationMethod,
-      accumulatedDepreciation: asset.accumulatedDepreciation,
-      purchaseDate: asset.purchaseDate,
-      periodIndex,
-      convention: asset.convention,
-      inServiceDate: asset.inServiceDate ?? asset.purchaseDate,
-      totalExpectedUnits: asset.totalExpectedUnits,
-      unitsThisPeriod,
-      periodDate: today,
-    });
-
-    if (amount <= 0) {
+    if (result.status === "already_this_month") {
+      return NextResponse.json(
+        { error: `This month's value drop is already recorded (${result.month}). Undo it first to record it again.` },
+        { status: 409 }
+      );
+    }
+    if (result.status === "nothing_due") {
       return NextResponse.json(
         { error: "No depreciation remaining" },
         { status: 400 }
       );
     }
 
-    // Create journal entry if accounts are configured
-    let journalEntryId: string | null = null;
-
-    if (asset.depreciationAccountId && asset.accumulatedDepAccountId) {
-      const [maxResult] = await db
-        .select({
-          max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
-        })
-        .from(journalEntry)
-        .where(eq(journalEntry.organizationId, ctx.organizationId));
-
-      const entryNumber = (maxResult?.max || 0) + 1;
-
-      const [entry] = await db
-        .insert(journalEntry)
-        .values({
-          organizationId: ctx.organizationId,
-          entryNumber,
-          date: today,
-          description: `Depreciation - ${asset.name} (${asset.assetNumber})`,
-          reference: asset.assetNumber,
-          status: "posted",
-          sourceType: "depreciation",
-          sourceId: asset.id,
-          postedAt: new Date(),
-          createdBy: ctx.userId,
-        })
-        .returning();
-
-      journalEntryId = entry.id;
-
-      // DR Depreciation Expense, CR Accumulated Depreciation
-      await db.insert(journalLine).values([
-        {
-          journalEntryId: entry.id,
-          accountId: asset.depreciationAccountId,
-          description: `Depreciation - ${asset.name}`,
-          debitAmount: amount,
-          creditAmount: 0,
-        },
-        {
-          journalEntryId: entry.id,
-          accountId: asset.accumulatedDepAccountId,
-          description: `Depreciation - ${asset.name}`,
-          debitAmount: 0,
-          creditAmount: amount,
-        },
-      ]);
-    }
-
-    // Create depreciation entry
-    const [depEntry] = await db
-      .insert(depreciationEntry)
-      .values({
-        fixedAssetId: asset.id,
-        date: today,
-        amount,
-        unitsThisPeriod: unitsThisPeriod ?? null,
-        journalEntryId,
-      })
-      .returning();
-
-    // Update asset totals
-    const newAccumulated = asset.accumulatedDepreciation + amount;
-    const newNetBookValue = asset.purchasePrice - newAccumulated;
-    const newStatus =
-      newNetBookValue <= asset.residualValue ? "fully_depreciated" : "active";
-
-    await db
-      .update(fixedAsset)
-      .set({
-        accumulatedDepreciation: newAccumulated,
-        netBookValue: newNetBookValue,
-        status: newStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(fixedAsset.id, id));
-
-    logAudit({ ctx, action: "depreciate", entityType: "fixed_asset", entityId: id, changes: { previousStatus: asset.status }, request });
+    logAudit({ ctx, action: "depreciate", entityType: "fixed_asset", entityId: id, changes: { amount: result.amount, journalEntryId: result.journalEntryId }, request });
 
     return NextResponse.json({
-      depreciationEntry: depEntry,
-      asset: {
-        accumulatedDepreciation: newAccumulated,
-        netBookValue: newNetBookValue,
-        status: newStatus,
-      },
+      depreciationEntry: result.depreciationEntry,
+      asset: result.asset,
     });
   } catch (err) {
     return handleError(err);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Scale, Percent, Pencil, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import {
   Sheet,
   SheetContent,
@@ -111,7 +112,7 @@ function ComponentsEditor({ components, setComponents }: { components: TaxCompon
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Split this tax into separate parts (for example GST and PST) when each part needs its own rate or ledger account.
+        Split this tax into separate parts (for example GST and PST) when each part needs its own rate or ledger account. The rate becomes the total of the parts, and each line&apos;s tax is shared between them by rate.
       </p>
       {components.length > 0 && (
         <div className="space-y-3 rounded-md border p-3">
@@ -161,10 +162,22 @@ function TaxRateFormFields({
   components: TaxComponent[]; setComponents: (c: TaxComponent[]) => void;
 }) {
   const kindHelp = KIND_OPTIONS.find((k) => k.value === kind)?.help;
+  const namedParts = components.filter((c) => c.name.trim());
+  const partsTotal = namedParts.reduce((s, c) => s + c.rate, 0);
   return (
     <>
       <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GST 10%" required /></div>
-      <div className="space-y-2"><Label>Rate (%)</Label><Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required /></div>
+      <div className="space-y-2">
+        <Label>Rate (%)</Label>
+        {namedParts.length > 0 ? (
+          <>
+            <Input value={(partsTotal / 100).toFixed(2)} disabled />
+            <p className="text-xs text-muted-foreground">The total of the parts below.</p>
+          </>
+        ) : (
+          <Input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10.00" required />
+        )}
+      </div>
       <div className="space-y-2"><Label>Applies to</Label>
         <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="sales">Sales</SelectItem><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent>
@@ -208,9 +221,11 @@ function buildPayload(opts: {
     : opts.kind === "standard"
       ? 10000
       : 0;
+  const parts = opts.components.filter((c) => c.name.trim());
   return {
     name: opts.name,
-    rate: Math.round(parseFloat(opts.rate) * 100),
+    // A compound rate charges the total of its parts.
+    rate: parts.length > 0 ? parts.reduce((s, c) => s + c.rate, 0) : Math.round(parseFloat(opts.rate) * 100),
     type: opts.type,
     kind: opts.kind,
     recoverablePercent,
@@ -227,33 +242,14 @@ interface CountryProfile {
 
 // Shown when the org has no tax rates yet: one click seeds the country's
 // standard tax rates so the user doesn't have to type them all out by hand.
-function QuickSetup({ orgId, onSeeded }: { orgId: string | null; onSeeded: () => void }) {
-  const [profiles, setProfiles] = useState<CountryProfile[]>([]);
-  const [recommended, setRecommended] = useState<string | null>(null);
-  const [country, setCountry] = useState<string>("");
+function QuickSetup({ orgId }: { orgId: string | null }) {
+  // If this fails the picker stays empty; the seed button is still usable
+  const { data } = useApi<{ profiles?: CountryProfile[]; recommendedCountry?: string | null }>("/api/v1/tax-profiles");
+  const profiles: CountryProfile[] = Array.isArray(data?.profiles) ? data.profiles.map((p) => ({ country: p.country, countryName: p.countryName })) : [];
+  const recommended = data?.recommendedCountry || null;
+  const [picked, setCountry] = useState<string | null>(null);
+  const country = picked ?? recommended ?? "";
   const [seeding, setSeeding] = useState(false);
-
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/v1/tax-profiles", { headers: { "x-organization-id": orgId } });
-        const data = await res.json();
-        if (cancelled) return;
-        if (Array.isArray(data.profiles)) {
-          setProfiles(data.profiles.map((p: CountryProfile) => ({ country: p.country, countryName: p.countryName })));
-        }
-        if (data.recommendedCountry) {
-          setRecommended(data.recommendedCountry);
-          setCountry(data.recommendedCountry);
-        }
-      } catch {
-        /* leave the picker empty; the seed button is still usable */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [orgId]);
 
   async function handleSeed() {
     if (!orgId) return;
@@ -274,7 +270,6 @@ function QuickSetup({ orgId, onSeeded }: { orgId: string | null; onSeeded: () =>
       } else {
         toast.info("Those tax rates were already set up");
       }
-      onSeeded();
     } catch {
       toast.error("Couldn't add tax rates — try again");
     } finally {
@@ -321,7 +316,7 @@ function QuickSetup({ orgId, onSeeded }: { orgId: string | null; onSeeded: () =>
   );
 }
 
-function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolean; setOpen: (v: boolean) => void; onCreated: () => void; orgId: string | null }) {
+function CreateTaxRateDialog({ open, setOpen, orgId }: { open: boolean; setOpen: (v: boolean) => void; orgId: string | null }) {
   const [name, setName] = useState("");
   const [rate, setRate] = useState("");
   const [type, setType] = useState("both");
@@ -349,7 +344,6 @@ function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolea
       setKind("standard");
       setRecoverable("100");
       setComponents([]);
-      onCreated();
     } catch { toast.error("Failed to create tax rate"); }
     finally { setSaving(false); }
   }
@@ -380,8 +374,8 @@ function CreateTaxRateDialog({ open, setOpen, onCreated, orgId }: { open: boolea
 }
 
 export default function TaxRatesPage() {
-  const [rates, setRates] = useState<TaxRate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ taxRates?: TaxRate[] }>("/api/v1/tax-rates");
+  const rates = data?.taxRates ?? [];
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
   const [editName, setEditName] = useState("");
@@ -394,20 +388,6 @@ export default function TaxRatesPage() {
   useDocumentTitle("Tax · Tax Rates");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  async function fetchRates() {
-    if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } });
-      const data = await res.json();
-      if (data.taxRates) setRates(data.taxRates);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchRates(); }, [orgId]);
 
   const salesCount = rates.filter((r) => r.type === "sales" || r.type === "both").length;
   const purchaseCount = rates.filter((r) => r.type === "purchase" || r.type === "both").length;
@@ -437,7 +417,6 @@ export default function TaxRatesPage() {
       });
       if (!res.ok) throw new Error("Failed");
       setEditing(null);
-      await fetchRates();
       toast.success("Tax rate updated");
     } catch { toast.error("Failed to update tax rate"); }
     finally { setEditSaving(false); }
@@ -449,7 +428,7 @@ export default function TaxRatesPage() {
         title="Tax Rates"
         description="Define tax rates to apply on invoices and bills."
       >
-        <CreateTaxRateDialog open={open} setOpen={setOpen} onCreated={fetchRates} orgId={orgId} />
+        <CreateTaxRateDialog open={open} setOpen={setOpen} orgId={orgId} />
       </PageHeader>
 
       {/* Summary KPIs */}
@@ -487,7 +466,7 @@ export default function TaxRatesPage() {
       {loading ? (
         <BrandLoader className="h-48" />
       ) : rates.length === 0 ? (
-        <QuickSetup orgId={orgId} onSeeded={fetchRates} />
+        <QuickSetup orgId={orgId} />
       ) : (
         <div className="space-y-2.5">
           {rates.map((rate) => {

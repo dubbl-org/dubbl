@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { revenueSchedule, revenueEntry } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { handleError, notFound, validationError } from "@/lib/api/response";
+import { requireRole } from "@/lib/api/require-role";
+import { error, handleError, notFound } from "@/lib/api/response";
+import {
+  cancelRevenueSchedule,
+  getRevenueSchedule,
+  RevenueScheduleError,
+} from "@/lib/api/revenue-schedules";
 
 export async function GET(
   request: Request,
@@ -13,14 +16,7 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const schedule = await db.query.revenueSchedule.findFirst({
-      where: and(
-        eq(revenueSchedule.id, id),
-        eq(revenueSchedule.organizationId, ctx.organizationId)
-      ),
-      with: { entries: true },
-    });
-
+    const schedule = await getRevenueSchedule(ctx.organizationId, id);
     if (!schedule) {
       return notFound("Revenue schedule");
     }
@@ -31,6 +27,10 @@ export async function GET(
   }
 }
 
+/**
+ * Cancel the schedule. Income not counted yet goes back to the income account
+ * (dated today); periods already counted stay.
+ */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -38,33 +38,16 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:revenue");
 
-    const schedule = await db.query.revenueSchedule.findFirst({
-      where: and(
-        eq(revenueSchedule.id, id),
-        eq(revenueSchedule.organizationId, ctx.organizationId)
-      ),
-      with: { entries: true },
-    });
-
-    if (!schedule) {
-      return notFound("Revenue schedule");
-    }
-
-    const allRecognized = schedule.entries.every((e) => e.recognized);
-    if (allRecognized && schedule.entries.length > 0) {
-      return validationError(
-        "Cannot cancel a schedule where all entries are already recognized"
-      );
-    }
-
-    await db
-      .update(revenueSchedule)
-      .set({ status: "cancelled", updatedAt: new Date() })
-      .where(eq(revenueSchedule.id, id));
+    await cancelRevenueSchedule(
+      { organizationId: ctx.organizationId, userId: ctx.userId, auth: ctx },
+      id
+    );
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof RevenueScheduleError) return error(err.message, err.status);
     return handleError(err);
   }
 }

@@ -18,18 +18,22 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { formatMoney } from "@/lib/money";
+import { useAccountContext } from "./layout";
 
 interface LedgerEntry {
   entryId: string;
   entryNumber: number;
   date: string;
   description: string;
-  debitAmount: string;
-  creditAmount: string;
-  balance: string;
+  // Integer cents, like every amount the API returns.
+  debitAmount: number;
+  creditAmount: number;
+  balance: number;
 }
 
-const ledgerColumns: Column<LedgerEntry>[] = [
+const ledgerColumns = (currency: string): Column<LedgerEntry>[] => [
   {
     key: "number",
     header: "#",
@@ -60,7 +64,7 @@ const ledgerColumns: Column<LedgerEntry>[] = [
     className: "w-28 text-right",
     render: (r) => (
       <span className="font-mono text-sm tabular-nums">
-        {parseFloat(r.debitAmount) > 0 ? parseFloat(r.debitAmount).toFixed(2) : ""}
+        {r.debitAmount > 0 ? formatMoney(r.debitAmount, currency) : ""}
       </span>
     ),
   },
@@ -70,7 +74,7 @@ const ledgerColumns: Column<LedgerEntry>[] = [
     className: "w-28 text-right",
     render: (r) => (
       <span className="font-mono text-sm tabular-nums">
-        {parseFloat(r.creditAmount) > 0 ? parseFloat(r.creditAmount).toFixed(2) : ""}
+        {r.creditAmount > 0 ? formatMoney(r.creditAmount, currency) : ""}
       </span>
     ),
   },
@@ -80,7 +84,7 @@ const ledgerColumns: Column<LedgerEntry>[] = [
     className: "w-28 text-right",
     render: (r) => (
       <span className="font-mono text-sm font-medium tabular-nums">
-        {parseFloat(r.balance).toFixed(2)}
+        {formatMoney(r.balance, currency)}
       </span>
     ),
   },
@@ -88,10 +92,9 @@ const ledgerColumns: Column<LedgerEntry>[] = [
 
 export default function AccountLedgerPage() {
   const { id } = useParams<{ id: string }>();
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-
+  const { account } = useAccountContext();
+  const currency = account?.currencyCode || "USD";
+  const columns = useMemo(() => ledgerColumns(currency), [currency]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
   const [dateFrom, setDateFrom] = useState("");
@@ -99,10 +102,8 @@ export default function AccountLedgerPage() {
   const [sort, setSort] = useState("date:desc");
   const [entryType, setEntryType] = useState("all");
 
-  const [refetching, setRefetching] = useState(false);
-  const [fetchKey, setFetchKey] = useState(0);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  // Pages loaded by scrolling, on top of the cached first page. Tied to the filters they were loaded for.
+  const [more, setMore] = useState<{ key: string; rows: LedgerEntry[]; page: number; total: number; hasMore: boolean } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -126,41 +127,21 @@ export default function AccountLedgerPage() {
     return params;
   }, [debouncedSearch, dateFrom, dateTo, entryType, sort]);
 
-  useEffect(() => {
-    if (!orgId) return;
-    let cancelled = false;
-    const isRefetch = !loading;
-    setPage(1);
-    setHasMore(true);
-    if (isRefetch) setRefetching(true);
-
-    fetch(`/api/v1/accounts/${id}?${buildParams(1)}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.data) setLedger(data.data);
-        if (data.pagination) {
-          setTotal(data.pagination.total);
-          setHasMore(data.pagination.page < data.pagination.totalPages);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setRefetching(false);
-          setFetchKey((k) => k + 1);
-        }
-      });
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, debouncedSearch, dateFrom, dateTo, entryType, sort]);
+  const firstUrl = `/api/v1/accounts/${id}?${buildParams(1)}`;
+  const { data: first, refreshing } = useApi<{ data?: LedgerEntry[]; pagination?: { page: number; total: number; totalPages: number } }>(firstUrl, {
+    keepPrevious: true,
+    learn: !debouncedSearch,
+  });
+  const extra = more?.key === firstUrl ? more : null;
+  const ledger = useMemo(() => [...(first?.data ?? []), ...(extra?.rows ?? [])], [first, extra]);
+  const total = extra?.total ?? first?.pagination?.total ?? 0;
+  const page = extra?.page ?? 1;
+  const hasMore = extra ? extra.hasMore : first?.pagination ? first.pagination.page < first.pagination.totalPages : false;
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore || !orgId) return;
     const nextPage = page + 1;
+    const key = firstUrl;
     setLoadingMore(true);
 
     fetch(`/api/v1/accounts/${id}?${buildParams(nextPage)}`, {
@@ -168,15 +149,19 @@ export default function AccountLedgerPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.data) setLedger((prev) => [...prev, ...data.data]);
-        if (data.pagination) {
-          setPage(data.pagination.page);
-          setTotal(data.pagination.total);
-          setHasMore(data.pagination.page < data.pagination.totalPages);
-        }
+        setMore((prev) => {
+          const base = prev?.key === key ? prev : { key, rows: [] as LedgerEntry[], page: 1, total: 0, hasMore: true };
+          return {
+            key,
+            rows: data.data ? [...base.rows, ...data.data] : base.rows,
+            page: data.pagination ? data.pagination.page : base.page,
+            total: data.pagination ? data.pagination.total : base.total,
+            hasMore: data.pagination ? data.pagination.page < data.pagination.totalPages : base.hasMore,
+          };
+        });
       })
       .finally(() => setLoadingMore(false));
-  }, [loadingMore, hasMore, page, id, orgId, buildParams]);
+  }, [loadingMore, hasMore, page, id, orgId, buildParams, firstUrl]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -188,12 +173,6 @@ export default function AccountLedgerPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMore]);
-
-  const summary = useMemo(() => {
-    const totalDebits = ledger.reduce((s, e) => s + parseFloat(e.debitAmount), 0);
-    const totalCredits = ledger.reduce((s, e) => s + parseFloat(e.creditAmount), 0);
-    return { totalDebits, totalCredits };
-  }, [ledger]);
 
   const hasFilters = search || dateFrom || dateTo || entryType !== "all";
 
@@ -281,7 +260,7 @@ export default function AccountLedgerPage() {
         )}
       </div>
 
-      {refetching || pendingSearch ? (
+      {pendingSearch ? (
         <div className="flex items-center justify-center py-20">
           <div className="brand-loader" aria-label="Loading">
             <div className="brand-loader-circle brand-loader-circle-1" />
@@ -291,7 +270,7 @@ export default function AccountLedgerPage() {
       ) : (
         <MotionConfig reducedMotion="never">
           <motion.div
-            key={fetchKey}
+            key={firstUrl}
             initial={{ opacity: 0, y: 12, filter: "blur(10px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
@@ -299,7 +278,7 @@ export default function AccountLedgerPage() {
             className="overflow-x-auto"
           >
             <DataTable
-              columns={ledgerColumns}
+              columns={columns}
               data={ledger}
               emptyMessage={hasFilters ? "No entries match your filters." : "No transactions in this account yet."}
             />
@@ -307,7 +286,7 @@ export default function AccountLedgerPage() {
         </MotionConfig>
       )}
 
-      {hasMore && !refetching && <div ref={sentinelRef} className="h-1" />}
+      {hasMore && !refreshing && <div ref={sentinelRef} className="h-1" />}
       {loadingMore && (
         <div className="flex items-center justify-center py-4">
           <div className="brand-loader" aria-label="Loading more">

@@ -7,8 +7,10 @@ import { handleError } from "@/lib/api/response";
 import { centsToDecimal } from "@/lib/money";
 import { requireRole } from "@/lib/api/require-role";
 import { assertNotLocked } from "@/lib/api/period-lock";
+import { assertCostCentersActive } from "@/lib/api/cost-centers";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
 const updateLineSchema = z.object({
@@ -142,6 +144,17 @@ export async function PUT(
       );
     }
 
+    // Lines are replaced wholesale; cost centers already on the entry stay allowed.
+    const savedLines = await db.query.journalLine.findMany({
+      where: eq(journalLine.journalEntryId, id),
+      columns: { costCenterId: true },
+    });
+    await assertCostCentersActive(
+      ctx.organizationId,
+      parsed.lines.map((l) => l.costCenterId),
+      savedLines.map((l) => l.costCenterId)
+    );
+
     const updated = await db.transaction(async (tx) => {
       const [entry] = await tx
         .update(journalEntry)
@@ -199,6 +212,10 @@ export async function PUT(
       request,
     });
 
+    // An approval covers the entry as it was: editing it cancels any pending
+    // or granted approval, so it has to be submitted again.
+    await cancelApprovalRequests(ctx.organizationId, "journal_entry", id);
+
     return NextResponse.json({ entry: updated });
   } catch (err) {
     return handleError(err);
@@ -235,6 +252,8 @@ export async function DELETE(
 
     await db.delete(journalLine).where(eq(journalLine.journalEntryId, id));
     await db.delete(journalEntry).where(eq(journalEntry.id, id));
+    // Nothing left to approve.
+    await cancelApprovalRequests(ctx.organizationId, "journal_entry", id, ["pending"]);
 
     return NextResponse.json({ success: true });
   } catch (err) {

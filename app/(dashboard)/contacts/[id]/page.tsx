@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Section } from "@/components/dashboard/section";
@@ -18,8 +18,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { decimalToCents } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { TagPicker } from "@/components/dashboard/tag-picker";
 import { useContactContext, getOrgId } from "./layout";
 import type { Account, TaxRate, ContactDetail } from "./layout";
 
@@ -51,35 +53,12 @@ export default function ContactDetailsPage() {
   } = useContactContext();
 
   const [deleting] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-
-  const fetchReferenceData = useCallback(() => {
-    const orgId = getOrgId();
-    if (!orgId) return;
-
-    fetch("/api/v1/accounts", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.accounts) setAccounts(data.accounts);
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/tax-rates", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.taxRates) setTaxRates(data.taxRates);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetchReferenceData();
-  }, [fetchReferenceData]);
+  const [w9Class, setW9Class] = useState<string>(contact?.w9TaxClassification || "none");
+  const [backupWithholding, setBackupWithholding] = useState<boolean>(contact?.backupWithholding ?? false);
+  const { data: accountsData } = useApi<{ accounts?: Account[] }>("/api/v1/accounts");
+  const { data: taxRatesData } = useApi<{ taxRates?: TaxRate[] }>("/api/v1/tax-rates");
+  const accounts = accountsData?.accounts ?? [];
+  const taxRates = taxRatesData?.taxRates ?? [];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -103,13 +82,22 @@ export default function ContactDetailsPage() {
           phone: form.get("phone") || null,
           taxNumber: form.get("taxNumber") || null,
           type: formType,
-          paymentTermsDays:
-            parseInt(form.get("paymentTermsDays") as string) || 30,
+          // 0 = due on receipt, so only fall back when the field isn't a number.
+          paymentTermsDays: Number.isNaN(parseInt(form.get("paymentTermsDays") as string))
+            ? 30
+            : parseInt(form.get("paymentTermsDays") as string),
           creditLimit: creditLimitValue
             ? decimalToCents(creditLimitValue)
             : null,
           isTaxExempt: formTaxExempt,
           is1099Vendor: form1099Vendor,
+          ...(form1099Vendor
+            ? {
+                w9TaxClassification: w9Class === "none" ? null : w9Class,
+                taxIdentifier: (form.get("taxIdentifier") as string | null)?.trim() || null,
+                backupWithholding: backupWithholding,
+              }
+            : {}),
           currencyCode: formCurrencyCode || null,
           defaultRevenueAccountId: formRevenueAccountId !== "none" ? formRevenueAccountId : null,
           defaultExpenseAccountId: formExpenseAccountId !== "none" ? formExpenseAccountId : null,
@@ -122,14 +110,6 @@ export default function ContactDetailsPage() {
       const data = await res.json();
       const c = data.contact as ContactDetail;
       setContact(c);
-      setFormType(c.type);
-      setFormRevenueAccountId(c.defaultRevenueAccountId || "none");
-      setFormExpenseAccountId(c.defaultExpenseAccountId || "none");
-      setFormTaxRateId(c.defaultTaxRateId || "none");
-      setFormTaxExempt(c.isTaxExempt);
-      setForm1099Vendor(c.is1099Vendor ?? false);
-      setFormCreditLimit(c.creditLimit != null ? String(c.creditLimit / 100) : "");
-      setFormCurrencyCode(c.currencyCode || "");
       toast.success("Contact updated");
     } catch {
       toast.error("Failed to update contact");
@@ -197,6 +177,10 @@ export default function ContactDetailsPage() {
                 <Label className="text-xs">Tax number / VAT</Label>
                 <Input name="taxNumber" defaultValue={contact.taxNumber || ""} placeholder="e.g. US12-3456789" />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tags</Label>
+              <TagPicker entityType="contact" entityId={id} />
             </div>
           </div>
         </Section>
@@ -275,6 +259,51 @@ export default function ContactDetailsPage() {
                   </span>
                 </Label>
               </div>
+              {form1099Vendor && (
+                <div className="mt-3 grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">W-9 tax classification</Label>
+                    <Select value={w9Class} onValueChange={setW9Class}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        <SelectItem value="individual">Individual / sole proprietor</SelectItem>
+                        <SelectItem value="c_corp">C corporation</SelectItem>
+                        <SelectItem value="s_corp">S corporation</SelectItem>
+                        <SelectItem value="partnership">Partnership</SelectItem>
+                        <SelectItem value="trust_estate">Trust / estate</SelectItem>
+                        <SelectItem value="llc">LLC</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="taxIdentifier" className="text-xs">Tax ID (SSN or EIN from their W-9)</Label>
+                    <Input
+                      id="taxIdentifier"
+                      name="taxIdentifier"
+                      defaultValue={contact?.taxIdentifier ?? ""}
+                      placeholder="12-3456789"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="flex items-start space-x-2 sm:col-span-2">
+                    <Checkbox
+                      id="backupWithholding"
+                      className="mt-0.5"
+                      checked={backupWithholding}
+                      onCheckedChange={(checked) => setBackupWithholding(checked === true)}
+                    />
+                    <Label htmlFor="backupWithholding" className="cursor-pointer text-sm font-normal leading-snug">
+                      Backup withholding
+                      <span className="block text-[12px] font-normal text-muted-foreground">
+                        Hold back 24% of payments, usually because their tax ID is missing or wrong.
+                      </span>
+                    </Label>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Section>

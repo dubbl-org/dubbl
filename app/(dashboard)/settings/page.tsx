@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Check, ChevronsUpDown, Lock } from "lucide-react";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,14 @@ import {
   getCountryByCode,
 } from "@/lib/data/business-types";
 import { Section } from "@/components/dashboard/section";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface OrgSettings {
   id: string;
@@ -59,6 +68,11 @@ interface OrgSettings {
   contactWebsite: string | null;
   defaultPaymentTerms: string | null;
   industrySector: string | null;
+  peppolId?: string | null;
+  peppolScheme?: string | null;
+  interestRate?: number | null;
+  interestMethod?: string | null;
+  interestGraceDays?: number | null;
 }
 
 const MONTHS = [
@@ -66,35 +80,108 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+type OrgForm = {
+  name: string;
+  country: string;
+  businessType: string;
+  defaultCurrency: string;
+  fiscalYearStartMonth: string;
+  countryCode: string;
+  taxId: string;
+  businessRegistrationNumber: string;
+  legalEntityType: string;
+  addressStreet: string;
+  addressCity: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
+  contactPhone: string;
+  contactEmail: string;
+  contactWebsite: string;
+  defaultPaymentTerms: string;
+  industrySector: string;
+  interestPercent: string;
+  interestMethod: string;
+  interestGraceDays: string;
+};
+
+function toForm(o: OrgSettings | null | undefined): OrgForm {
+  if (!o) {
+    return {
+      name: "",
+      country: "",
+      businessType: "",
+      defaultCurrency: "USD",
+      fiscalYearStartMonth: "1",
+      countryCode: "",
+      taxId: "",
+      businessRegistrationNumber: "",
+      legalEntityType: "",
+      addressStreet: "",
+      addressCity: "",
+      addressState: "",
+      addressPostalCode: "",
+      addressCountry: "",
+      contactPhone: "",
+      contactEmail: "",
+      contactWebsite: "",
+      defaultPaymentTerms: "",
+      industrySector: "",
+      interestPercent: "",
+      interestMethod: "simple",
+      interestGraceDays: "0",
+    };
+  }
+  return {
+    name: o.name,
+    country: o.country ?? "",
+    businessType: o.businessType ?? "",
+    defaultCurrency: o.defaultCurrency,
+    fiscalYearStartMonth: String(o.fiscalYearStartMonth),
+    countryCode: o.countryCode || "",
+    taxId: o.taxId || "",
+    businessRegistrationNumber: o.businessRegistrationNumber || "",
+    legalEntityType: o.legalEntityType || "",
+    addressStreet: o.addressStreet || "",
+    addressCity: o.addressCity || "",
+    addressState: o.addressState || "",
+    addressPostalCode: o.addressPostalCode || "",
+    addressCountry: o.addressCountry || "",
+    contactPhone: o.contactPhone || "",
+    contactEmail: o.contactEmail || "",
+    contactWebsite: o.contactWebsite || "",
+    defaultPaymentTerms: o.defaultPaymentTerms || "",
+    industrySector: o.industrySector || "",
+    // Stored in basis points (850 = 8.5%); edited as a percentage.
+    interestPercent: o.interestRate != null ? String(o.interestRate / 100) : "",
+    interestMethod: o.interestMethod || "simple",
+    interestGraceDays: String(o.interestGraceDays ?? 0),
+  };
+}
+
 export default function SettingsPage() {
-  const [, setOrg] = useState<OrgSettings | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    country: "" as string,
-    businessType: "" as string,
-    defaultCurrency: "USD",
-    fiscalYearStartMonth: "1",
-    countryCode: "",
-    taxId: "",
-    businessRegistrationNumber: "",
-    legalEntityType: "",
-    addressStreet: "",
-    addressCity: "",
-    addressState: "",
-    addressPostalCode: "",
-    addressCountry: "",
-    contactPhone: "",
-    contactEmail: "",
-    contactWebsite: "",
-    defaultPaymentTerms: "",
-    industrySector: "",
-  });
+  const { data: orgData } = useApi<{ organization?: OrgSettings }>("/api/v1/organization");
+  const { data: lockData } = useApi<{ periodLock?: { lockDate?: string | null; advisorLockDate?: string | null } | null }>("/api/v1/period-lock");
+  const cache = useApiCache();
+  const org = orgData?.organization ?? null;
+  const [draft, setDraft] = useState<OrgForm | null>(null);
+  const form = draft ?? toForm(org);
+  const setForm = (next: OrgForm | ((prev: OrgForm) => OrgForm)) =>
+    setDraft((prev) => (typeof next === "function" ? next(prev ?? form) : next));
   const [saving, setSaving] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
-  const [lockDate, setLockDate] = useState("");
+  const [lockDraft, setLockDate] = useState<string | null>(null);
+  const lockDate = lockDraft ?? lockData?.periodLock?.lockDate ?? "";
+  const [advisorLockDraft, setAdvisorLockDate] = useState<string | null>(null);
+  const advisorLockDate = advisorLockDraft ?? lockData?.periodLock?.advisorLockDate ?? "";
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [lockSaving, setLockSaving] = useState(false);
-  const [peppolId, setPeppolId] = useState("");
-  const [peppolScheme, setPeppolScheme] = useState("");
+  const [peppolIdDraft, setPeppolId] = useState<string | null>(null);
+  const [peppolSchemeDraft, setPeppolScheme] = useState<string | null>(null);
+  const peppolId = peppolIdDraft ?? org?.peppolId ?? "";
+  const peppolScheme = peppolSchemeDraft ?? org?.peppolScheme ?? "";
 
   useDocumentTitle("Settings · General");
 
@@ -102,55 +189,6 @@ export default function SettingsPage() {
     () => (form.countryCode ? getBusinessTypesForCountry(form.countryCode) : []),
     [form.countryCode]
   );
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    // Fetch period lock
-    fetch("/api/v1/period-lock", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.lock?.lockDate) setLockDate(data.lock.lockDate);
-      })
-      .catch(() => {});
-
-    fetch("/api/v1/organization", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.organization) {
-          const o = data.organization;
-          setOrg(o);
-          setPeppolId(o.peppolId || "");
-          setPeppolScheme(o.peppolScheme || "");
-          setForm({
-            name: o.name,
-            country: o.country ?? "",
-            businessType: o.businessType ?? "",
-            defaultCurrency: o.defaultCurrency,
-            fiscalYearStartMonth: String(o.fiscalYearStartMonth),
-            countryCode: o.countryCode || "",
-            taxId: o.taxId || "",
-            businessRegistrationNumber: o.businessRegistrationNumber || "",
-            legalEntityType: o.legalEntityType || "",
-            addressStreet: o.addressStreet || "",
-            addressCity: o.addressCity || "",
-            addressState: o.addressState || "",
-            addressPostalCode: o.addressPostalCode || "",
-            addressCountry: o.addressCountry || "",
-            contactPhone: o.contactPhone || "",
-            contactEmail: o.contactEmail || "",
-            contactWebsite: o.contactWebsite || "",
-            defaultPaymentTerms: o.defaultPaymentTerms || "",
-            industrySector: o.industrySector || "",
-          });
-        }
-      });
-  }, []);
 
   function handleCountryChange(countryCode: string) {
     const country = getCountryByCode(countryCode);
@@ -197,14 +235,45 @@ export default function SettingsPage() {
           industrySector: form.industrySector || null,
           peppolId: peppolId || null,
           peppolScheme: peppolScheme || null,
+          interestRate: form.interestPercent.trim()
+            ? Math.round(parseFloat(form.interestPercent) * 100)
+            : null,
+          interestMethod: form.interestMethod,
+          interestGraceDays: parseInt(form.interestGraceDays) || 0,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      if (json.organization) cache.set("/api/v1/organization", { organization: json.organization });
+      setDraft(null);
+      setPeppolId(null);
+      setPeppolScheme(null);
       toast.success("Settings saved");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteOrganization() {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/v1/organization", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ confirmName: deleteConfirm }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Failed to delete organization");
+      // Open whichever organization is left, or onboarding when there's none.
+      localStorage.removeItem("activeOrgId");
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete organization");
+      setDeleting(false);
     }
   }
 
@@ -511,17 +580,54 @@ export default function SettingsPage() {
 
       <div className="h-px bg-border" />
 
-      {/* Save */}
-      <div className="flex justify-end">
-        <Button
-          onClick={save}
-          disabled={saving}
-          size="sm"
-          className="bg-brand-600 hover:bg-brand-700"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </Button>
-      </div>
+      {/* Late payment interest */}
+      <Section title="Late payment interest" description="What Charge interest on an overdue invoice bills the customer for paying late. Leave the rate blank if you don't charge interest.">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Annual interest rate (%)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.interestPercent}
+              onChange={(e) =>
+                setForm({ ...form, interestPercent: e.target.value })
+              }
+              placeholder="e.g. 8"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Interest method</Label>
+            <Select
+              value={form.interestMethod}
+              onValueChange={(v) => setForm({ ...form, interestMethod: v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simple">Simple</SelectItem>
+                <SelectItem value="compound">Compound (daily)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Grace period (days)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={form.interestGraceDays}
+              onChange={(e) =>
+                setForm({ ...form, interestGraceDays: e.target.value })
+              }
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Interest runs on the amount still due, from the end of the grace period after the due date.
+        </p>
+      </Section>
 
       <div className="h-px bg-border" />
 
@@ -549,7 +655,6 @@ export default function SettingsPage() {
                 <SelectItem value="0088">0088 - EAN/GLN</SelectItem>
                 <SelectItem value="0007">0007 - SE Org Nr</SelectItem>
                 <SelectItem value="0009">0009 - FR SIRET</SelectItem>
-                <SelectItem value="0088">0088 - GLN</SelectItem>
                 <SelectItem value="9925">9925 - IT VAT</SelectItem>
                 <SelectItem value="9930">9930 - DE VAT</SelectItem>
                 <SelectItem value="9944">9944 - GB VAT</SelectItem>
@@ -564,15 +669,37 @@ export default function SettingsPage() {
 
       <div className="h-px bg-border" />
 
+      {/* Save */}
+      <div className="flex justify-end">
+        <Button
+          onClick={save}
+          disabled={saving}
+          size="sm"
+          className="bg-brand-600 hover:bg-brand-700"
+        >
+          {saving ? "Saving..." : "Save changes"}
+        </Button>
+      </div>
+
+      <div className="h-px bg-border" />
+
       {/* Period Lock */}
-      <Section title="Lock past dates" description="Lock past dates so they can't be changed. Once set, nothing dated on or before this day can be added or edited — useful after you've filed taxes or closed your books for a period.">
-        <div className="flex items-end gap-3">
+      <Section title="Lock past dates" description="Lock past dates so they can't be changed. Once set, nothing dated on or before this day can be added or edited. Useful after you've filed taxes or closed your books for a period.">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5 flex-1 max-w-xs">
             <Label className="text-xs">Lock everything up to and including</Label>
             <Input
               type="date"
               value={lockDate}
               onChange={(e) => setLockDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5 flex-1 max-w-xs">
+            <Label className="text-xs">Advisor lock date (optional)</Label>
+            <Input
+              type="date"
+              value={advisorLockDate}
+              onChange={(e) => setAdvisorLockDate(e.target.value)}
             />
           </div>
           <Button
@@ -588,13 +715,16 @@ export default function SettingsPage() {
                 const res = await fetch("/api/v1/period-lock", {
                   method: "PUT",
                   headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-                  body: JSON.stringify({ lockDate }),
+                  body: JSON.stringify({ lockDate, advisorLockDate: advisorLockDate || null }),
                 });
                 if (!res.ok) {
                   const data = await res.json();
                   toast.error(data.error || "Failed to set lock");
                   return;
                 }
+                // The saved date is in the refreshed cache now.
+                setLockDate(null);
+                setAdvisorLockDate(null);
                 toast.success("Period locked");
               } finally {
                 setLockSaving(false);
@@ -608,8 +738,14 @@ export default function SettingsPage() {
         {lockDate && (
           <p className="text-xs text-amber-600 mt-2">
             Nothing dated on or before {lockDate} can be added or changed.
+            {advisorLockDate && advisorLockDate < lockDate
+              ? ` Your advisors can still work back to the day after ${advisorLockDate}.`
+              : ""}
           </p>
         )}
+        <p className="text-xs text-muted-foreground mt-2">
+          The advisor lock date is an earlier hard lock for your advisors (Settings &gt; Advisors): they can still change things dated after it, while your team is held to the main lock date. Leave it blank to hold everyone to the same date.
+        </p>
       </Section>
 
       <div className="h-px bg-border" />
@@ -623,11 +759,50 @@ export default function SettingsPage() {
               Permanently delete this organization and all its data.
             </p>
           </div>
-          <Button variant="destructive" size="sm" className="w-fit">
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-fit"
+            onClick={() => {
+              setDeleteConfirm("");
+              setDeleteOpen(true);
+            }}
+          >
             Delete
           </Button>
         </div>
       </Section>
+
+      <Dialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {org?.name ?? "this organization"}?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes the organization with all its books, contacts, documents and backups, cancels its subscription and removes everyone&apos;s access. It can&apos;t be undone. Download a backup first if you might need the data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Type the organization&apos;s name to confirm</Label>
+            <Input
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder={org?.name}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting || !org || deleteConfirm.trim() !== org.name.trim()}
+              onClick={deleteOrganization}
+            >
+              {deleting ? "Deleting..." : "Delete organization"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

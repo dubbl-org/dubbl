@@ -9,15 +9,20 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
+import { checkEmployeeLimit } from "@/lib/api/check-limit";
+import { resolvePayrollSettings } from "@/lib/api/payroll-withholding";
+import { syncLeaveBalances } from "@/lib/api/leave-balances";
 
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().nullable().optional(),
   employeeNumber: z.string().min(1),
   position: z.string().nullable().optional(),
+  department: z.string().trim().nullable().optional(),
   salary: z.number().int().min(0),
   payFrequency: z.enum(["weekly", "biweekly", "monthly"]).default("monthly"),
-  taxRate: z.number().int().min(0).default(2000),
+  // Defaults to the "Default Tax Rate" in payroll settings.
+  taxRate: z.number().int().min(0).max(10000).optional(),
   bankAccountNumber: z.string().nullable().optional(),
   startDate: z.string().min(1),
   endDate: z.string().nullable().optional(),
@@ -46,6 +51,9 @@ export async function GET(request: Request) {
     } else if (active === "false") {
       conditions.push(eq(payrollEmployee.isActive, false));
     }
+
+    // Keep "Time off left" current (leave accrues over time).
+    await syncLeaveBalances(ctx.organizationId);
 
     const employees = await db.query.payrollEmployee.findMany({
       where: and(...conditions),
@@ -82,6 +90,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await checkEmployeeLimit(ctx.organizationId);
+    const settings = await resolvePayrollSettings(ctx.organizationId);
 
     const [created] = await db
       .insert(payrollEmployee)
@@ -91,9 +101,10 @@ export async function POST(request: Request) {
         email: parsed.email || null,
         employeeNumber: parsed.employeeNumber,
         position: parsed.position || null,
+        department: parsed.department || null,
         salary: parsed.salary,
         payFrequency: parsed.payFrequency,
-        taxRate: parsed.taxRate,
+        taxRate: parsed.taxRate ?? settings.defaultTaxRate,
         bankAccountNumber: parsed.bankAccountNumber || null,
         startDate: parsed.startDate,
         endDate: parsed.endDate || null,

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Send, Ban, FileText } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,9 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoney, centsToDecimal } from "@/lib/money";
+import { formatMoney, centsToDecimal, decimalToMinorUnits } from "@/lib/money";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
 import Link from "next/link";
@@ -45,6 +45,7 @@ interface CreditNoteDetail {
   amountRemaining: number;
   contactId: string | null;
   invoiceId: string | null;
+  currencyCode: string;
   contact: { name: string; email: string | null } | null;
   lines: {
     id: string;
@@ -77,70 +78,57 @@ interface InvoiceOption {
   invoiceNumber: string;
   total: number;
   amountDue: number;
+  currencyCode: string;
+  contactId: string;
   contact: { name: string } | null;
 }
 
 export default function CreditNoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [cn, setCn] = useState<CreditNoteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/credit-notes/${id}`;
+  const { data, loading } = useApi<{ creditNote?: CreditNoteDetail }>(url);
+  const cn = data?.creditNote ?? null;
+  const cache = useApiCache();
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyInvoiceId, setApplyInvoiceId] = useState("");
   const [applyAmount, setApplyAmount] = useState("");
-  const [invoices, setInvoices] = useState<InvoiceOption[]>([]);
 
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
-  const [orgName, setOrgName] = useState("");
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useEntityTitle(cn?.creditNoteNumber);
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/credit-notes/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.creditNote) setCn(data.creditNote);
-      })
-      .finally(() => setLoading(false));
-    fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
-  }, [id, orgId]);
+  const { data: orgData } = useApi<{ organization?: { name?: string } }>("/api/v1/organization");
+  const orgName = orgData?.organization?.name || "";
 
-  // Fetch outstanding invoices for apply dialog
-  useEffect(() => {
-    if (!orgId || !applyOpen) return;
-    fetch(`/api/v1/invoices?limit=100`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.data) {
-          setInvoices(
-            data.data.filter((inv: InvoiceOption & { status: string }) =>
-              ["sent", "partial", "overdue"].includes(inv.status) && inv.amountDue > 0
-            )
-          );
-        }
-      });
-  }, [orgId, applyOpen]);
+  // Outstanding invoices of the same customer and currency for the apply
+  // dialog (the API rejects any other invoice).
+  const { data: invoiceData } = useApi<{ data?: (InvoiceOption & { status: string })[] }>(
+    applyOpen && cn?.contactId ? `/api/v1/invoices?contactId=${cn.contactId}&limit=100` : null
+  );
+  const invoices = useMemo<InvoiceOption[]>(
+    () =>
+      (invoiceData?.data ?? []).filter((inv) =>
+        ["sent", "partial", "overdue"].includes(inv.status) &&
+        inv.amountDue > 0 &&
+        inv.contactId === cn?.contactId &&
+        inv.currencyCode === cn?.currencyCode
+      ),
+    [invoiceData, cn?.contactId, cn?.currencyCode]
+  );
 
   function handleSendComplete() {
-    if (!orgId) return;
-    fetch(`/api/v1/credit-notes/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json()).then((data) => { if (data.creditNote) setCn(data.creditNote); });
+    // The credit note refreshes itself once the send lands.
     setEmailHistoryKey((k) => k + 1);
   }
 
   async function handleApply() {
     if (!orgId || !applyInvoiceId) return;
-    const amount = Math.round(parseFloat(applyAmount) * 100);
+    const amount = decimalToMinorUnits(applyAmount, cn?.currencyCode);
     if (!amount || amount <= 0) {
       toast.error("Enter a valid amount");
       return;
@@ -157,7 +145,7 @@ export default function CreditNoteDetailPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setCn((prev) => prev ? { ...prev, ...data.creditNote } : prev);
+        cache.update<{ creditNote?: CreditNoteDetail }>(url, (d) => d.creditNote ? { ...d, creditNote: { ...d.creditNote, ...data.creditNote } } : d);
         setApplyOpen(false);
         setApplyInvoiceId("");
         setApplyAmount("");
@@ -185,7 +173,7 @@ export default function CreditNoteDetailPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          setCn((prev) => prev ? { ...prev, ...data.creditNote } : prev);
+          cache.update<{ creditNote?: CreditNoteDetail }>(url, (d) => d.creditNote ? { ...d, creditNote: { ...d.creditNote, ...data.creditNote } } : d);
           toast.success("Credit note cancelled");
         }
       },
@@ -227,12 +215,12 @@ export default function CreditNoteDetailPage() {
                     <SelectContent>
                       {invoices.map((inv) => (
                         <SelectItem key={inv.id} value={inv.id}>
-                          {inv.invoiceNumber} · {inv.contact?.name || "Unknown"} · Due: {formatMoney(inv.amountDue)}
+                          {inv.invoiceNumber} · Due: {formatMoney(inv.amountDue, inv.currencyCode)}
                         </SelectItem>
                       ))}
                       {invoices.length === 0 && (
                         <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                          No outstanding invoices
+                          No outstanding invoices for {cn.contact?.name || "this customer"}
                         </div>
                       )}
                     </SelectContent>

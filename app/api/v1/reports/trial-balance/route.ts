@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { getFiscalYearStart } from "@/lib/api/fiscal-year-start";
 import { centsToDecimal } from "@/lib/money";
 import { aggregateAsAt, type AccountAggregate } from "@/lib/reports/gl-query";
 import type { Statement } from "@/lib/reports/statement-export";
@@ -168,6 +169,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       asAt,
+      // First day of the financial year containing asAt: where the ledger
+      // click-through starts.
+      fiscalYearStart: await getFiscalYearStart(ctx.organizationId, asAt),
       ...(hasComparatives ? { dates: allDates, compareDates } : {}),
       accounts: result.map((r) => ({
         accountId: r.accountId,

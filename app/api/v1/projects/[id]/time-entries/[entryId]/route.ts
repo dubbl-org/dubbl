@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, timeEntry } from "@/lib/db/schema";
+import { projectTask, timeEntry } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
-import { handleError, notFound } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { requireProjectAccess } from "@/lib/api/project-access";
+import { error, handleError, notFound } from "@/lib/api/response";
+import { syncProjectBilling } from "@/lib/api/project-billing";
+import { timeEntryChangeError } from "@/lib/projects/rules";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -26,15 +27,7 @@ export async function GET(
     const ctx = await getAuthContext(request);
 
     // Verify project belongs to org
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
 
     const entry = await db.query.timeEntry.findFirst({
       where: and(
@@ -58,21 +51,14 @@ export async function PATCH(
   try {
     const { id, entryId } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
     // Verify project belongs to org
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    const { access } = await requireProjectAccess(ctx, id, "contribute");
+    // An entry whose invoice was voided or deleted is editable again.
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     const existing = await db.query.timeEntry.findFirst({
       where: and(
@@ -83,23 +69,24 @@ export async function PATCH(
 
     if (!existing) return notFound("Time entry");
 
+    const blocked = timeEntryChangeError(existing, parsed, { userId: ctx.userId, access });
+    if (blocked) return error(blocked.message, blocked.status);
+
+    if (parsed.taskId) {
+      const task = await db.query.projectTask.findFirst({
+        where: and(eq(projectTask.id, parsed.taskId), eq(projectTask.projectId, id)),
+        columns: { id: true },
+      });
+      if (!task) return notFound("Task");
+    }
+
     const [updated] = await db
       .update(timeEntry)
       .set(parsed)
       .where(eq(timeEntry.id, entryId))
       .returning();
 
-    // Update project total hours if minutes changed
-    if (parsed.minutes && parsed.minutes !== existing.minutes) {
-      const diff = parsed.minutes - existing.minutes;
-      await db
-        .update(project)
-        .set({
-          totalHours: proj.totalHours + diff,
-          updatedAt: new Date(),
-        })
-        .where(eq(project.id, id));
-    }
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     return NextResponse.json({ timeEntry: updated });
   } catch (err) {
@@ -114,18 +101,10 @@ export async function DELETE(
   try {
     const { id, entryId } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     // Verify project belongs to org
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    const { access } = await requireProjectAccess(ctx, id, "contribute");
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     const existing = await db.query.timeEntry.findFirst({
       where: and(
@@ -136,16 +115,11 @@ export async function DELETE(
 
     if (!existing) return notFound("Time entry");
 
-    await db.delete(timeEntry).where(eq(timeEntry.id, entryId));
+    const blocked = timeEntryChangeError(existing, "delete", { userId: ctx.userId, access });
+    if (blocked) return error(blocked.message, blocked.status);
 
-    // Update project total hours
-    await db
-      .update(project)
-      .set({
-        totalHours: proj.totalHours - existing.minutes,
-        updatedAt: new Date(),
-      })
-      .where(eq(project.id, id));
+    await db.delete(timeEntry).where(eq(timeEntry.id, entryId));
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     return NextResponse.json({ success: true });
   } catch (err) {

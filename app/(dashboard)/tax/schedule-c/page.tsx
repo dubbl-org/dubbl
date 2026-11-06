@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { TrendingUp, TrendingDown, DollarSign, Printer, Info } from "lucide-react";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -12,11 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { BasisToggle } from "../../reports/_components";
 
 interface ScheduleCLine {
   line: string;
   label: string;
   amount: number;
+  /** Accounts mapped to the line (empty for computed lines). */
+  accounts?: { code: string; name: string; amount: number }[];
 }
 
 const INCOME_LINES = ["1", "2", "3", "4", "5", "6", "7"];
@@ -26,36 +30,18 @@ export default function ScheduleCPage() {
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(`${now.getFullYear()}-12-31`);
-  const [lines, setLines] = useState<ScheduleCLine[]>([]);
-  const [totalIncome, setTotalIncome] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
-  const [netProfit, setNetProfit] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [basis, setBasis] = useState<"accrual" | "cash">("accrual");
+  const { data, loading } = useApi<{ lines?: ScheduleCLine[]; totalIncome?: number; totalExpenses?: number; netProfit?: number; currency?: string }>(
+    `/api/v1/reports/schedule-c?${new URLSearchParams({ startDate, endDate, basis })}`,
+    { keepPrevious: true }
+  );
+  const lines = data?.lines || [];
+  const totalIncome = data?.totalIncome || 0;
+  const totalExpenses = data?.totalExpenses || 0;
+  const netProfit = data?.netProfit || 0;
+  const currency = data?.currency || "USD";
+  const money = (cents: number) => formatMoney(cents, currency);
   useDocumentTitle("Tax · Schedule C");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/schedule-c?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setLines(data.lines || []);
-        setTotalIncome(data.totalIncome || 0);
-        setTotalExpenses(data.totalExpenses || 0);
-        setNetProfit(data.netProfit || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
 
   const incomeLines = lines.filter((l) => INCOME_LINES.includes(l.line));
   const expenseLines = lines.filter((l) => !INCOME_LINES.includes(l.line) && !SUMMARY_LINES.includes(l.line));
@@ -82,6 +68,7 @@ export default function ScheduleCPage() {
             amount: l.amount,
           }))}
           columns={["line", "description", "amount"]}
+          moneyColumns={["amount"]}
           filename={`schedule-c-${startDate.slice(0, 4)}`}
         />
       </PageHeader>
@@ -94,11 +81,14 @@ export default function ScheduleCPage() {
         </p>
       </div>
 
-      <DateRangeFilter
-        startDate={startDate}
-        endDate={endDate}
-        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+        />
+        <BasisToggle basis={basis} onChange={setBasis} />
+      </div>
 
       {loading ? (
         <BrandLoader className="h-48" />
@@ -117,7 +107,7 @@ export default function ScheduleCPage() {
                     <span className="text-muted-foreground">Gross Income</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium text-brand-600 dark:text-brand-400">
-                    {formatMoney(totalIncome)}
+                    {money(totalIncome)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -134,7 +124,7 @@ export default function ScheduleCPage() {
                     <span className="text-muted-foreground">Total Expenses</span>
                   </div>
                   <span className="font-mono text-sm tabular-nums font-medium text-red-600 dark:text-red-400">
-                    {formatMoney(totalExpenses)}
+                    {money(totalExpenses)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
@@ -153,7 +143,7 @@ export default function ScheduleCPage() {
                   "font-mono text-sm tabular-nums font-semibold",
                   netProfit >= 0 ? "text-brand-600 dark:text-brand-400" : "text-red-600 dark:text-red-400"
                 )}>
-                  {formatMoney(netProfit)}
+                  {money(netProfit)}
                 </span>
               </div>
             </div>
@@ -175,7 +165,7 @@ export default function ScheduleCPage() {
                   "mt-1 text-2xl font-bold font-mono tabular-nums",
                   netProfit >= 0 ? "text-brand-600 dark:text-brand-400" : "text-red-600 dark:text-red-400"
                 )}>
-                  {formatMoney(Math.abs(netProfit))}
+                  {money(Math.abs(netProfit))}
                 </p>
               </div>
               <div className={cn(
@@ -211,15 +201,22 @@ export default function ScheduleCPage() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex size-7 items-center justify-center rounded-md bg-muted text-[11px] font-mono font-bold text-muted-foreground">{l.line}</span>
-                        <span className="text-sm">{l.label}</span>
+                        <span className="text-sm">
+                          {l.label}
+                          {l.accounts && l.accounts.length > 0 && (
+                            <span className="block text-[11px] text-muted-foreground">
+                              {l.accounts.map((a) => `${a.code} ${a.name}`).join(", ")}
+                            </span>
+                          )}
+                        </span>
                       </div>
-                      <span className="font-mono text-sm tabular-nums font-medium">{formatMoney(l.amount)}</span>
+                      <span className="font-mono text-sm tabular-nums font-medium">{money(l.amount)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-brand-50 dark:bg-brand-950/30 rounded-lg border border-brand-200 dark:border-brand-900/40 text-sm font-semibold">
                   <span>Gross Income</span>
-                  <span className="font-mono tabular-nums text-brand-600 dark:text-brand-400">{formatMoney(totalIncome)}</span>
+                  <span className="font-mono tabular-nums text-brand-600 dark:text-brand-400">{money(totalIncome)}</span>
                 </div>
               </div>
             )}
@@ -243,17 +240,24 @@ export default function ScheduleCPage() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex size-7 items-center justify-center rounded-md bg-muted text-[11px] font-mono font-bold text-muted-foreground">{l.line}</span>
-                        <span className="text-sm">{l.label}</span>
+                        <span className="text-sm">
+                          {l.label}
+                          {l.accounts && l.accounts.length > 0 && (
+                            <span className="block text-[11px] text-muted-foreground">
+                              {l.accounts.map((a) => `${a.code} ${a.name}`).join(", ")}
+                            </span>
+                          )}
+                        </span>
                       </div>
                       <span className="font-mono text-sm tabular-nums font-medium">
-                        {l.amount === 0 ? "-" : formatMoney(l.amount)}
+                        {l.amount === 0 ? "-" : money(l.amount)}
                       </span>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between items-center px-4 py-2.5 mt-2 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-900/40 text-sm font-semibold">
                   <span>Total Expenses</span>
-                  <span className="font-mono tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)}</span>
+                  <span className="font-mono tabular-nums text-red-600 dark:text-red-400">{money(totalExpenses)}</span>
                 </div>
               </div>
             )}
@@ -286,7 +290,7 @@ export default function ScheduleCPage() {
                           isNet && "text-base font-bold",
                           isNet && (l.amount >= 0 ? "text-brand-600 dark:text-brand-400" : "text-red-600 dark:text-red-400")
                         )}>
-                          {formatMoney(l.amount)}
+                          {money(l.amount)}
                         </span>
                       </div>
                     );

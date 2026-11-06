@@ -4,7 +4,9 @@ import { member, apiKey, advisorAccess, customRole, users } from "@/lib/db/schem
 import { subscription } from "@/lib/db/schema/billing";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
-import { getEffectiveLimits, type MemberRole } from "@/lib/plans";
+import { getEffectiveLimits, ADVISOR_PERMISSIONS, type MemberRole } from "@/lib/plans";
+import { getAppBearer, resolveAppAccessToken } from "@/lib/api/app-auth";
+import { isSelfHostedUnlimited } from "@/lib/site-settings";
 
 export interface AuthContext {
   userId: string;
@@ -27,6 +29,27 @@ async function resolveCustomRole(
   return {
     customRoleId: role.id,
     permissions: role.permissions as string[],
+  };
+}
+
+/**
+ * The auth context for a user's current membership of an organization, with
+ * any custom role applied. Null when they are not (or no longer) a member.
+ * Used by credentials that act as a member: API keys and MCP tokens.
+ */
+export async function resolveMemberContext(
+  userId: string,
+  organizationId: string
+): Promise<AuthContext | null> {
+  const mem = await db.query.member.findFirst({
+    where: and(eq(member.organizationId, organizationId), eq(member.userId, userId)),
+  });
+  if (!mem) return null;
+  return {
+    userId,
+    organizationId,
+    role: mem.role as MemberRole,
+    ...(await resolveCustomRole(mem)),
   };
 }
 
@@ -53,9 +76,19 @@ export async function getAuthContext(
     const sub = await db.query.subscription.findFirst({
       where: eq(subscription.organizationId, key.organizationId),
     });
-    const limits = getEffectiveLimits(sub ?? null);
+    const limits = getEffectiveLimits(sub ?? null, await isSelfHostedUnlimited());
     if (!limits.apiAccess) {
-      throw new AuthError("API access requires a Pro or Business plan", 403);
+      throw new AuthError("This organization's plan doesn't include API access", 403);
+    }
+
+    // A key acts as the member who created it. Once that person leaves the
+    // organization the key is disabled (the API Keys page marks it as such).
+    const ctx = await resolveMemberContext(key.createdBy, key.organizationId);
+    if (!ctx) {
+      throw new AuthError(
+        "API key disabled: the member who created it is no longer in this organization",
+        401
+      );
     }
 
     // Update last used (fire and forget)
@@ -65,39 +98,34 @@ export async function getAuthContext(
       .execute()
       .catch(() => {});
 
-    // Get the member who created the key to resolve role
-    const mem = await db.query.member.findFirst({
-      where: and(
-        eq(member.organizationId, key.organizationId),
-        eq(member.userId, key.createdBy)
-      ),
-    });
-
-    const customRoleInfo = mem ? await resolveCustomRole(mem) : {};
-
-    return {
-      userId: key.createdBy,
-      organizationId: key.organizationId,
-      role: (mem?.role ?? "member") as MemberRole,
-      ...customRoleInfo,
-    };
+    return ctx;
   }
 
-  // Session auth
-  const session = await auth();
-  if (!session?.user?.id) throw new AuthError("Not authenticated", 401);
+  // Native app token (iOS): acts as the user, like a browser session
+  let userId: string;
+  const appBearer = getAppBearer(request);
+  if (appBearer) {
+    const resolved = await resolveAppAccessToken(appBearer);
+    if (!resolved) throw new AuthError("Session expired. Please sign in again.", 401);
+    userId = resolved.userId;
+  } else {
+    // Session auth
+    const session = await auth();
+    if (!session?.user?.id) throw new AuthError("Not authenticated", 401);
 
-  // Check if session was revoked (sign out all devices)
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-    columns: { sessionRevokedAt: true },
-  });
-  if (user?.sessionRevokedAt) {
-    // JWT iat is in seconds, sessionRevokedAt is a Date
-    const tokenIat = (session as unknown as { iat?: number }).iat;
-    if (tokenIat && tokenIat < Math.floor(user.sessionRevokedAt.getTime() / 1000)) {
-      throw new AuthError("Session expired. Please sign in again.", 401);
+    // Check if session was revoked (sign out all devices)
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, session.user.id),
+      columns: { sessionRevokedAt: true },
+    });
+    if (user?.sessionRevokedAt) {
+      // JWT iat is in seconds, sessionRevokedAt is a Date
+      const tokenIat = (session as unknown as { iat?: number }).iat;
+      if (tokenIat && tokenIat < Math.floor(user.sessionRevokedAt.getTime() / 1000)) {
+        throw new AuthError("Session expired. Please sign in again.", 401);
+      }
     }
+    userId = session.user.id;
   }
 
   const orgId = organizationId || request.headers.get("x-organization-id");
@@ -105,7 +133,7 @@ export async function getAuthContext(
   // If no org ID provided, auto-resolve if user has exactly one membership
   if (!orgId) {
     const memberships = await db.query.member.findMany({
-      where: eq(member.userId, session.user.id),
+      where: eq(member.userId, userId),
     });
 
     if (memberships.length === 0) {
@@ -118,7 +146,7 @@ export async function getAuthContext(
     const customRoleInfo = await resolveCustomRole(memberships[0]);
 
     return {
-      userId: session.user.id,
+      userId,
       organizationId: memberships[0].organizationId,
       role: memberships[0].role as MemberRole,
       ...customRoleInfo,
@@ -128,7 +156,7 @@ export async function getAuthContext(
   const mem = await db.query.member.findFirst({
     where: and(
       eq(member.organizationId, orgId),
-      eq(member.userId, session.user.id)
+      eq(member.userId, userId)
     ),
   });
 
@@ -136,7 +164,7 @@ export async function getAuthContext(
     // Check advisor access as fallback
     const advisor = await db.query.advisorAccess.findFirst({
       where: and(
-        eq(advisorAccess.advisorUserId, session.user.id),
+        eq(advisorAccess.advisorUserId, userId),
         eq(advisorAccess.organizationId, orgId),
         eq(advisorAccess.isActive, true)
       ),
@@ -147,9 +175,10 @@ export async function getAuthContext(
     }
 
     return {
-      userId: session.user.id,
+      userId,
       organizationId: orgId,
       role: "member" as MemberRole,
+      permissions: ADVISOR_PERMISSIONS,
       isAdvisor: true,
       advisorRole: advisor.role,
     };
@@ -158,7 +187,7 @@ export async function getAuthContext(
   const customRoleInfo = await resolveCustomRole(mem);
 
   return {
-    userId: session.user.id,
+    userId,
     organizationId: orgId,
     role: mem.role as MemberRole,
     ...customRoleInfo,

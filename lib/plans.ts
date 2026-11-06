@@ -1,65 +1,181 @@
-export const PLAN_LIMITS = {
+/*
+ * Subscription plans. Every plan is priced per organization — never per user —
+ * and every paid plan includes unlimited users. Prices are USD per month;
+ * `annual` is the monthly equivalent when billed yearly.
+ *
+ * Limits use Infinity for "unlimited". Admin overrides on the subscription row
+ * replace individual limits (see getEffectiveLimits).
+ */
+export type PlanName = "free" | "standard" | "premium" | "ultimate";
+
+export interface PlanLimits {
+  /** Free organizations a single user may own (paid orgs don't count). */
+  organizations: number;
+  members: number;
+  /** Active payroll employees. */
+  employees: number;
+  entriesPerMonth: number;
+  invoicesPerMonth: number;
+  contacts: number;
+  bankAccounts: number;
+  projects: number;
+  multiCurrency: boolean;
+  /** Entities per consolidation group; 0 means consolidation is not included. */
+  consolidationEntities: number;
+  storageMb: number;
+  emailsPerMonth: number;
+  apiAccess: boolean;
+  auditLogDays: number;
+  backupRetentionDays: number;
+  maxManualBackups: number;
+}
+
+export const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
   free: {
     organizations: 1,
     members: 1,
-    entriesPerMonth: 500,
+    employees: 2,
+    entriesPerMonth: Infinity,
+    invoicesPerMonth: Infinity,
+    contacts: Infinity,
+    bankAccounts: 3,
+    projects: 3,
     multiCurrency: false,
-    contacts: 200,
-    invoicesPerMonth: 10,
-    emailsPerMonth: 25,
-    bankAccounts: 1,
-    projects: 2,
-    reports: ["trial-balance", "general-ledger"] as string[],
-    storageMb: 100,
+    consolidationEntities: 0,
+    storageMb: 2048,
+    emailsPerMonth: 200,
     apiAccess: true,
-    auditLogDays: 30,
+    auditLogDays: 90,
     backupRetentionDays: 7,
     maxManualBackups: 3,
   },
-  pro: {
-    organizations: 1,
+  standard: {
+    organizations: Infinity,
     members: Infinity,
+    employees: 10,
     entriesPerMonth: Infinity,
-    multiCurrency: true,
-    contacts: Infinity,
     invoicesPerMonth: Infinity,
-    emailsPerMonth: 100,
+    contacts: Infinity,
     bankAccounts: Infinity,
-    projects: 20,
-    reports: [
-      "trial-balance",
-      "general-ledger",
-      "balance-sheet",
-      "income-statement",
-      "profit-and-loss",
-      "aged-receivables",
-      "aged-payables",
-      "cash-flow",
-      "account-transactions",
-    ] as string[],
-    storageMb: 5120,
+    projects: Infinity,
+    multiCurrency: true,
+    consolidationEntities: 0,
+    storageMb: 20480,
+    emailsPerMonth: 2000,
     apiAccess: true,
     auditLogDays: 365,
     backupRetentionDays: 30,
     maxManualBackups: 10,
   },
-} as const;
+  premium: {
+    organizations: Infinity,
+    members: Infinity,
+    employees: 50,
+    entriesPerMonth: Infinity,
+    invoicesPerMonth: Infinity,
+    contacts: Infinity,
+    bankAccounts: Infinity,
+    projects: Infinity,
+    multiCurrency: true,
+    consolidationEntities: 3,
+    storageMb: 102400,
+    emailsPerMonth: 10000,
+    apiAccess: true,
+    auditLogDays: 1095,
+    backupRetentionDays: 90,
+    maxManualBackups: 25,
+  },
+  ultimate: {
+    organizations: Infinity,
+    members: Infinity,
+    employees: Infinity,
+    entriesPerMonth: Infinity,
+    invoicesPerMonth: Infinity,
+    contacts: Infinity,
+    bankAccounts: Infinity,
+    projects: Infinity,
+    multiCurrency: true,
+    consolidationEntities: Infinity,
+    storageMb: 512000,
+    emailsPerMonth: 50000,
+    apiAccess: true,
+    auditLogDays: Infinity,
+    backupRetentionDays: 365,
+    maxManualBackups: 50,
+  },
+};
 
-export const STORAGE_PLANS = {
-  free: { filesMb: 5120, emailsPerMonth: 100, monthly: 0, annual: 0 },
-  starter: { filesMb: 25600, emailsPerMonth: 500, monthly: 15, annual: 13 },
-  growth: { filesMb: 76800, emailsPerMonth: 3000, monthly: 45, annual: 38 },
-  scale: { filesMb: 307200, emailsPerMonth: 10000, monthly: 120, annual: 100 },
-} as const;
+/** Paid plans, cheapest first. */
+export const PAID_PLANS = ["standard", "premium", "ultimate"] as const;
+export type PaidPlanName = (typeof PAID_PLANS)[number];
 
-export type StoragePlanName = keyof typeof STORAGE_PLANS;
+/** Plans ordered from lowest to highest, for upgrade/downgrade comparisons. */
+export const PLAN_ORDER: PlanName[] = ["free", ...PAID_PLANS];
 
-export type PlanName = keyof typeof PLAN_LIMITS;
-
-export const PLAN_PRICES = {
+export const PLAN_PRICES: Record<PlanName, { monthly: number; annual: number }> = {
   free: { monthly: 0, annual: 0 },
-  pro: { monthly: 12, annual: 10 },
-} as const;
+  standard: { monthly: 19, annual: 15 },
+  premium: { monthly: 49, annual: 39 },
+  ultimate: { monthly: 99, annual: 79 },
+};
+
+/** Display copy for each plan, shared by the pricing and billing pages. */
+export const PLAN_INFO: Record<PlanName, { name: string; tagline: string; highlights: string[] }> = {
+  free: {
+    name: "Free",
+    tagline: "Everything a one-person business needs.",
+    highlights: [
+      "1 user",
+      "Unlimited invoices, quotes, bills and contacts",
+      "Unlimited journal entries",
+      "Bank feeds and reconciliation, 3 accounts",
+      "Payroll for 2 employees",
+      "Every report, API and MCP access",
+    ],
+  },
+  standard: {
+    name: "Standard",
+    tagline: "For teams. One price, everyone included.",
+    highlights: [
+      "Unlimited users",
+      "Multi-currency",
+      "Unlimited bank accounts and projects",
+      "Payroll for 10 employees",
+      "20 GB storage, 2,000 emails a month",
+      "1-year audit history",
+    ],
+  },
+  premium: {
+    name: "Premium",
+    tagline: "For growing businesses and groups.",
+    highlights: [
+      "Everything in Standard",
+      "Consolidation across 3 entities",
+      "Payroll for 50 employees",
+      "100 GB storage, 10,000 emails a month",
+      "3-year audit history, 90-day backups",
+      "Priority support",
+    ],
+  },
+  ultimate: {
+    name: "Ultimate",
+    tagline: "For large and multi-entity businesses.",
+    highlights: [
+      "Everything in Premium",
+      "Consolidation across unlimited entities",
+      "Unlimited payroll employees",
+      "500 GB storage, 50,000 emails a month",
+      "Unlimited audit history, 1-year backups",
+      "Priority support and onboarding",
+    ],
+  },
+};
+
+/** Percentage saved by paying yearly, rounded. */
+export function annualSaving(plan: PaidPlanName): number {
+  const p = PLAN_PRICES[plan];
+  return Math.round((1 - p.annual / p.monthly) * 100);
+}
 
 export type BillingInterval = "monthly" | "annual";
 
@@ -125,6 +241,7 @@ const PERMISSION_REQUIREMENTS: Record<string, MemberRole> = {
   "manage:revenue": "admin",
   "manage:members": "admin",
   "approve:purchases": "admin",
+  "manage:organization": "admin",
   "manage:billing": "owner",
   "delete:organization": "owner",
 };
@@ -216,6 +333,17 @@ export const PRESET_ROLES: PresetRole[] = [
   },
 ];
 
+/**
+ * What an external advisor (Settings > Advisors) can do: everything a member
+ * can, plus managing period locks and working down to the stricter advisor
+ * lock date, as the invite drawer promises.
+ */
+export const ADVISOR_PERMISSIONS = [
+  ...ALL_PERMISSIONS.filter((p) => PERMISSION_REQUIREMENTS[p] === "member"),
+  "manage:period-lock",
+  "bypass:period-lock",
+];
+
 /** Permission categories for UI grouping */
 export const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "General": ["view:data"],
@@ -238,7 +366,7 @@ export const PERMISSION_CATEGORIES: Record<string, string[]> = {
   "Integrations": ["manage:integrations"],
   "Time Tracking": ["manage:time-tracking"],
   "Purchases": ["manage:purchases", "approve:purchases"],
-  "Admin": ["manage:teams", "manage:members", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
+  "Admin": ["manage:organization", "manage:teams", "manage:members", "invite:members", "change:roles", "remove:members", "manage:api-keys", "view:audit-log"],
   "Owner": ["manage:billing", "delete:organization"],
 };
 
@@ -247,8 +375,29 @@ export const PERMISSION_CATEGORIES: Record<string, string[]> = {
  * Owners always have all permissions.
  */
 /**
+ * True when this deployment runs without Stripe billing. This is the "auto"
+ * default only: server code asks `isSelfHostedUnlimited()` in
+ * lib/site-settings, which also honours the admin setting.
+ */
+export function isUnlimitedDeployment(): boolean {
+  return !process.env.STRIPE_SECRET_KEY;
+}
+
+const UNLIMITED: PlanLimits = {
+  ...PLAN_LIMITS.ultimate,
+  organizations: Infinity,
+  storageMb: Infinity,
+  emailsPerMonth: Infinity,
+  auditLogDays: Infinity,
+  backupRetentionDays: Infinity,
+  maxManualBackups: Infinity,
+};
+
+/**
  * Get effective limits for an org, respecting admin overrides.
- * Pass the subscription row (or null for free defaults).
+ * Pass the subscription row (or null for free defaults), and whether the
+ * instance is in unlimited mode (`await isSelfHostedUnlimited()`), in which
+ * case everything is unlimited.
  */
 export function getEffectiveLimits(sub: {
   plan: PlanName;
@@ -260,31 +409,10 @@ export function getEffectiveLimits(sub: {
   overrideBankAccounts?: number | null;
   overrideMultiCurrency?: boolean | null;
   overrideEntriesPerMonth?: number | null;
-} | null) {
-  // Self-hosted mode: if no Stripe key, everything is unlimited
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return {
-      ...PLAN_LIMITS.pro,
-      organizations: Infinity,
-      members: Infinity,
-      storageMb: Infinity,
-      entriesPerMonth: Infinity,
-      contacts: Infinity,
-      invoicesPerMonth: Infinity,
-      emailsPerMonth: Infinity,
-      bankAccounts: Infinity,
-      projects: Infinity,
-      multiCurrency: true,
-      apiAccess: true,
-      auditLogDays: Infinity,
-      backupRetentionDays: Infinity,
-      maxManualBackups: Infinity,
-      reports: PLAN_LIMITS.pro.reports,
-    };
-  }
+} | null, unlimited = isUnlimitedDeployment()): PlanLimits {
+  if (unlimited) return UNLIMITED;
 
-  const plan = sub?.plan ?? "free";
-  const base = PLAN_LIMITS[plan];
+  const base = PLAN_LIMITS[sub?.plan ?? "free"] ?? PLAN_LIMITS.free;
   return {
     ...base,
     members: sub?.overrideMembers ?? base.members,

@@ -9,10 +9,11 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { trackLogin } from "./auth/track-login";
 import { getAppleClientSecret } from "./auth/apple-secret";
 import { getSiteSetting } from "./site-settings";
+import { hasRegistrationInvite, INVITE_COOKIE } from "./api/registration-invite";
 import { sql } from "drizzle-orm";
 import { isTwoFactorEnabled, verifyTwoFactor } from "./auth/two-factor";
 
@@ -125,7 +126,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       if (!isFirstUser) {
         const registrationMode = await getSiteSetting("registration_mode");
         if (registrationMode === "disabled") return false;
-        if (registrationMode === "invite_only") return false;
+        if (registrationMode === "invite_only") {
+          const inviteToken = (await cookies()).get(INVITE_COOKIE)?.value;
+          if (!(await hasRegistrationInvite(email, inviteToken))) return false;
+        }
       }
 
       return true;

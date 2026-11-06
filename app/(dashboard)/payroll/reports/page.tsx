@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { BarChart3, FileText, DollarSign, TrendingUp, Download } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
+import { toast } from "sonner";
+import { downloadFile } from "@/components/dashboard/download-link";
 
 interface Summary {
   totalRuns: number;
@@ -33,30 +32,21 @@ const REPORT_TYPES = [
   { type: "summary", label: "Payroll Summary", description: "Overview of payroll totals and averages", icon: BarChart3 },
   { type: "tax-liability", label: "Tax Liability", description: "Tax breakdown by employee", icon: FileText },
   { type: "labor-cost", label: "Labor Cost", description: "Cost breakdown by department", icon: DollarSign },
-  { type: "yoy", label: "Year over Year", description: "Monthly payroll trends", icon: TrendingUp },
+  { type: "yoy", label: "Year over Year", description: "Each month compared with the same month last year", icon: TrendingUp },
 ];
 
 export default function ReportsPage() {
   const router = useRouter();
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ summary?: Summary }>("/api/v1/payroll/reports/summary");
+  const summary = data?.summary ?? null;
 
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Reports");
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch("/api/v1/payroll/reports/summary", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.summary) setSummary(data.summary); })
-      .finally(() => setLoading(false));
-  }, [orgId]);
-
+  // Fetch with the org header (a plain link can't send it) and save the file
   function handleExport() {
-    if (!orgId) return;
-    window.open(`/api/v1/payroll/reports/export?x-organization-id=${orgId}`, "_blank");
+    downloadFile("/api/v1/payroll/reports/export", "payroll-export.csv").catch((err) =>
+      toast.error(err instanceof Error ? err.message : "Couldn't export payroll")
+    );
   }
 
   if (loading) return <BrandLoader />;

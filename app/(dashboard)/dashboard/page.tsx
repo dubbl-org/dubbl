@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -22,13 +22,13 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
-import { devDelay } from "@/lib/dev-delay";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ErrorState } from "@/components/dashboard/error-state";
 import { cn } from "@/lib/utils";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { AskTilly } from "@/components/dashboard/assistant/assistant-panel";
+import { useApi } from "@/lib/query/use-api";
 import {
   Card,
   CardHeader,
@@ -299,12 +299,6 @@ function orgHeaders(): Record<string, string> {
   return id ? { "x-organization-id": id } : {};
 }
 
-function getJson(url: string) {
-  return fetch(url, { headers: orgHeaders() })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
-}
-
 function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
@@ -398,22 +392,9 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const firstName = session?.user?.name?.split(" ")[0] || "";
   const [greeting] = useState(() => pickGreeting());
-  const [orgName, setOrgName] = useState("");
   const [period, setPeriod] = useState<Period>("year");
-  const [pnl, setPnl] = useState<PnLData>({ totalRevenue: 0, totalExpenses: 0, netIncome: 0, expenses: [] });
-  const [receivables, setReceivables] = useState<Aging>({ buckets: [], grandTotal: 0 });
-  const [payables, setPayables] = useState<Aging>({ buckets: [], grandTotal: 0 });
-  const [trend, setTrend] = useState<TrendMonth[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[] | null>(null);
-  const [forecast, setForecast] = useState<Forecast | null>(null);
-  const [ratios, setRatios] = useState<Ratios | null>(null);
-  const [alerts, setAlerts] = useState<Alerts | null>(null);
-  const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlert[]>([]);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   // Getting-started checklist: show while the org has never completed onboarding.
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [dismissingOnboarding, setDismissingOnboarding] = useState(false);
 
   useDocumentTitle("Dashboard · Overview");
@@ -421,72 +402,63 @@ export default function DashboardPage() {
   const range = periodRange(period);
 
   // Everything that doesn't depend on the period
-  useEffect(() => {
-    Promise.all([
-      getJson("/api/v1/reports/aged-receivables"),
-      getJson("/api/v1/reports/aged-payables"),
-      getJson("/api/v1/reports/monthly-trends?months=12"),
-      getJson("/api/v1/bank-accounts"),
-    ])
-      .then(([arData, apData, trendData, bankData]) => {
-        if (arData?.buckets) setReceivables(arData);
-        if (apData?.buckets) setPayables(apData);
-        if (trendData?.months) setTrend(trendData.months);
-        if (bankData?.bankAccounts) setAccounts(bankData.bankAccounts.filter((a: BankAccount) => a.isActive));
-      })
-      .then(() => devDelay())
-      .catch(() => setError("Failed to load dashboard data. Please check your connection."))
-      .finally(() => setLoading(false));
-
-    getJson("/api/v1/dashboard/alerts").then((data) => data && setAlerts(data));
-    getJson("/api/v1/reports/cash-flow-forecast?weeks=8").then((data) => data?.entries && setForecast(data));
-
-    getJson("/api/v1/reports/budget-vs-actual").then((data) => {
-      if (!data?.comparisons) return;
-      setBudgetAlerts(
-        data.comparisons
-          .filter((c: { budgeted: number; actual: number }) => c.budgeted > 0 && c.actual / c.budgeted >= 0.9)
-          .map((c: { accountName: string; budgeted: number; actual: number }) => ({
-            accountName: c.accountName,
-            pct: Math.round((c.actual / c.budgeted) * 100),
-            actual: c.actual,
-          }))
-      );
-    });
-
-    getJson("/api/v1/entries?limit=8").then((data) => {
-      if (!data?.entries) return;
-      setEntries(
-        data.entries.map((e: Record<string, string | number>) => ({
-          ...e,
-          totalDebit: (e.totalDebit as string) || "0.00",
-        }))
-      );
-    });
-
-    // Decide whether to show the getting-started checklist (org never onboarded).
-    getJson("/api/v1/organization").then((data) => {
-      if (!data?.organization) return;
-      setOrgName(data.organization.name || "");
-      if (!data.organization.onboardingCompletedAt) setShowOnboarding(true);
-    });
-  }, []);
+  const arQuery = useApi<Aging>("/api/v1/reports/aged-receivables");
+  const apQuery = useApi<Aging>("/api/v1/reports/aged-payables");
+  const trendQuery = useApi<{ months?: TrendMonth[] }>("/api/v1/reports/monthly-trends?months=12");
+  const bankQuery = useApi<{ bankAccounts?: BankAccount[] }>("/api/v1/bank-accounts");
+  const { data: alertsData } = useApi<Alerts>("/api/v1/dashboard/alerts");
+  const { data: forecastData } = useApi<Forecast>("/api/v1/reports/cash-flow-forecast?weeks=8");
+  const { data: budgetData } = useApi<{ comparisons?: { accountName: string; budgeted: number; actual: number }[] }>("/api/v1/reports/budget-vs-actual");
+  const { data: entriesData } = useApi<{ entries?: Record<string, string | number>[] }>("/api/v1/entries?limit=8");
+  // Decide whether to show the getting-started checklist (org never onboarded).
+  const { data: orgData } = useApi<{ organization?: { name?: string; onboardingCompletedAt?: string | null } }>("/api/v1/organization");
 
   // Profit and loss and ratios for the selected period
-  useEffect(() => {
-    const { startDate, endDate } = periodRange(period);
-    const qs = `startDate=${startDate}&endDate=${endDate}`;
-    getJson(`/api/v1/reports/profit-and-loss?${qs}`).then((data) => {
-      if (!data) return;
-      setPnl({
-        totalRevenue: data.totalRevenue || 0,
-        totalExpenses: data.totalExpenses || 0,
-        netIncome: data.netIncome || 0,
-        expenses: data.expenses || [],
-      });
-    });
-    getJson(`/api/v1/reports/financial-ratios?${qs}`).then((data) => data?.ratios && setRatios(data.ratios));
-  }, [period]);
+  const qs = `startDate=${range.startDate}&endDate=${range.endDate}`;
+  const { data: pnlData } = useApi<Partial<PnLData>>(`/api/v1/reports/profit-and-loss?${qs}`, { keepPrevious: true });
+  const { data: ratiosData } = useApi<{ ratios?: Ratios }>(`/api/v1/reports/financial-ratios?${qs}`, { keepPrevious: true });
+
+  const loading = arQuery.loading || apQuery.loading || trendQuery.loading || bankQuery.loading;
+  const coreQueries = [arQuery, apQuery, trendQuery, bankQuery];
+  const error = coreQueries.every((q) => q.error && !q.data) ? "Failed to load dashboard data. Please check your connection." : null;
+
+  const receivables: Aging = arQuery.data?.buckets ? arQuery.data : { buckets: [], grandTotal: 0 };
+  const payables: Aging = apQuery.data?.buckets ? apQuery.data : { buckets: [], grandTotal: 0 };
+  const trend = useMemo(() => trendQuery.data?.months ?? [], [trendQuery.data]);
+  const accounts = useMemo(
+    () => bankQuery.data?.bankAccounts?.filter((a) => a.isActive) ?? null,
+    [bankQuery.data]
+  );
+  const alerts = alertsData ?? null;
+  const forecast = forecastData?.entries ? forecastData : null;
+  const ratios = ratiosData?.ratios ?? null;
+  const pnl: PnLData = {
+    totalRevenue: pnlData?.totalRevenue || 0,
+    totalExpenses: pnlData?.totalExpenses || 0,
+    netIncome: pnlData?.netIncome || 0,
+    expenses: pnlData?.expenses || [],
+  };
+  const budgetAlerts = useMemo<BudgetAlert[]>(
+    () =>
+      (budgetData?.comparisons ?? [])
+        .filter((c) => c.budgeted > 0 && c.actual / c.budgeted >= 0.9)
+        .map((c) => ({
+          accountName: c.accountName,
+          pct: Math.round((c.actual / c.budgeted) * 100),
+          actual: c.actual,
+        })),
+    [budgetData]
+  );
+  const entries = useMemo<Entry[]>(
+    () =>
+      (entriesData?.entries ?? []).map((e) => ({
+        ...e,
+        totalDebit: (e.totalDebit as string) || "0.00",
+      })) as unknown as Entry[],
+    [entriesData]
+  );
+  const orgName = orgData?.organization?.name || "";
+  const showOnboarding = !!orgData?.organization && !orgData.organization.onboardingCompletedAt && !onboardingDismissed;
 
   const dismissOnboarding = () => {
     setDismissingOnboarding(true);
@@ -495,7 +467,7 @@ export default function DashboardPage() {
       headers: { "Content-Type": "application/json", ...orgHeaders() },
       body: JSON.stringify({ onboardingCompleted: true }),
     })
-      .then(() => setShowOnboarding(false))
+      .then(() => setOnboardingDismissed(true))
       .catch(() => {})
       .finally(() => setDismissingOnboarding(false));
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -11,7 +11,6 @@ import {
   Download,
   Trash2,
   MoreHorizontal,
-  X,
   FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,7 +32,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -41,9 +39,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useApi } from "@/lib/query/use-api";
+import { formatMoney } from "@/lib/money";
+import { downloadFile } from "@/components/dashboard/download-link";
+import { SAVED_REPORT_SOURCES, columnLabel, type DataSourceInfo } from "@/lib/reports/saved-report-sources";
 
 interface SavedReport {
   id: string;
@@ -60,30 +61,26 @@ interface SavedReport {
   createdAt: string;
 }
 
-const DATA_SOURCES: Record<string, { label: string; columns: string[] }> = {
-  invoices: {
-    label: "Invoices",
-    columns: ["invoiceNumber", "contactName", "status", "issueDate", "dueDate", "subtotal", "taxTotal", "total", "amountPaid", "amountDue", "currencyCode"],
-  },
-  contacts: {
-    label: "Contacts",
-    columns: ["name", "email", "type", "phone", "paymentTermsDays", "creditLimit"],
-  },
-  inventory: {
-    label: "Inventory",
-    columns: ["code", "name", "category", "purchasePrice", "salePrice", "quantityOnHand", "reorderPoint", "isActive"],
-  },
-  transactions: {
-    label: "Transactions",
-    columns: ["date", "description", "amount", "status", "payee"],
-  },
-};
+const DATA_SOURCES: Record<string, DataSourceInfo> = SAVED_REPORT_SOURCES;
+
+/** A cell in the preview: money columns hold integer cents. */
+function formatCell(col: string, row: Record<string, unknown>, moneyColumns: string[], currency: string): string {
+  const v = row[col];
+  if (v === null || v === undefined || v === "") return "-";
+  if (moneyColumns.includes(col)) {
+    const n = Number(v);
+    const rowCurrency = typeof row.currencyCode === "string" ? row.currencyCode : currency;
+    return Number.isFinite(n) ? formatMoney(n, rowCurrency) : String(v);
+  }
+  if (col === "percentage") return `${v}%`;
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  return String(v);
+}
 
 export default function CustomReportsPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const { data: savedData, loading } = useApi<{ reports?: SavedReport[] }>("/api/v1/reports/saved");
+  const savedReports = savedData?.reports || [];
 
   // Builder state
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -91,26 +88,13 @@ export default function CustomReportsPage() {
   const [dataSource, setDataSource] = useState("invoices");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, unknown>[] | null>(null);
+  const [resultMoney, setResultMoney] = useState<{ moneyColumns: string[]; currency: string }>({ moneyColumns: [], currency: "USD" });
   const [running, setRunning] = useState(false);
 
   function getHeaders() {
     const orgId = localStorage.getItem("activeOrgId") || "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
-
-  function fetchReports() {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetch("/api/v1/reports/saved", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => { if (data.reports) setSavedReports(data.reports); })
-      .finally(() => {
-        setLoading(false);
-        setInitialLoad(false);
-      });
-  }
-
-  useEffect(() => { fetchReports(); }, []);
 
   function openBuilder() {
     setReportName("");
@@ -134,7 +118,13 @@ export default function CustomReportsPage() {
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to run report");
+        setResults([]);
+        return;
+      }
       setResults(data.data || []);
+      setResultMoney({ moneyColumns: data.moneyColumns || [], currency: data.currency || "USD" });
     } catch {
       toast.error("Failed to run report");
     } finally {
@@ -162,7 +152,6 @@ export default function CustomReportsPage() {
     });
     toast.success("Report saved");
     setBuilderOpen(false);
-    fetchReports();
   }
 
   async function handleDelete(report: SavedReport) {
@@ -177,19 +166,21 @@ export default function CustomReportsPage() {
           headers: getHeaders(),
         });
         toast.success("Report deleted");
-        fetchReports();
       },
     });
   }
 
-  function handleExport(report: SavedReport) {
-    const orgId = localStorage.getItem("activeOrgId") || "";
-    window.open(`/api/v1/reports/saved/${report.id}/export?x-organization-id=${orgId}`, "_blank");
+  async function handleExport(report: SavedReport, format: "csv" | "xlsx" | "pdf") {
+    try {
+      await downloadFile(`/api/v1/reports/saved/${report.id}/export?format=${format}`, `${report.name}.${format}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't export the report");
+    }
   }
 
   const availableColumns = DATA_SOURCES[dataSource]?.columns || [];
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -204,65 +195,67 @@ export default function CustomReportsPage() {
         </Button>
       </PageHeader>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          {savedReports.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-                <BarChart3 className="size-6 text-muted-foreground" />
-              </div>
-              <h3 className="mt-4 text-sm font-medium">No custom reports</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Create a custom report to analyze your data.
-              </p>
-              <Button size="sm" className="mt-4" onClick={openBuilder}>
-                Create Report
-              </Button>
+      <ContentReveal>
+        {savedReports.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
+              <BarChart3 className="size-6 text-muted-foreground" />
             </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {savedReports.map((report) => (
-                <div key={report.id} className="rounded-lg border bg-card p-4 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-medium truncate">{report.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {DATA_SOURCES[report.config.dataSource]?.label || report.config.dataSource}
-                        {" "}· {report.config.columns.length} columns
-                      </p>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="size-7 p-0">
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleExport(report)}>
-                          <Download className="size-4" /> Export CSV
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onClick={() => handleDelete(report)}>
-                          <Trash2 className="size-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            <h3 className="mt-4 text-sm font-medium">No custom reports</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create a custom report to analyze your data.
+            </p>
+            <Button size="sm" className="mt-4" onClick={openBuilder}>
+              Create Report
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {savedReports.map((report) => (
+              <div key={report.id} className="rounded-lg border bg-card p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium truncate">{report.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {DATA_SOURCES[report.config.dataSource]?.label || report.config.dataSource}
+                      {" "}· {report.config.columns.length} columns
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {report.config.columns.slice(0, 3).map((col) => (
-                      <Badge key={col} variant="outline" className="text-[10px]">{col}</Badge>
-                    ))}
-                    {report.config.columns.length > 3 && (
-                      <Badge variant="outline" className="text-[10px]">+{report.config.columns.length - 3}</Badge>
-                    )}
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="size-7 p-0">
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport(report, "csv")}>
+                        <Download className="size-4" /> Export CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(report, "xlsx")}>
+                        <FileSpreadsheet className="size-4" /> Export spreadsheet
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(report, "pdf")}>
+                        <Download className="size-4" /> Download PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => handleDelete(report)}>
+                        <Trash2 className="size-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              ))}
-            </div>
-          )}
-        </ContentReveal>
-      )}
+                <div className="flex flex-wrap gap-1">
+                  {report.config.columns.slice(0, 3).map((col) => (
+                    <Badge key={col} variant="outline" className="text-[10px]">{columnLabel(col)}</Badge>
+                  ))}
+                  {report.config.columns.length > 3 && (
+                    <Badge variant="outline" className="text-[10px]">+{report.config.columns.length - 3}</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ContentReveal>
 
       {/* Builder Dialog */}
       <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
@@ -290,6 +283,7 @@ export default function CustomReportsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">{DATA_SOURCES[dataSource]?.description}</p>
               </div>
             </div>
 
@@ -312,7 +306,7 @@ export default function CustomReportsPage() {
                           : "border-border text-muted-foreground hover:bg-muted"
                       }`}
                     >
-                      {col}
+                      {columnLabel(col)}
                     </button>
                   );
                 })}
@@ -336,8 +330,8 @@ export default function CustomReportsPage() {
                   <thead>
                     <tr className="border-b bg-muted/50">
                       {selectedColumns.map((col) => (
-                        <th key={col} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                          {col}
+                        <th key={col} className={`px-3 py-2 text-xs font-medium text-muted-foreground ${resultMoney.moneyColumns.includes(col) ? "text-right" : "text-left"}`}>
+                          {columnLabel(col)}
                         </th>
                       ))}
                     </tr>
@@ -346,8 +340,8 @@ export default function CustomReportsPage() {
                     {results.slice(0, 50).map((row, i) => (
                       <tr key={i} className="border-b last:border-0">
                         {selectedColumns.map((col) => (
-                          <td key={col} className="px-3 py-2 text-xs">
-                            {String(row[col] ?? "-")}
+                          <td key={col} className={`px-3 py-2 text-xs ${resultMoney.moneyColumns.includes(col) ? "text-right font-mono tabular-nums" : ""}`}>
+                            {formatCell(col, row, resultMoney.moneyColumns, resultMoney.currency)}
                           </td>
                         ))}
                       </tr>

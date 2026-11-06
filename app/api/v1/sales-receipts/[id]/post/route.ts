@@ -21,6 +21,7 @@ import {
   assertBaseRateAvailable,
   ensureControlAccount,
   createCogsJournalEntry,
+  routeOutputTax,
 } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
 
@@ -155,23 +156,16 @@ export async function POST(
         }
       }
 
-      // CR Output VAT (2200) for the collected tax.
-      if (found.taxTotal > 0) {
-        const outputVat = await ensureControlAccount(
-          ctx.organizationId,
-          "outputVat",
-          base,
-          tx
-        );
-        if (outputVat) {
-          lines.push({
-            journalEntryId: entry.id,
-            accountId: outputVat.id,
-            description: `Tax on ${found.receiptNumber}`,
-            debitAmount: 0,
-            creditAmount: found.taxTotal,
-          });
-        }
+      // CR the collected tax: US sales tax to Sales Tax Payable (2230),
+      // VAT / GST to Output VAT (2200), compound parts to their accounts.
+      for (const t of await routeOutputTax(ctx.organizationId, found.lines, found.taxTotal, tx)) {
+        lines.push({
+          journalEntryId: entry.id,
+          accountId: t.accountId,
+          description: `Tax on ${found.receiptNumber}`,
+          debitAmount: 0,
+          creditAmount: t.amount,
+        });
       }
 
       // DR Cash for the sum of the offsetting credit legs, so the entry balances

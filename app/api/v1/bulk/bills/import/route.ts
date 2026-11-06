@@ -11,7 +11,9 @@ import { resolveContactByName, resolveAccountByCode } from "@/lib/import-export/
 import { parseMoney } from "@/lib/import-export/transformers";
 import { preProcessBills } from "@/lib/import-export/pre-process";
 import type { SourceSystem } from "@/lib/import-export/types";
+import { validateImportRows } from "@/lib/import-export/validate-rows";
 import { z } from "zod";
+import { emitBillCreated } from "@/lib/webhooks/events";
 
 const rowSchema = z.object({
   billNumber: z.string().optional(),
@@ -39,16 +41,18 @@ export async function POST(request: Request) {
     const rawParsed = importSchema.parse(body);
     const source = (rawParsed.source || "custom") as SourceSystem;
     const transformedRows = preProcessBills(rawParsed.rows, source);
+    // Validate row by row: bad rows are reported, the rest still import.
+    const checked = validateImportRows(transformedRows, rowSchema);
     const parsed = {
       fileName: rawParsed.fileName,
-      rows: transformedRows.map(r => rowSchema.parse(r)),
+      rows: checked.rows,
     };
 
     const [job] = await db.insert(bulkImportJob).values({
       organizationId: ctx.organizationId,
       type: "bills",
       fileName: parsed.fileName,
-      totalRows: parsed.rows.length,
+      totalRows: transformedRows.length,
       status: "processing",
       createdBy: ctx.userId,
     }).returning();
@@ -63,8 +67,8 @@ export async function POST(request: Request) {
     }
 
     let processedRows = 0;
-    let errorRows = 0;
-    const errorDetails: Array<{ row: number; error: string }> = [];
+    let errorRows = checked.invalid.length;
+    const errorDetails: Array<{ row: number; error: string }> = [...checked.invalid];
     let rowIndex = 0;
 
     for (const [, groupRows] of billGroups) {
@@ -118,6 +122,7 @@ export async function POST(request: Request) {
           amountDue: subtotal,
           createdBy: ctx.userId,
         }).returning();
+        emitBillCreated(ctx.organizationId, [created.id]);
 
         if (processedLines.length > 0) {
           await db.insert(billLine).values(
@@ -135,7 +140,7 @@ export async function POST(request: Request) {
       processedRows,
       errorRows,
       errorDetails: errorDetails.length > 0 ? errorDetails : null,
-      status: errorRows === billGroups.size ? "failed" : "completed",
+      status: processedRows === 0 ? "failed" : "completed",
       completedAt: new Date(),
     }).where(eq(bulkImportJob.id, job.id));
 

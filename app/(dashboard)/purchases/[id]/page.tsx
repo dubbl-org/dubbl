@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, DollarSign, Ban, Undo2, ThumbsUp, X, GitCompareArrows, FileBarChart, PackageCheck } from "lucide-react";
+import { ArrowLeft, Check, Pencil, DollarSign, Ban, Undo2, ThumbsUp, X, GitCompareArrows, FileBarChart, PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,16 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApprovalPanel } from "@/components/dashboard/approval-panel";
+import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { formatMoney, minorUnitsToDecimal } from "@/lib/money";
 import { DualAmount } from "@/components/ui/dual-amount";
 import { RateNote, type RateInfo } from "@/components/ui/rate-note";
 import { ReceiptAttachments } from "@/components/dashboard/receipt-attachments";
+import { TagPicker } from "@/components/dashboard/tag-picker";
+import { BankAccountSelect } from "@/components/dashboard/bank-account-select";
+import { EditBillSheet, type EditableBill } from "./edit-bill-sheet";
 import Link from "next/link";
 
 interface BillDetail {
@@ -28,7 +34,7 @@ interface BillDetail {
   contactId: string;
   notes: string | null; contact: { name: string } | null;
   rejectionReason: string | null;
-  lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; goodsReceiptLineId: string | null; account: { code: string; name: string } | null }[];
+  lines: { id: string; description: string; quantity: number; unitPrice: number; amount: number; goodsReceiptLineId: string | null; account: { code: string; name: string } | null; accountId?: string | null; taxRateId?: string | null; discountPercent?: number }[];
 }
 
 interface BaseAmounts {
@@ -68,40 +74,34 @@ const statusLabels: Record<string, string> = {
 
 export default function BillDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [b, setB] = useState<BillDetail | null>(null);
-  const [base, setBase] = useState<BaseAmounts | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { open: openDrawer } = useCreateDrawer();
+  const url = `/api/v1/bills/${id}`;
+  const cache = useApiCache();
+  const { data, loading } = useApi<{ bill?: BillDetail; base?: BaseAmounts }>(url);
+  const b = data?.bill ?? null;
+  const base = data?.base ?? null;
+  const setB = (fn: (prev: BillDetail) => BillDetail) =>
+    cache.update<{ bill?: BillDetail; base?: BaseAmounts }>(url, (d) => (d.bill ? { ...d, bill: fn(d.bill) } : d));
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [payOpen, setPayOpen] = useState(false);
-  const [creditingSupplier, setCreditingSupplier] = useState(false);
+  const [payBankAccountId, setPayBankAccountId] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
   useDocumentTitle("Purchases · Bill Details");
   useEntityTitle(b?.billNumber);
 
-  const loadBill = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/bills/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.bill) setB(data.bill); if (data.base) setBase(data.base); })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    loadBill();
-  }, [loadBill]);
-
   async function handleReceive() {
     if (!orgId) return;
     const res = await fetch(`/api/v1/bills/${id}/receive`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill added to your books"); }
+    if (res.ok) { const data = await res.json(); setB((prev) => ({ ...prev, ...data.bill })); toast.success("Bill added to your books"); }
     else toast.error("Couldn't add this bill to your books");
   }
 
@@ -113,14 +113,37 @@ export default function BillDetailPage() {
     try {
       const res = await fetch(`/api/v1/bills/${id}/approve`, { method: "POST", headers: { "x-organization-id": orgId } });
       if (res.ok) {
-        toast.success("Bill approved and added to your books");
-        loadBill();
+        const data = await res.json().catch(() => ({}));
+        // With an approval workflow, a middle step only passes it on.
+        toast.success(
+          data.finalized === false
+            ? "Approved. It's now with the next approver."
+            : "Bill approved and added to your books"
+        );
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't approve this bill");
       }
     } finally {
       setApproving(false);
+    }
+  }
+
+  // Send a draft bill for approval. When an approval workflow matches it, its
+  // approvers act in order; otherwise anyone who can approve bills can.
+  async function handleSubmitForApproval() {
+    if (!orgId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/bills/${id}/submit-for-approval`, { method: "POST", headers: { "x-organization-id": orgId } });
+      if (res.ok) {
+        toast.success("Sent for approval");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Couldn't send this bill for approval");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -139,7 +162,6 @@ export default function BillDetailPage() {
         setRejectOpen(false);
         setRejectReason("");
         toast.success("Bill rejected and sent back to draft");
-        loadBill();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Couldn't reject this bill");
@@ -155,10 +177,13 @@ export default function BillDetailPage() {
     if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
     const res = await fetch(`/api/v1/bills/${id}/pay`, {
       method: "POST", headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({ amount, date: payDate }),
+      body: JSON.stringify({ amount, date: payDate, bankAccountId: payBankAccountId || null }),
     });
-    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); setPayOpen(false); toast.success("Payment recorded"); }
-    else toast.error("Failed");
+    if (res.ok) { const data = await res.json(); setB((prev) => ({ ...prev, ...data.bill })); setPayOpen(false); toast.success("Payment recorded"); }
+    else {
+      const data = await res.json().catch(() => ({}));
+      toast.error(typeof data.error === "string" ? data.error : "Couldn't record this payment");
+    }
   }
 
   async function handleVoid() {
@@ -171,49 +196,36 @@ export default function BillDetailPage() {
     });
     if (!confirmed) return;
     const res = await fetch(`/api/v1/bills/${id}/void`, { method: "POST", headers: { "x-organization-id": orgId } });
-    if (res.ok) { const data = await res.json(); setB((prev) => prev ? { ...prev, ...data.bill } : prev); toast.success("Bill cancelled"); }
+    if (res.ok) { const data = await res.json(); setB((prev) => ({ ...prev, ...data.bill })); toast.success("Bill cancelled"); }
   }
 
   // Record a supplier credit (a "debit note") — money the supplier owes you back,
-  // e.g. for returned goods or an overcharge. Starts a credit pre-filled from
-  // this bill's lines so you don't have to retype them.
-  async function handleSupplierCredit() {
-    if (!orgId || !b) return;
-    const confirmed = await confirm({
-      title: "Record a supplier credit?",
-      description:
-        "Use this when a supplier owes you money back (for example, returned goods or an overcharge). We'll start a credit pre-filled from this bill's items, which you can adjust.",
-      confirmLabel: "Start supplier credit",
-    });
-    if (!confirmed) return;
-    setCreditingSupplier(true);
-    try {
-      const res = await fetch(`/api/v1/debit-notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-        body: JSON.stringify({
-          contactId: b.contactId,
-          billId: b.id,
-          issueDate: new Date().toISOString().split("T")[0],
-          currencyCode: b.currencyCode,
-          reference: b.billNumber,
-          lines: b.lines.map((l) => ({
+  // e.g. for returned goods or an overcharge. Opens the new supplier credit form
+  // pre-filled from this bill (supplier, currency, number, and each line with
+  // its account and tax rate) so you only change what's being credited.
+  function handleSupplierCredit() {
+    if (!b) return;
+    openDrawer("debitNote", {
+      debitNote: {
+        billId: b.id,
+        contactId: b.contactId,
+        currencyCode: b.currencyCode,
+        reference: b.billNumber,
+        lines: b.lines.map((l) => {
+          const qty = l.quantity / 100;
+          // Supplier credit lines have no discount, so carry a discounted bill
+          // line over at its discounted price per unit.
+          const unit = l.discountPercent && qty ? Math.round(l.amount / qty) : l.unitPrice;
+          return {
             description: l.description,
-            quantity: l.quantity / 100,
-            unitPrice: l.unitPrice / 100,
-          })),
+            quantity: String(qty),
+            unitPrice: minorUnitsToDecimal(unit, b.currencyCode),
+            accountId: l.accountId ?? "",
+            taxRateId: l.taxRateId ?? "",
+          };
         }),
-      });
-      if (res.ok) {
-        toast.success("Supplier credit recorded");
-        router.push("/purchases");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error(typeof data.error === "string" ? data.error : "Couldn't record the supplier credit");
-      }
-    } finally {
-      setCreditingSupplier(false);
-    }
+      },
+    });
   }
 
   if (loading) return <BrandLoader />;
@@ -248,6 +260,7 @@ export default function BillDetailPage() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {b.contact?.name || "Unknown supplier"} · Due {b.dueDate}
               </p>
+              <TagPicker entityType="bill" entityId={b.id} className="mt-1.5" />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -301,6 +314,16 @@ export default function BillDetailPage() {
               </>
             )}
             {b.status === "draft" && (
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} title="Change the supplier, dates or lines before you add this bill to your books">
+                <Pencil className="mr-2 size-3.5" />Edit
+              </Button>
+            )}
+            {b.status === "draft" && (
+              <Button variant="outline" size="sm" onClick={handleSubmitForApproval} loading={submitting} title="Send this bill to be approved before it's added to your books">
+                <ThumbsUp className="mr-2 size-3.5" />Submit for approval
+              </Button>
+            )}
+            {b.status === "draft" && (
               <Button size="sm" onClick={handleReceive} className="bg-brand-600 hover:bg-brand-700" title="Approve this bill and add it to your books so it counts toward what you owe">
                 <Check className="mr-2 size-3.5" />Add to my books
               </Button>
@@ -323,6 +346,7 @@ export default function BillDetailPage() {
                       <Label>Date</Label>
                       <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
                     </div>
+                    <BankAccountSelect value={payBankAccountId} onChange={setPayBankAccountId} />
                     <Button onClick={handlePay} className="w-full bg-brand-600 hover:bg-brand-700">Record Payment</Button>
                   </div>
                 </DialogContent>
@@ -333,7 +357,6 @@ export default function BillDetailPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleSupplierCredit}
-                loading={creditingSupplier}
                 title="Supplier owes you money back (returned goods or an overcharge)? Record a credit from them."
               >
                 <Undo2 className="mr-2 size-3.5" />Record a supplier credit
@@ -346,6 +369,11 @@ export default function BillDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Approval workflow progress: who has approved and whose turn it is */}
+        {(b.status === "draft" || b.status === "pending_approval") && (
+          <ApprovalPanel entityType="bill" entityId={id} mode="progress" />
+        )}
 
         {/* Gradient divider */}
         <div className="h-px bg-gradient-to-r from-blue-500/20 via-border to-transparent" />
@@ -572,6 +600,14 @@ export default function BillDetailPage() {
         </div>
       </div>
       {confirmDialog}
+      {b.status === "draft" && (
+        <EditBillSheet
+          bill={b as unknown as EditableBill}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSaved={() => cache.invalidate("/api/v1/bills")}
+        />
+      )}
     </ContentReveal>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Plus, Users, DollarSign, FileText, CalendarDays, BarChart3, ArrowRight } from "lucide-react";
@@ -12,6 +11,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 
 interface Employee {
   id: string;
@@ -28,13 +28,35 @@ interface PayrollRun {
   payPeriodStart: string;
   payPeriodEnd: string;
   status: string;
+  approvalStatus?: string | null;
   totalGross: number;
   totalDeductions: number;
   totalNet: number;
 }
 
+// Same labels as the Payroll runs list (app/(dashboard)/payroll/runs/page.tsx).
+// Signed-off and sent-back runs are drafts with an approval outcome.
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Not finished",
+  sent_back: "Sent back",
+  pending_approval: "Waiting for sign-off",
+  approved: "Signed off",
+  processing: "Finishing",
+  completed: "Finished & recorded",
+  void: "Cancelled",
+};
+
+function statusOf(r: PayrollRun) {
+  if (r.status === "draft" && r.approvalStatus === "approved") return "approved";
+  if (r.status === "draft" && r.approvalStatus === "rejected") return "sent_back";
+  return r.status;
+}
+
 const statusColors: Record<string, string> = {
   draft: "",
+  sent_back: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  pending_approval: "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
+  approved: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300",
   processing: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
   completed: "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
   void: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300",
@@ -49,40 +71,27 @@ const anim = (delay: number) => ({
 export default function PayrollPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [runs, setRuns] = useState<PayrollRun[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: employeesData, loading: employeesLoading } = useApi<{ data?: Employee[] }>("/api/v1/payroll/employees?limit=100");
+  const { data: runsData, loading: runsLoading } = useApi<{ data?: PayrollRun[] }>("/api/v1/payroll/runs?limit=100");
+  const employees = employeesData?.data ?? [];
+  const runs = runsData?.data ?? [];
+  const loading = employeesLoading || runsLoading;
   useDocumentTitle("Payroll · Overview");
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    let done = 0;
-    const check = () => { done++; if (done >= 2) setLoading(false); };
-
-    fetch("/api/v1/payroll/employees", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setEmployees(data.data); })
-      .finally(check);
-
-    fetch("/api/v1/payroll/runs", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.data) setRuns(data.data); })
-      .finally(check);
-  }, []);
 
   if (loading) return <BrandLoader />;
 
   const activeEmployees = employees.filter((e) => e.isActive);
   const totalAnnualSalary = activeEmployees.reduce((sum, e) => sum + e.salary, 0);
-  const completedRuns = runs.filter((r) => r.status === "completed");
+  // Finished runs only (void runs no longer count), newest pay date first
+  const completedRuns = runs
+    .filter((r) => r.status === "completed")
+    .sort((a, b) => b.payPeriodEnd.localeCompare(a.payPeriodEnd));
   const lastRun = runs.length > 0 ? runs[0] : null;
-  const ytdPaid = completedRuns.reduce((sum, r) => sum + r.totalNet, 0);
+  // Take-home from finished runs whose pay date falls in this calendar year
+  const thisYear = String(new Date().getFullYear());
+  const ytdPaid = completedRuns
+    .filter((r) => r.payPeriodEnd.startsWith(thisYear))
+    .reduce((sum, r) => sum + r.totalNet, 0);
   const draftRuns = runs.filter((r) => r.status === "draft");
   const hasData = employees.length > 0 || runs.length > 0;
   const recentRuns = runs.slice(0, 5);
@@ -94,9 +103,9 @@ export default function PayrollPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: Users, label: "Active Employees" },
-            { icon: DollarSign, label: "Monthly Cost" },
-            { icon: FileText, label: "Last take-home" },
+            { icon: DollarSign, label: "Monthly Payroll Cost" },
             { icon: CalendarDays, label: "Paid this year" },
+            { icon: FileText, label: "Not finished yet" },
           ].map((card, i) => (
             <motion.div
               key={card.label}
@@ -217,7 +226,6 @@ export default function PayrollPage() {
 
   const breakdownRun = completedRuns.length > 0 ? completedRuns[0] : lastRun;
   const breakdownTotal = breakdownRun ? breakdownRun.totalGross : 0;
-  const grossPct = breakdownTotal > 0 ? 100 : 0;
   const deductionsPct = breakdownTotal > 0 ? (breakdownRun!.totalDeductions / breakdownTotal) * 100 : 0;
   const netPct = breakdownTotal > 0 ? (breakdownRun!.totalNet / breakdownTotal) * 100 : 0;
 
@@ -313,8 +321,8 @@ export default function PayrollPage() {
                         {run.payPeriodStart} to {run.payPeriodEnd}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className={statusColors[run.status] || ""}>
-                          {run.status}
+                        <Badge variant="outline" className={statusColors[statusOf(run)] || ""}>
+                          {STATUS_LABELS[statusOf(run)] ?? run.status}
                         </Badge>
                       </div>
                     </div>

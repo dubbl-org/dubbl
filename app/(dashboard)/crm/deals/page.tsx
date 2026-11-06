@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Handshake, KanbanSquare, Plus, Trophy } from "lucide-react";
@@ -50,15 +50,7 @@ export default function DealsPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
   const { pipelines } = usePipelines();
-  const [refreshKey, setRefreshKey] = useState(0);
   useDocumentTitle("CRM · Deals");
-
-  // The drawer announces new deals; reload so they appear straight away
-  useEffect(() => {
-    const bump = () => setRefreshKey((k) => k + 1);
-    window.addEventListener("deals-changed", bump);
-    return () => window.removeEventListener("deals-changed", bump);
-  }, []);
 
   const statuses = useMemo<ExplorerStatus[]>(() => {
     const seen = new Map<string, ExplorerStatus>();
@@ -283,5 +275,5 @@ export default function DealsPage() {
     [openDrawer, pipelines, router, statuses]
   );
 
-  return <Explorer config={config} refreshKey={refreshKey} />;
+  return <Explorer config={config} />;
 }

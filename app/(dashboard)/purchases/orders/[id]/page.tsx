@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Send, ShoppingCart, Pencil, Trash2, Plus, Package, PackageCheck } from "lucide-react";
@@ -20,13 +20,17 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { AccountPicker } from "@/components/dashboard/account-picker";
+import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi, useApiCache } from "@/lib/query/use-api";
+import { ApprovalPanel, approvalStatusUrl, type ApprovalStatus } from "@/components/dashboard/approval-panel";
 import { formatMoney, centsToDecimal } from "@/lib/money";
 import { SendDocumentDialog } from "@/components/dashboard/send-document-dialog";
 import { EmailHistory } from "@/components/dashboard/email-history";
+import { ReceiveItemsDialog } from "./receive-items-dialog";
 import Link from "next/link";
 
 interface PODetail {
@@ -49,8 +53,11 @@ interface PODetail {
     quantityBilled: number;
     unitPrice: number;
     amount: number;
+    discountPercent?: number;
     account: { id: string; code: string; name: string } | null;
     taxRate: { id: string } | null;
+    inventoryItemId?: string | null;
+    warehouseId?: string | null;
   }[];
 }
 
@@ -60,6 +67,11 @@ interface EditLine {
   unitPrice: string;
   accountId: string;
   taxRateId: string;
+  // Not editable here, but kept so saving doesn't drop a discount set elsewhere.
+  discountPercent?: number;
+  /** Stock item this line orders (kept with its location when saving). */
+  inventoryItemId: string;
+  warehouseId?: string | null;
 }
 
 const statusConfig: Record<string, { class: string }> = {
@@ -134,12 +146,10 @@ function EditPODrawer({
   open,
   onClose,
   po,
-  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   po: PODetail;
-  onSaved: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [contactId, setContactId] = useState("");
@@ -161,6 +171,9 @@ function EditPODrawer({
           unitPrice: centsToDecimal(l.unitPrice),
           accountId: l.account?.id || "",
           taxRateId: l.taxRate?.id || "",
+          discountPercent: l.discountPercent ?? 0,
+          inventoryItemId: l.inventoryItemId || "",
+          warehouseId: l.warehouseId ?? null,
         }))
       );
     }
@@ -171,7 +184,7 @@ function EditPODrawer({
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "" }]);
+    setLines((prev) => [...prev, { description: "", quantity: "1", unitPrice: "", accountId: "", taxRateId: "", inventoryItemId: "" }]);
   }
 
   function removeLine(index: number) {
@@ -207,6 +220,9 @@ function EditPODrawer({
             unitPrice: parseFloat(l.unitPrice) || 0,
             accountId: l.accountId || null,
             taxRateId: l.taxRateId || null,
+            discountPercent: l.discountPercent ?? 0,
+            inventoryItemId: l.inventoryItemId || null,
+            warehouseId: l.inventoryItemId ? l.warehouseId ?? null : null,
           })),
         }),
       });
@@ -218,7 +234,6 @@ function EditPODrawer({
 
       toast.success("Purchase order updated");
       onClose();
-      onSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update");
     } finally {
@@ -295,6 +310,20 @@ function EditPODrawer({
                         <Label className="text-xs">Account</Label>
                         <AccountPicker value={line.accountId} onChange={(val) => updateLine(index, { accountId: val })} typeFilter={["expense"]} />
                       </div>
+                      <div className="space-y-2 sm:col-span-3">
+                        <Label className="text-xs">Stock item</Label>
+                        <InventoryItemPicker
+                          value={line.inventoryItemId}
+                          onChange={(itemId, item) =>
+                            updateLine(index, {
+                              inventoryItemId: itemId,
+                              ...(item && !line.description.trim() ? { description: item.name } : {}),
+                              ...(item && !line.unitPrice && item.purchasePrice ? { unitPrice: centsToDecimal(item.purchasePrice) } : {}),
+                            })
+                          }
+                          placeholder="Not a stock item"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -323,34 +352,26 @@ export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [po, setPo] = useState<PODetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ purchaseOrder?: PODetail }>(`/api/v1/purchase-orders/${id}`);
+  const po = data?.purchaseOrder ?? null;
+  const cache = useApiCache();
   const [editOpen, setEditOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [emailHistoryKey, setEmailHistoryKey] = useState(0);
-  const [orgName, setOrgName] = useState("");
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  // An approval workflow can hold back sending a draft until it's approved.
+  const { data: approval } = useApi<ApprovalStatus>(
+    po?.status === "draft" ? approvalStatusUrl("purchase_order", id) : null
+  );
+  const approvalBlocked = !!approval?.blocked;
 
   useEntityTitle(po?.poNumber);
 
-  const loadPO = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/purchase-orders/${id}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => { if (data.purchaseOrder) setPo(data.purchaseOrder); })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    loadPO();
-    if (orgId) {
-      fetch("/api/v1/organization", { headers: { "x-organization-id": orgId } })
-        .then((r) => r.json()).then((data) => { if (data.organization?.name) setOrgName(data.organization.name); }).catch(() => {});
-    }
-  }, [loadPO, orgId]);
+  const { data: orgData } = useApi<{ organization?: { name?: string } }>("/api/v1/organization");
+  const orgName = orgData?.organization?.name || "";
 
   function handleSendComplete() {
-    loadPO();
     setEmailHistoryKey((k) => k + 1);
   }
 
@@ -366,46 +387,15 @@ export default function PODetailPage() {
     }
   }
 
-  // Record that the items you ordered have arrived (for the quantities still
-  // outstanding on each line). Adds stock you track to your inventory.
-  async function handleReceiveItems() {
-    if (!orgId || !po) return;
-    const linesToReceive = po.lines
-      .map((l) => ({
-        purchaseOrderLineId: l.id,
-        quantity: (l.quantity - l.quantityReceived) / 100,
-      }))
-      .filter((l) => l.quantity > 0);
-
-    if (linesToReceive.length === 0) {
+  // Record that the items you ordered have arrived. The dialog starts at the
+  // quantities still outstanding; lower them for a part delivery.
+  function handleReceiveItems() {
+    if (!po) return;
+    if (!po.lines.some((l) => l.quantity > l.quantityReceived)) {
       toast.info("All items on this order are already marked as received");
       return;
     }
-
-    const confirmed = await confirm({
-      title: "Mark all items as received?",
-      description:
-        "Records that everything still outstanding on this order has arrived. Anything you track as stock is added to your inventory.",
-      confirmLabel: "Mark items as received",
-    });
-    if (!confirmed) return;
-
-    const res = await fetch(`/api/v1/goods-receipts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-organization-id": orgId },
-      body: JSON.stringify({
-        purchaseOrderId: id,
-        date: new Date().toISOString().split("T")[0],
-        lines: linesToReceive,
-      }),
-    });
-    if (res.ok) {
-      toast.success("Items marked as received");
-      loadPO();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      toast.error(typeof data.error === "string" ? data.error : "Couldn't record the items as received");
-    }
+    setReceiveOpen(true);
   }
 
   async function handleDelete() {
@@ -471,7 +461,13 @@ export default function PODetailPage() {
                 <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                   <Pencil className="mr-2 size-3.5" />Edit
                 </Button>
-                <Button size="sm" onClick={() => setSendDialogOpen(true)} className="bg-brand-600 hover:bg-brand-700">
+                <Button
+                  size="sm"
+                  onClick={() => setSendDialogOpen(true)}
+                  disabled={approvalBlocked}
+                  title={approvalBlocked ? "This order needs approval before it can be sent" : undefined}
+                  className="bg-brand-600 hover:bg-brand-700"
+                >
                   <Send className="mr-2 size-3.5" />Send
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
@@ -496,6 +492,9 @@ export default function PODetailPage() {
             )}
           </div>
         </div>
+
+        {/* Approval workflow: submit / approve / reject, and who's next */}
+        {po.status === "draft" && <ApprovalPanel entityType="purchase_order" entityId={id} />}
 
         {/* Gradient divider */}
         <div className="h-px bg-gradient-to-r from-blue-500/20 via-border to-transparent" />
@@ -545,8 +544,15 @@ export default function PODetailPage() {
                   {line.account && (
                     <p className="text-xs text-muted-foreground">{line.account.code} · {line.account.name}</p>
                   )}
+                  {line.quantityReceived > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {line.quantityReceived >= line.quantity
+                        ? "All received"
+                        : `${line.quantityReceived / 100} of ${line.quantity / 100} received`}
+                    </p>
+                  )}
                 </div>
-                <span className="text-right text-sm font-mono tabular-nums">{(line.quantity / 100).toFixed(0)}</span>
+                <span className="text-right text-sm font-mono tabular-nums">{line.quantity / 100}</span>
                 <span className="text-right text-sm font-mono tabular-nums">{formatMoney(line.unitPrice)}</span>
                 <span className="text-right text-sm font-mono font-medium tabular-nums">{formatMoney(line.amount)}</span>
               </div>
@@ -564,12 +570,19 @@ export default function PODetailPage() {
 
       <EmailHistory key={emailHistoryKey} documentType="purchase_order" documentId={id} />
 
+      <ReceiveItemsDialog
+        purchaseOrderId={id}
+        lines={po.lines}
+        open={receiveOpen}
+        onOpenChange={setReceiveOpen}
+        onReceived={() => cache.invalidate(`/api/v1/purchase-orders/${id}`)}
+      />
+
       {/* Edit PO Drawer */}
       <EditPODrawer
         open={editOpen}
         onClose={() => setEditOpen(false)}
         po={po}
-        onSaved={loadPO}
       />
 
       <SendDocumentDialog

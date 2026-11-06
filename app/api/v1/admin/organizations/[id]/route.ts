@@ -4,7 +4,8 @@ import { organization, subscription, member, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { handleError } from "@/lib/api/response";
 import { requireSiteAdmin } from "@/lib/api/require-site-admin";
-import { PLAN_LIMITS, getEffectiveLimits, type PlanName } from "@/lib/plans";
+import { PLAN_LIMITS, PLAN_ORDER, getEffectiveLimits, type PlanName } from "@/lib/plans";
+import { isSelfHostedUnlimited } from "@/lib/site-settings";
 
 export async function GET(
   _request: Request,
@@ -51,7 +52,7 @@ export async function GET(
       overrideBankAccounts: sub.overrideBankAccounts,
       overrideMultiCurrency: sub.overrideMultiCurrency,
       overrideEntriesPerMonth: sub.overrideEntriesPerMonth,
-    } : null);
+    } : null, await isSelfHostedUnlimited());
 
     return NextResponse.json({
       organization: org,
@@ -85,7 +86,7 @@ export async function PATCH(
 
     // Update subscription fields
     const subFields: Record<string, unknown> = {};
-    if (body.plan && ["free", "pro"].includes(body.plan)) {
+    if (body.plan && (PLAN_ORDER as string[]).includes(body.plan)) {
       subFields.plan = body.plan;
     }
     if (body.status && ["active", "canceled", "past_due", "trialing", "incomplete"].includes(body.status)) {
@@ -121,9 +122,6 @@ export async function PATCH(
     }
 
     // Storage plan override (for manually managed orgs)
-    if (body.storagePlan && ["free", "starter", "growth", "scale"].includes(body.storagePlan)) {
-      subFields.storagePlan = body.storagePlan;
-    }
 
     if (Object.keys(subFields).length > 0) {
       subFields.updatedAt = new Date();

@@ -1,78 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-
-const PAGE = 100;
-const MAX_PAGES = 50;
-
-interface Page<T> {
-  rows: T[];
-  total: number;
-  totalPages: number;
-}
-
-async function fetchPage<T>(url: string, orgId: string, select: (json: unknown) => T[]): Promise<Page<T>> {
-  const res = await fetch(url, { headers: { "x-organization-id": orgId } });
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  const json = (await res.json()) as { pagination?: { total?: number; totalPages?: number } };
-  const rows = select(json);
-  return {
-    rows,
-    total: json.pagination?.total ?? rows.length,
-    totalPages: json.pagination?.totalPages ?? 1,
-  };
-}
-
-const defaultSelect = (json: unknown) => ((json as { data?: unknown[] }).data ?? []) as never[];
+import { useEffect, useRef, useState } from "react";
+import { useApiRecords } from "@/lib/query/use-api";
 
 /**
  * Loads every record behind a list endpoint (up to 5,000) so the explorer can
- * search, filter, group and total instantly in the browser.
+ * search, filter, group and total instantly in the browser. Lists come from the
+ * shared cache: a list opened before shows at once and refreshes behind the scenes.
  */
 export function useRecords<T>(endpoint: string, params?: Record<string, string>, select?: (json: unknown) => T[], refreshKey?: unknown) {
-  const [rows, setRows] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const [version, setVersion] = useState(0);
-  const paramKey = JSON.stringify(params ?? {});
+  const query = new URLSearchParams(params ?? {}).toString();
+  const url = query ? `${endpoint}?${query}` : endpoint;
+  // `select` is expected to be stable for the page's lifetime.
+  const [stableSelect] = useState(() => select);
+  const { data, rows, total, truncated, loading, error, refetch } = useApiRecords<T>(url, stableSelect);
 
+  // A changed `refreshKey` asks for fresh rows (the cache already refreshes after any change made in the app).
+  const firstKey = useRef(refreshKey);
   useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const pick = select ?? (defaultSelect as (json: unknown) => T[]);
-    const url = (page: number) => {
-      const q = new URLSearchParams({ ...(JSON.parse(paramKey) as Record<string, string>), page: String(page), limit: String(PAGE) });
-      return `${endpoint}?${q}`;
-    };
+    if (refreshKey !== firstKey.current) void refetch();
+  }, [refreshKey, refetch]);
 
-    (async () => {
-      try {
-        const first = await fetchPage(url(1), orgId, pick);
-        const pages = Math.min(first.totalPages, MAX_PAGES);
-        const rest = await Promise.all(
-          Array.from({ length: Math.max(0, pages - 1) }, (_, i) => fetchPage(url(i + 2), orgId, pick))
-        );
-        if (cancelled) return;
-        setRows([...first.rows, ...rest.flatMap((p) => p.rows)]);
-        setTotal(first.total);
-        setError(null);
-      } catch {
-        if (!cancelled) setError("We couldn't load this list. Check your connection and try again.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // `select` is expected to be stable for the page's lifetime
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint, paramKey, version, refreshKey]);
-
-  const refresh = useCallback(() => setVersion((v) => v + 1), []);
-
-  return { rows, loading, error, total, truncated: total > rows.length, refresh };
+  return {
+    rows,
+    loading,
+    // A failed background refresh keeps the rows already showing.
+    error: error && data === undefined ? "We couldn't load this list. Check your connection and try again." : null,
+    total,
+    truncated,
+    refresh: () => void refetch(),
+  };
 }

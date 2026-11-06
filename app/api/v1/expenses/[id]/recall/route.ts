@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { cancelApprovalRequests } from "@/lib/approvals/engine";
 
 // Recall a claim that's awaiting approval back to draft so it can be edited.
 // Only "submitted" claims qualify — they haven't been approved, so nothing has
@@ -45,6 +46,9 @@ export async function POST(
       })
       .where(eq(expenseClaim.id, id))
       .returning();
+
+    // Pull it out of the approvers' queue too.
+    await cancelApprovalRequests(ctx.organizationId, "expense", id, ["pending"]);
 
     logAudit({ ctx, action: "recall", entityType: "expense", entityId: id, changes: { previousStatus: found.status }, request });
 

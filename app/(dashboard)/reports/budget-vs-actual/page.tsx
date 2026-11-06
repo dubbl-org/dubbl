@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, DollarSign, Target } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DataTable, type Column } from "@/components/dashboard/data-table";
@@ -12,6 +12,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
+import { useApi } from "@/lib/query/use-api";
 
 interface Budget {
   id: string;
@@ -48,66 +49,22 @@ const columns: Column<Comparison>[] = [
 ];
 
 export default function BudgetVsActualPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string>("");
-  const [comparisons, setComparisons] = useState<Comparison[]>([]);
-  const [totalBudgeted, setTotalBudgeted] = useState(0);
-  const [totalActual, setTotalActual] = useState(0);
-  const [totalVariance, setTotalVariance] = useState(0);
-  const [reportLoading, setReportLoading] = useState(false);
-
-  // Fetch budget list
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch("/api/v1/budgets?limit=100", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        const list = data.data || [];
-        setBudgets(list);
-        if (list.length > 0) {
-          setSelectedBudgetId(list[0].id);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, []);
+  const { data: budgetList, loading } = useApi<{ data?: Budget[] }>("/api/v1/budgets?limit=100");
+  const budgets = budgetList?.data || [];
+  const [pickedBudgetId, setSelectedBudgetId] = useState<string>("");
+  const selectedBudgetId = pickedBudgetId || budgets[0]?.id || "";
 
   // Fetch report when budget selected
-  useEffect(() => {
-    if (!selectedBudgetId) return;
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setReportLoading(true);
-    fetch(`/api/v1/reports/budget-vs-actual?budgetId=${selectedBudgetId}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setComparisons(data.comparisons || []);
-        setTotalBudgeted(data.totalBudgeted || 0);
-        setTotalActual(data.totalActual || 0);
-        setTotalVariance(data.totalVariance || 0);
-      })
-      .finally(() => { if (!cancelled) setReportLoading(false); });
-    return () => { cancelled = true; };
-  }, [selectedBudgetId]);
+  const { data: report, loading: reportLoading } = useApi<{ comparisons?: Comparison[]; totalBudgeted?: number; totalActual?: number; totalVariance?: number }>(
+    selectedBudgetId ? `/api/v1/reports/budget-vs-actual?budgetId=${selectedBudgetId}` : null,
+    { keepPrevious: true }
+  );
+  const comparisons = report?.comparisons || [];
+  const totalBudgeted = report?.totalBudgeted || 0;
+  const totalActual = report?.totalActual || 0;
+  const totalVariance = report?.totalVariance || 0;
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   if (budgets.length === 0) {
     return (

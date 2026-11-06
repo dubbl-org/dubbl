@@ -28,6 +28,17 @@ export const authConfig: NextAuthConfig = {
 
       // Redirect logged-in users away from auth pages
       if (isLoggedIn && (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up"))) {
+        // Signed-in visitors choosing a plan on the pricing page go straight to checkout
+        const plan = request.nextUrl.searchParams.get("plan");
+        if (plan && ["standard", "premium", "ultimate"].includes(plan)) {
+          const interval = request.nextUrl.searchParams.get("interval") === "monthly" ? "monthly" : "annual";
+          return Response.redirect(new URL(`/settings/billing?upgrade=${plan}&interval=${interval}`, request.nextUrl.origin));
+        }
+        // Already signed in while connecting a native app: go straight to its approval page
+        const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+        if (callbackUrl?.startsWith("/app-authorize?")) {
+          return Response.redirect(new URL(callbackUrl, request.nextUrl.origin));
+        }
         return Response.redirect(new URL("/dashboard", request.nextUrl.origin));
       }
 
@@ -50,6 +61,9 @@ export const authConfig: NextAuthConfig = {
         /^\/api\/v1\/portal\/(?!access(\/|$)|invite(\/|$))[^/]+\//.test(pathname) ||
         pathname === "/api/v1/invitations/info" ||
         pathname === "/api/v1/invite-links/info" ||
+        // Native app sign-in: code/refresh exchange and sign-out carry their own credentials
+        pathname === "/api/v1/app-auth/token" ||
+        pathname === "/api/v1/app-auth/revoke" ||
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/health") ||
         pathname.startsWith("/api/stripe/webhook") ||
@@ -59,6 +73,7 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/api/mcp/") ||
         pathname.startsWith("/.well-known") ||
         pathname.startsWith("/docs") ||
+        pathname === "/api/search" ||
         pathname.startsWith("/_next") ||
         pathname.startsWith("/favicon") ||
         pathname === "/sitemap.xml" ||

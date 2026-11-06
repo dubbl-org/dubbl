@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { motion, MotionConfig } from "motion/react";
@@ -40,13 +40,14 @@ import {
 import { toast } from "sonner";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface Team {
   id: string;
   name: string;
   description: string | null;
   color: string | null;
-  members?: { id: string; name?: string }[];
+  members?: { id: string; name?: string | null; email?: string }[];
   _count?: { members: number };
   memberCount?: number;
 }
@@ -177,9 +178,8 @@ function CreateTeamSheet({
 
 export default function TeamsPage() {
   const router = useRouter();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchKey, setFetchKey] = useState(0);
+  const { data, loading } = useApi<{ data?: Team[] }>("/api/v1/teams");
+  const teams = useMemo(() => data?.data || [], [data]);
 
   // Search, sort
   const [search, setSearch] = useState("");
@@ -189,35 +189,8 @@ export default function TeamsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   useDocumentTitle("Teams · Overview");
 
-  const fetchTeams = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/teams", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setTeams(data.data || []);
-      })
-      .finally(() => {
-        setLoading(false);
-        setFetchKey((k) => k + 1);
-      });
-  }, []);
-
-  useEffect(() => {
-    fetchTeams();
-    const handler = () => fetchTeams();
-    window.addEventListener("refetch-teams", handler);
-    return () => window.removeEventListener("refetch-teams", handler);
-  }, [fetchTeams]);
-
   // Re-animate on sort/search changes
-  useEffect(() => {
-    if (!loading) setFetchKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortOrder, debouncedSearch]);
+  const fetchKey = `${sortBy}:${sortOrder}:${debouncedSearch}`;
 
   // Client-side filtering + sorting
   const filtered = teams
@@ -268,7 +241,6 @@ export default function TeamsPage() {
       setCreateName("");
       setCreateDesc("");
       setCreateColor("#3b82f6");
-      fetchTeams();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create team");
     } finally {
@@ -635,13 +607,13 @@ export default function TeamsPage() {
                           {/* Member avatar stack */}
                           {team.members && team.members.length > 0 ? (
                             <div className="flex -space-x-1.5">
-                              {team.members.slice(0, 4).map((m, mi) => (
+                              {team.members.slice(0, 4).map((m) => (
                                 <div
                                   key={m.id}
                                   className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-medium ring-2 ring-card"
-                                  title={m.name}
+                                  title={m.name || m.email}
                                 >
-                                  {m.name ? getInitials(m.name) : "?"}
+                                  {m.name || m.email ? getInitials(m.name || m.email || "") : "?"}
                                 </div>
                               ))}
                               {team.members.length > 4 && (

@@ -3,6 +3,8 @@ import { deal, dealActivity } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
+import { CRM_PERMISSION } from "@/lib/api/crm-deals";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, notFound, handleError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -28,6 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, CRM_PERMISSION);
     const parsed = patchSchema.parse(await request.json());
 
     const existing = await findActivity(id, ctx.organizationId);
@@ -52,6 +55,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
+    requireRole(ctx, CRM_PERMISSION);
 
     const existing = await findActivity(id, ctx.organizationId);
     if (!existing) return notFound("Activity");

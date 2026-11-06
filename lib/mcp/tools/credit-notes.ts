@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -16,9 +17,11 @@ import { requireRole } from "@/lib/api/require-role";
 import { getNextNumber } from "@/lib/api/numbering";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
-import { getNextEntryNumber, createCogsJournalEntry } from "@/lib/api/journal-automation";
+import { getNextEntryNumber, createCogsJournalEntry, createCreditNoteJournalEntry } from "@/lib/api/journal-automation";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { checkMultiCurrency } from "@/lib/api/check-limit";
+import { emitInvoicePaid } from "@/lib/webhooks/events";
 
 /**
  * MCP tools for customer credit notes (AR / sales credit notes). A credit note
@@ -32,8 +35,8 @@ import type { AuthContext } from "@/lib/api/auth-context";
  * integer cents. Direct DB access via Drizzle (no HTTP self-calls); org-scoped
  * via the AuthContext.
  *
- * NOTE: sending a credit note (which posts the GL issue entry) is handled by the
- * separate `send_credit_note` tool — not duplicated here.
+ * Sending a credit note (which posts the GL issue entry) is `send_credit_note`,
+ * at the end of this file.
  */
 export function registerCreditNoteTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -170,6 +173,15 @@ export function registerCreditNoteTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:credit-notes");
+
+        // The customer's defaults: income account and tax rate for lines that
+        // don't set one, and no tax if they're marked "Don't charge tax".
+        params.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+          params.lines,
+          await loadContactDefaults(ctx.organizationId, params.contactId),
+          "sales"
+        ));
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
         await assertNotLocked(ctx.organizationId, params.issueDate);
 
         const creditNoteNumber = await getNextNumber(
@@ -282,7 +294,7 @@ export function registerCreditNoteTools(server: McpServer, ctx: AuthContext) {
           ),
         });
         if (!foundInvoice) throw new Error("Invoice not found");
-        if (foundInvoice.status === "draft" || foundInvoice.status === "void") {
+        if (["draft", "void", "pending_approval", "rejected"].includes(foundInvoice.status)) {
           throw new Error("Cannot apply credit to this invoice status");
         }
         // The credit note belongs to one customer — applying it to another
@@ -346,6 +358,8 @@ export function registerCreditNoteTools(server: McpServer, ctx: AuthContext) {
                 createdBy: ctx.userId,
               })
               .returning();
+            // A credit applied, not money received: only invoice.paid can apply
+            emitInvoicePaid(ctx.organizationId, [foundInvoice.id]);
 
             // Record the credit-note allocation linking credit note -> invoice.
             await tx.insert(paymentAllocation).values([
@@ -613,6 +627,76 @@ export function registerCreditNoteTools(server: McpServer, ctx: AuthContext) {
         });
 
         return { creditNote: updated };
+      })
+  );
+
+  server.tool(
+    "send_credit_note",
+    "Send a draft customer credit note. Posts the reversing journal entry (DR Revenue, DR Output VAT, CR Accounts Receivable) so the credit note reverses revenue and output VAT, marks it sent, and sets amountRemaining to the full total. Amounts are in integer cents. Returns the updated credit note and its journalEntryId.",
+    {
+      creditNoteId: z
+        .string()
+        .describe("UUID of the draft credit note to send"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:credit-notes");
+
+        const found = await db.query.creditNote.findFirst({
+          where: and(
+            eq(creditNote.id, params.creditNoteId),
+            eq(creditNote.organizationId, ctx.organizationId),
+            notDeleted(creditNote.deletedAt)
+          ),
+          with: { lines: true },
+        });
+        if (!found) throw new Error("Credit note not found");
+        if (found.status !== "draft") {
+          throw new Error("Only draft credit notes can be sent");
+        }
+
+        await assertNotLocked(ctx.organizationId, found.issueDate);
+
+        // Post the reversing JE + the status/journalEntryId update in ONE
+        // transaction so a mid-post failure can't leave an orphaned journal
+        // entry or a sent credit note with no GL.
+        const { updated, entry } = await db.transaction(async (tx) => {
+          const e = await createCreditNoteJournalEntry(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+              creditNoteNumber: found.creditNoteNumber,
+              total: found.total,
+              taxTotal: found.taxTotal,
+              lines: found.lines.map((l) => ({
+                accountId: l.accountId,
+                amount: l.amount,
+                taxAmount: l.taxAmount,
+                taxRateId: l.taxRateId,
+              })),
+              date: found.issueDate,
+              currencyCode: found.currencyCode,
+            },
+            tx
+          );
+
+          const [row] = await tx
+            .update(creditNote)
+            .set({
+              status: "sent",
+              sentAt: new Date(),
+              amountRemaining: found.total,
+              journalEntryId: e?.id || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(creditNote.id, params.creditNoteId))
+            .returning();
+          return { updated: row, entry: e };
+        });
+
+        return {
+          creditNote: updated,
+          journalEntryId: entry?.id ?? null,
+        };
       })
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileText, ChevronDown, ScrollText } from "lucide-react";
+import { ArrowLeft, FileText, ChevronDown, ScrollText, Download } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -10,11 +11,52 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache, useApis } from "@/lib/query/use-api";
+import { downloadFile } from "@/components/dashboard/download-link";
+
+interface TaxLine {
+  id: string;
+  jurisdictionLevel: string; // federal | state | local
+  jurisdiction: string | null;
+  taxKind: string; // income_tax | social_security | medicare | additional_medicare
+  amount: number; // cents
+}
 
 interface RunItem {
   id: string;
   employeeId: string;
   employee: { name: string; employeeNumber: string } | null;
+  taxBreakdowns?: TaxLine[];
+  deductionBreakdowns?: { id: string; amount: number; category: string; deductionType: { name: string } | null }[];
+}
+
+const TAX_ORDER = ["income_tax", "social_security", "medicare", "additional_medicare"];
+const LEVEL_ORDER = ["federal", "state", "local"];
+
+/** "Federal income tax", "State income tax (CA)", "Social Security", ... */
+function taxLabel(t: TaxLine): string {
+  switch (t.taxKind) {
+    case "income_tax": {
+      const level = t.jurisdictionLevel === "state" ? "State" : t.jurisdictionLevel === "local" ? "Local" : "Federal";
+      return `${level} income tax${t.jurisdiction && t.jurisdictionLevel !== "federal" ? ` (${t.jurisdiction})` : ""}`;
+    }
+    case "social_security":
+      return "Social Security";
+    case "medicare":
+      return "Medicare";
+    case "additional_medicare":
+      return "Additional Medicare";
+    default:
+      return t.taxKind.replace(/_/g, " ");
+  }
+}
+
+function sortTaxLines(lines: TaxLine[]): TaxLine[] {
+  const rank = (t: TaxLine) => {
+    const k = TAX_ORDER.indexOf(t.taxKind);
+    return (k === -1 ? TAX_ORDER.length : k) * 10 + Math.max(0, LEVEL_ORDER.indexOf(t.jurisdictionLevel));
+  };
+  return [...lines].sort((a, b) => rank(a) - rank(b));
 }
 
 interface RunDetail {
@@ -56,70 +98,50 @@ interface Row {
   name: string;
   employeeNumber: string;
   payslip: Payslip | null;
+  taxLines: TaxLine[];
+  deductionLines: DeductionLine[];
 }
+
+const payslipsUrl = (employeeId: string) => `/api/v1/payroll/employees/${employeeId}/payslips`;
 
 export default function RunPayslipsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [run, setRun] = useState<RunDetail | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const cache = useApiCache();
 
   useDocumentTitle("Payroll · Payslips");
 
-  const load = useCallback(async () => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) {
-      setLoading(false);
-      return;
+  // 1. Get the run so we know every employee on it (and the pay period).
+  const { data: runData, loading: runLoading } = useApi<{ run?: RunDetail }>(`/api/v1/payroll/runs/${id}`);
+  const run = runData?.run ?? null;
+
+  // 2. There is no per-run payslip endpoint, so fetch each employee's
+  //    payslips and pick the one generated for this run.
+  const items = useMemo(() => run?.items || [], [run]);
+  const employeeIds = items.map((item) => item.employeeId).filter(Boolean);
+  const payslipQueries = useApis<{ data?: Payslip[] }>(employeeIds.map(payslipsUrl));
+  const payslipsLoading = payslipQueries.loading;
+  const loading = runLoading || payslipsLoading;
+  const rows: Row[] = items.map((item) => {
+    let slip: Payslip | null = null;
+    if (item.employeeId && run) {
+      const list = payslipQueries.data[employeeIds.indexOf(item.employeeId)]?.data || [];
+      slip = list.find((p) => p.payrollRunId === run.id) || null;
     }
-    const headers = { "x-organization-id": orgId };
-
-    // 1. Get the run so we know every employee on it (and the pay period).
-    const runRes = await fetch(`/api/v1/payroll/runs/${id}`, { headers });
-    const runData = await runRes.json();
-    const runDetail: RunDetail | undefined = runData.run;
-    if (!runDetail) {
-      setLoading(false);
-      return;
-    }
-    setRun(runDetail);
-
-    // 2. There is no per-run payslip endpoint, so fetch each employee's
-    //    payslips and pick the one generated for this run.
-    const built: Row[] = await Promise.all(
-      (runDetail.items || []).map(async (item) => {
-        let slip: Payslip | null = null;
-        if (item.employeeId) {
-          try {
-            const psRes = await fetch(
-              `/api/v1/payroll/employees/${item.employeeId}/payslips`,
-              { headers }
-            );
-            const psData = await psRes.json();
-            const list: Payslip[] = psData.data || [];
-            slip = list.find((p) => p.payrollRunId === runDetail.id) || null;
-          } catch {
-            slip = null;
-          }
-        }
-        return {
-          employeeId: item.employeeId,
-          name: item.employee?.name || "-",
-          employeeNumber: item.employee?.employeeNumber || "",
-          payslip: slip,
-        };
-      })
-    );
-    setRows(built);
-    setLoading(false);
-  }, [id]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    return {
+      employeeId: item.employeeId,
+      name: item.employee?.name || "-",
+      employeeNumber: item.employee?.employeeNumber || "",
+      payslip: slip,
+      taxLines: sortTaxLines((item.taxBreakdowns ?? []).filter((t) => t.amount > 0)),
+      // The payslip keeps its own copy of the deduction lines; fall back to the run item's
+      deductionLines:
+        slip?.deductionsBreakdown && slip.deductionsBreakdown.length > 0
+          ? slip.deductionsBreakdown
+          : (item.deductionBreakdowns ?? []).map((d) => ({ name: d.deductionType?.name, amount: d.amount, category: d.category })),
+    };
+  });
 
   // Opening a payslip detail marks it as viewed on the server. Refresh that
   // row's status so the badge reflects it.
@@ -134,13 +156,10 @@ export default function RunPayslipsPage() {
         await fetch(`/api/v1/payroll/payslips/${row.payslip.id}`, {
           headers: { "x-organization-id": orgId },
         });
-        setRows((prev) =>
-          prev.map((r) =>
-            r.payslip && r.payslip.id === row.payslip!.id
-              ? { ...r, payslip: { ...r.payslip, status: "viewed" } }
-              : r
-          )
-        );
+        cache.update<{ data?: Payslip[] }>(payslipsUrl(row.employeeId), (d) => ({
+          ...d,
+          data: d.data?.map((p) => (p.id === row.payslip!.id ? { ...p, status: "viewed" } : p)),
+        }));
       } catch {
         /* non-fatal */
       }
@@ -275,19 +294,45 @@ export default function RunPayslipsPage() {
                       <Detail label="Take-home" value={formatMoney(ps.netAmount)} emphasize />
                     </div>
 
-                    {ps.deductionsBreakdown && ps.deductionsBreakdown.length > 0 && (
+                    {row.taxLines.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                          Taxes
+                        </p>
+                        <div className="rounded-lg border bg-card divide-y">
+                          {row.taxLines.map((t) => (
+                            <div
+                              key={t.id}
+                              className="flex items-center justify-between px-3 py-2"
+                            >
+                              <span className="text-xs">{taxLabel(t)}</span>
+                              <span className="text-xs font-mono tabular-nums">
+                                {formatMoney(t.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {row.deductionLines.length > 0 && (
                       <div className="mt-4">
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
                           Deductions
                         </p>
                         <div className="rounded-lg border bg-card divide-y">
-                          {ps.deductionsBreakdown.map((d, i) => (
+                          {row.deductionLines.map((d, i) => (
                             <div
                               key={i}
                               className="flex items-center justify-between px-3 py-2"
                             >
-                              <span className="text-xs capitalize">
-                                {d.name || d.category || "Deduction"}
+                              <span className="text-xs">
+                                {d.name || "Deduction"}
+                                {d.category && (
+                                  <span className="ml-1.5 text-muted-foreground">
+                                    {d.category === "pre_tax" ? "Pre-tax" : "Post-tax"}
+                                  </span>
+                                )}
                               </span>
                               <span className="text-xs font-mono tabular-nums">
                                 {formatMoney(d.amount || 0)}
@@ -307,6 +352,21 @@ export default function RunPayslipsPage() {
                         <Detail label="Tax" value={formatMoney(ps.ytdTax)} small />
                         <Detail label="Take-home" value={formatMoney(ps.ytdNet)} small />
                       </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          downloadFile(`/api/v1/payroll/payslips/${ps.id}/pdf?format=pdf`, `payslip-${row.name}.pdf`).catch((err) =>
+                            toast.error(err instanceof Error ? err.message : "Couldn't download the payslip")
+                          )
+                        }
+                      >
+                        <Download className="mr-1.5 size-3.5" />
+                        Download PDF
+                      </Button>
                     </div>
                   </div>
                 )}

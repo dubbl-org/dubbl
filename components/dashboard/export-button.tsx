@@ -7,6 +7,11 @@ interface ExportButtonProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>[];
   columns: string[];
+  /**
+   * Columns holding integer cents. They are written as decimal amounts
+   * (1250 → 12.50) so the file opens with real money values in a spreadsheet.
+   */
+  moneyColumns?: string[];
   filename?: string;
 }
 
@@ -19,13 +24,21 @@ function toCsvValue(value: unknown): string {
   return str;
 }
 
-export function ExportButton({ data, columns, filename = "export" }: ExportButtonProps) {
+function toMoneyValue(value: unknown): unknown {
+  if (value === null || value === undefined || value === "") return value;
+  const n = Number(value);
+  return Number.isFinite(n) ? (n / 100).toFixed(2) : value;
+}
+
+export function ExportButton({ data, columns, moneyColumns = [], filename = "export" }: ExportButtonProps) {
   const handleExport = () => {
     if (data.length === 0) return;
 
     const header = columns.join(",");
     const rows = data.map((row) =>
-      columns.map((col) => toCsvValue(row[col])).join(",")
+      columns
+        .map((col) => toCsvValue(moneyColumns.includes(col) ? toMoneyValue(row[col]) : row[col]))
+        .join(",")
     );
     const csv = [header, ...rows].join("\n");
 

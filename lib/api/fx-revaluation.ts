@@ -1,9 +1,8 @@
 import { ensureAccountForCode, findAccountForCode } from "@/lib/api/account-roles";
-import { sql, eq, and, isNull, ne } from "drizzle-orm";
+import { eq, and, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   organization,
-  chartAccount,
   journalEntry,
   journalLine,
   invoice,
@@ -16,6 +15,7 @@ import {
   type SettlementLeg,
 } from "@/lib/currency/convert-entry";
 import { assertNotLocked, PeriodLockedError } from "@/lib/api/period-lock";
+import { getNextEntryNumber } from "@/lib/api/journal-automation";
 
 /** Either the pool or an open transaction. */
 type Exec = typeof db | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
@@ -61,13 +61,7 @@ async function ensureAccount(orgId: string, def: AccountDef, base: string) {
 }
 
 async function nextEntryNumber(orgId: string, exec: Exec = db) {
-  const [m] = await exec
-    .select({
-      max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
-    })
-    .from(journalEntry)
-    .where(eq(journalEntry.organizationId, orgId));
-  return (m?.max || 0) + 1;
+  return getNextEntryNumber(orgId, exec);
 }
 
 /** Sum the period-end-minus-issue base-value delta over a set of open docs. */

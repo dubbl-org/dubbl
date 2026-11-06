@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { bankTransaction, bankAccount, invoice, payment, paymentAllocation, auditLog } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -10,6 +11,8 @@ import { findMatches, type MatchCandidate } from "@/lib/banking/reconciliation-m
 import { createPaymentJournalEntry } from "@/lib/api/journal-automation";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
+import { notifyPaymentReceived, notifySafely } from "@/lib/notifications/events";
+import { emitPaymentReceived } from "@/lib/webhooks/events";
 
 // GET: Find potential invoice matches for an incoming bank transaction
 export async function GET(
@@ -177,6 +180,8 @@ export async function POST(
     // Commit the payment, allocation, journal entry, document-status update, and
     // bank-transaction reconcile together so a thrown MissingExchangeRateError
     // (or any error) rolls back the whole settlement instead of leaving orphans.
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
+
     const { created } = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(payment)
@@ -194,6 +199,7 @@ export async function POST(
           createdBy: ctx.userId,
         })
         .returning();
+      emitPaymentReceived(ctx.organizationId, [created.id]);
 
       // Create allocation
       await tx.insert(paymentAllocation).values({
@@ -258,6 +264,8 @@ export async function POST(
       entityId: id,
       changes: { invoiceId: parsed.invoiceId, paymentId: created.id, amount: parsed.amount },
     });
+
+    await notifySafely(notifyPaymentReceived(ctx.organizationId, created.id, ctx.userId));
 
     return NextResponse.json({
       payment: { id: created.id, paymentNumber },

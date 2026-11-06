@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Plus,
   FileText,
@@ -47,7 +47,8 @@ import {
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
-import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
+import { TEMPLATE_TYPE_DOCUMENTS, type DocumentTemplateType } from "@/lib/documents/template-text";
 
 interface Template {
   id: string;
@@ -74,6 +75,24 @@ const TYPE_LABELS: Record<string, string> = {
   purchase_order: "Purchase Order",
 };
 
+const DOCUMENT_VARIABLES = [
+  "orgName", "orgAddress", "orgTaxId", "orgPhone", "orgEmail", "orgRegistrationNumber",
+  "invoiceNumber", "issueDate", "dueDate", "reference",
+  "contactName", "contactEmail", "contactAddress", "contactTaxNumber",
+  "subtotal", "taxTotal", "total", "currency",
+];
+
+const PAYSLIP_VARIABLES = [
+  "orgName", "orgAddress", "orgTaxId", "orgPhone", "orgEmail", "orgRegistrationNumber",
+  "employeeName", "employeeNumber", "payPeriodStart", "payPeriodEnd", "payDate",
+  "grossPay", "netPay", "currency",
+];
+
+function usedForText(type: string): string {
+  const docs = TEMPLATE_TYPE_DOCUMENTS[type as DocumentTemplateType];
+  return docs ? `Used for: ${docs.join(", ")}` : "";
+}
+
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <div className="pt-2 pb-1">
@@ -84,12 +103,13 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export default function DocumentTemplatesPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ templates?: Template[] }>("/api/v1/document-templates");
+  const templates = data?.templates ?? [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Template | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState("invoice");
   const [saving, setSaving] = useState(false);
 
   // Form state
@@ -110,15 +130,6 @@ export default function DocumentTemplatesPage() {
     const orgId = localStorage.getItem("activeOrgId") || "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
-
-  function fetchTemplates() {
-    fetch("/api/v1/document-templates", { headers: getHeaders() })
-      .then((r) => r.json())
-      .then((data) => { if (data.templates) setTemplates(data.templates); })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => { fetchTemplates(); }, []);
 
   function openCreate() {
     setEditing(null);
@@ -171,25 +182,19 @@ export default function DocumentTemplatesPage() {
       isDefault,
     };
 
-    if (editing) {
-      await fetch(`/api/v1/document-templates/${editing.id}`, {
-        method: "PATCH",
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
-      toast.success("Template updated");
-    } else {
-      await fetch("/api/v1/document-templates", {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
-      toast.success("Template created");
-    }
-
+    const res = await fetch(editing ? `/api/v1/document-templates/${editing.id}` : "/api/v1/document-templates", {
+      method: editing ? "PATCH" : "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
     setSaving(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      toast.error(err?.error || "Failed to save template");
+      return;
+    }
+    toast.success(editing ? "Template updated" : "Template created");
     setSheetOpen(false);
-    fetchTemplates();
   }
 
   async function handleDelete(t: Template) {
@@ -204,13 +209,13 @@ export default function DocumentTemplatesPage() {
           headers: getHeaders(),
         });
         toast.success("Template deleted");
-        fetchTemplates();
       },
     });
   }
 
   async function handlePreview(t: Template) {
     setPreviewTemplateId(t.id);
+    setPreviewType(t.type);
     const res = await fetch(`/api/v1/document-templates/${t.id}/preview`, {
       method: "POST",
       headers: getHeaders(),
@@ -229,7 +234,7 @@ export default function DocumentTemplatesPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "sample-invoice.pdf";
+    a.download = `sample-${previewType.replace("_", "-")}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -333,7 +338,7 @@ export default function DocumentTemplatesPage() {
                 <Label className="text-xs">Name</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Standard Invoice" />
               </div>
-              {!editing && (
+              {!editing ? (
                 <div className="space-y-1.5">
                   <Label className="text-xs">Type</Label>
                   <Select value={type} onValueChange={setType}>
@@ -344,12 +349,17 @@ export default function DocumentTemplatesPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground">{usedForText(type)}</p>
                 </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  {TYPE_LABELS[type] || type} template. {usedForText(type)}
+                </p>
               )}
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-xs">Default Template</Label>
-                  <p className="text-[11px] text-muted-foreground">Use this template automatically for new documents</p>
+                  <p className="text-[11px] text-muted-foreground">Every PDF of this type uses it. Turning it on replaces the current default.</p>
                 </div>
                 <Switch checked={isDefault} onCheckedChange={setIsDefault} />
               </div>
@@ -371,7 +381,7 @@ export default function DocumentTemplatesPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Logo URL</Label>
-                <p className="text-[11px] text-muted-foreground">URL to your logo image (shown in HTML preview only)</p>
+                <p className="text-[11px] text-muted-foreground">Link to a PNG or JPEG image, printed at the top of the PDF</p>
                 <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://example.com/logo.png" />
               </div>
 
@@ -380,17 +390,21 @@ export default function DocumentTemplatesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-xs">Show Tax Breakdown</Label>
-                  <p className="text-[11px] text-muted-foreground">Show tax row in the totals section</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {type === "payslip" ? "List each tax separately instead of one Tax withheld line" : "Show tax row in the totals section"}
+                  </p>
                 </div>
                 <Switch checked={showTaxBreakdown} onCheckedChange={setShowTaxBreakdown} />
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-xs">Show Payment Terms</Label>
-                  <p className="text-[11px] text-muted-foreground">Show &quot;due by&quot; date below totals</p>
+              {type === "invoice" && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-xs">Show Payment Terms</Label>
+                    <p className="text-[11px] text-muted-foreground">Show the due date and a Payment terms line below totals</p>
+                  </div>
+                  <Switch checked={showPaymentTerms} onCheckedChange={setShowPaymentTerms} />
                 </div>
-                <Switch checked={showPaymentTerms} onCheckedChange={setShowPaymentTerms} />
-              </div>
+              )}
 
               {/* Payment Information */}
               <SectionHeading>Payment Information</SectionHeading>
@@ -413,14 +427,14 @@ export default function DocumentTemplatesPage() {
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Thank you for your business. Late payments are subject to a 1.5% monthly fee." rows={3} className="text-xs" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Header HTML</Label>
-                <p className="text-[11px] text-muted-foreground">Custom HTML at the top of the document, before the title</p>
-                <Textarea value={headerHtml} onChange={(e) => setHeaderHtml(e.target.value)} placeholder='<p style="color: #6b7280;">Custom header text</p>' rows={3} className="font-mono text-xs" />
+                <Label className="text-xs">Header Text</Label>
+                <p className="text-[11px] text-muted-foreground">Printed above the title. Line breaks are kept; any HTML tags are removed.</p>
+                <Textarea value={headerHtml} onChange={(e) => setHeaderHtml(e.target.value)} placeholder="Registered office: 1 High Street, London" rows={3} className="text-xs" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Footer HTML</Label>
-                <p className="text-[11px] text-muted-foreground">Custom HTML at the bottom, after all content sections</p>
-                <Textarea value={footerHtml} onChange={(e) => setFooterHtml(e.target.value)} placeholder='<p style="font-size: 10px; color: #9ca3af;">Terms and conditions apply.</p>' rows={3} className="font-mono text-xs" />
+                <Label className="text-xs">Footer Text</Label>
+                <p className="text-[11px] text-muted-foreground">Printed at the bottom of every page. Line breaks are kept; any HTML tags are removed.</p>
+                <Textarea value={footerHtml} onChange={(e) => setFooterHtml(e.target.value)} placeholder="Terms and conditions apply." rows={3} className="text-xs" />
               </div>
 
               {/* Template Variables Reference */}
@@ -428,12 +442,7 @@ export default function DocumentTemplatesPage() {
                 <p className="text-[11px] font-semibold text-muted-foreground mb-2">Template Variables</p>
                 <p className="text-[10px] text-muted-foreground mb-2">Use these in notes, bank details, payment instructions, header, and footer fields.</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {[
-                    "orgName", "orgAddress", "orgTaxId", "orgPhone", "orgEmail", "orgRegistrationNumber",
-                    "invoiceNumber", "issueDate", "dueDate", "reference",
-                    "contactName", "contactEmail", "contactAddress", "contactTaxNumber",
-                    "subtotal", "taxTotal", "total", "currency",
-                  ].map((v) => (
+                  {(type === "payslip" ? PAYSLIP_VARIABLES : DOCUMENT_VARIABLES).map((v) => (
                     <code key={v} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">{`{{${v}}}`}</code>
                   ))}
                 </div>
@@ -453,7 +462,7 @@ export default function DocumentTemplatesPage() {
         <Dialog open={!!previewHtml} onOpenChange={() => { setPreviewHtml(null); setPreviewTemplateId(null); }}>
           <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
             <DialogHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pr-8">
                 <DialogTitle>Template Preview</DialogTitle>
                 <Button variant="outline" size="sm" onClick={handleDownloadSamplePdf} className="gap-1.5">
                   <Download className="size-3.5" />
@@ -464,6 +473,7 @@ export default function DocumentTemplatesPage() {
             {previewHtml && (
               <iframe
                 srcDoc={previewHtml}
+                sandbox=""
                 className="w-full h-[600px] border rounded"
                 title="Template Preview"
               />

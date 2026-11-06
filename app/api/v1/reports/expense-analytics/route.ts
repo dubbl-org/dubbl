@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         accountName: chartAccount.name,
         accountCode: chartAccount.code,
         subType: chartAccount.subType,
-        total: sql<number>`COALESCE(SUM(${journalLine.debitAmount}) - SUM(${journalLine.creditAmount}), 0)`,
+        total: sql<number>`COALESCE(SUM(${journalLine.debitAmount}) - SUM(${journalLine.creditAmount}), 0)`.as("total"),
         txCount: sql<number>`COUNT(DISTINCT ${journalEntry.id})`,
       })
       .from(journalLine)

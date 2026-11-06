@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { ArrowLeft, ArrowDownRight, ArrowUpRight, BookOpen, Hash, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -8,18 +8,21 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 interface AccountDetail {
   id: string;
   code: string;
   name: string;
   type: string;
-  balance: string;
+  // Integer cents.
+  balance: number;
   subType?: string | null;
   description?: string | null;
   currencyCode?: string;
   isActive?: boolean;
   isSystem?: boolean;
+  defaultTaxRateId?: string | null;
   totalDebits?: number;
   totalCredits?: number;
   entryCount?: number;
@@ -91,26 +94,16 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
-  const [account, setAccount] = useState<AccountDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const fetchAccount = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/accounts/${id}?limit=1`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.account) setAccount(data.account);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => {
-    fetchAccount();
-  }, [fetchAccount]);
+  const url = `/api/v1/accounts/${id}?limit=1`;
+  const { data, loading, refetch } = useApi<{ account?: AccountDetail }>(url);
+  const cache = useApiCache();
+  const account = data?.account ?? null;
+  const setAccount = useCallback(
+    (fn: (prev: AccountDetail | null) => AccountDetail | null) =>
+      cache.update<{ account?: AccountDetail | null }>(url, (d) => ({ ...d, account: fn(d.account ?? null) })),
+    [cache, url]
+  );
+  const fetchAccount = useCallback(() => void refetch(), [refetch]);
 
   if (loading) return <BrandLoader />;
 
@@ -118,7 +111,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
     return <p className="text-muted-foreground">Account not found.</p>;
   }
 
-  const bal = parseFloat(account.balance || "0");
+  const bal = account.balance || 0;
   const cur = account.currencyCode || "USD";
   const typeConfig = TYPE_CONFIG[account.type];
   const totalDebits = account.totalDebits || 0;
@@ -171,7 +164,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
           <div>
             <p className="text-[11px] text-muted-foreground">Balance</p>
             <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-              {formatMoney(Math.round(bal * 100), cur)}
+              {formatMoney(bal, cur)}
             </p>
           </div>
           <div>
@@ -180,7 +173,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
               Total Debits
             </p>
             <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-brand-600">
-              {totalDebits > 0 ? formatMoney(Math.round(totalDebits * 100), cur) : "-"}
+              {totalDebits > 0 ? formatMoney(totalDebits, cur) : "-"}
             </p>
           </div>
           <div>
@@ -189,7 +182,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
               Total Credits
             </p>
             <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600">
-              {totalCredits > 0 ? formatMoney(Math.round(totalCredits * 100), cur) : "-"}
+              {totalCredits > 0 ? formatMoney(totalCredits, cur) : "-"}
             </p>
           </div>
           <div>

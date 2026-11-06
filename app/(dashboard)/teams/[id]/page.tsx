@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Users,
@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useConfirm } from "@/lib/hooks/use-confirm";
+import { useApi } from "@/lib/query/use-api";
 
 interface RawTeamMember {
   id: string;
@@ -70,6 +71,17 @@ interface Team {
   description: string | null;
   color: string | null;
   members: TeamMember[];
+}
+
+type RawTeam = Omit<Team, "members"> & { members?: RawTeamMember[] };
+
+interface RawOrgMember {
+  id: string;
+  userName?: string;
+  userEmail?: string;
+  name?: string;
+  email?: string;
+  user?: { name?: string; email?: string };
 }
 
 interface OrgMember {
@@ -108,10 +120,6 @@ export default function TeamDetailPage() {
   const router = useRouter();
   const teamId = params.id as string;
 
-  const [team, setTeam] = useState<Team | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(true);
   const [addingMemberId, setAddingMemberId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -125,63 +133,26 @@ export default function TeamDetailPage() {
   const [visibleCount, setVisibleCount] = useState(20);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const fetchTeam = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
+  const { data: teamData, loading } = useApi<{ team?: RawTeam; data?: RawTeam } & Partial<RawTeam>>(`/api/v1/teams/${teamId}`);
+  const team = useMemo<Team | null>(() => {
+    if (!teamData) return null;
+    const t = (teamData.team || teamData.data || teamData) as RawTeam;
+    return {
+      ...t,
+      members: normalizeMembers(t.members || []),
+    };
+  }, [teamData]);
 
-    fetch(`/api/v1/teams/${teamId}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const t = data.team || data.data || data;
-        setTeam({
-          ...t,
-          members: normalizeMembers(t.members || []),
-        });
-      })
-      .finally(() => setLoading(false));
-  }, [teamId]);
-
-  useEffect(() => {
-    fetchTeam();
-  }, [fetchTeam]);
-
-  const membersFetchedRef = useRef(false);
-
-  useEffect(() => {
-    if (!popoverOpen || membersFetchedRef.current) return;
-    membersFetchedRef.current = true;
-
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    setLoadingMembers(true);
-
-    fetch("/api/v1/members?limit=500", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const members = data.members || data.data || [];
-        setOrgMembers(
-          members.map(
-            (m: {
-              id: string;
-              userName?: string;
-              userEmail?: string;
-              name?: string;
-              email?: string;
-              user?: { name?: string; email?: string };
-            }) => ({
-              id: m.id,
-              name: m.userName || m.user?.name || m.name || "",
-              email: m.userEmail || m.user?.email || m.email || "",
-            })
-          )
-        );
-      })
-      .finally(() => setLoadingMembers(false));
-  }, [popoverOpen]);
+  const { data: orgMembersData, loading: loadingMembers } = useApi<{ members?: RawOrgMember[]; data?: RawOrgMember[] }>(popoverOpen ? "/api/v1/members?limit=500" : null);
+  const orgMembers = useMemo<OrgMember[]>(
+    () =>
+      (orgMembersData?.members || orgMembersData?.data || []).map((m) => ({
+        id: m.id,
+        name: m.userName || m.user?.name || m.name || "",
+        email: m.userEmail || m.user?.email || m.email || "",
+      })),
+    [orgMembersData]
+  );
 
   function openEdit() {
     if (!team) return;
@@ -208,7 +179,6 @@ export default function TeamDetailPage() {
       if (!res.ok) throw new Error("Failed");
       toast.success("Team updated");
       setEditOpen(false);
-      fetchTeam();
     } catch {
       toast.error("Failed to update team");
     } finally {
@@ -238,8 +208,6 @@ export default function TeamDetailPage() {
 
       toast.success("Member added");
       setPopoverOpen(false);
-      membersFetchedRef.current = false;
-      fetchTeam();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to add member");
     } finally {
@@ -275,8 +243,6 @@ export default function TeamDetailPage() {
       }
 
       toast.success("Member removed");
-      membersFetchedRef.current = false;
-      fetchTeam();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to remove member");
     } finally {

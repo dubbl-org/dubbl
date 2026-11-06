@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { syncLeaveBalances } from "@/lib/api/leave-balances";
 
 export async function GET(request: Request) {
   try {
@@ -28,12 +29,16 @@ export async function GET(request: Request) {
     });
     if (!emp) return notFound("Employee profile");
 
+    // Bring this year's balances up to date (accrual, approved leave).
+    await syncLeaveBalances(ctx.organizationId, { employeeIds: [emp.id] });
+
+    const year = new Date().getFullYear();
     const balances = await db.query.employeeLeaveBalance.findMany({
-      where: eq(employeeLeaveBalance.employeeId, emp.id),
+      where: and(eq(employeeLeaveBalance.employeeId, emp.id), eq(employeeLeaveBalance.year, year)),
       with: { policy: true },
     });
 
-    return ok({ data: balances });
+    return ok({ data: balances.filter((b) => b.policy?.isActive && !b.policy.deletedAt) });
   } catch (err) {
     return handleError(err);
   }

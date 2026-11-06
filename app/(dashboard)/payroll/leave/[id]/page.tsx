@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, CalendarDays, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Ban, CalendarDays, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query/use-api";
 
 interface LeaveRequestDetail {
   id: string;
@@ -45,29 +46,18 @@ const statusColors: Record<string, string> = {
 export default function LeaveRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [req, setReq] = useState<LeaveRequestDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ request?: LeaveRequestDetail }>(`/api/v1/payroll/leave/requests/${id}`);
+  const req = data?.request ?? null;
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
   useDocumentTitle("Payroll · Leave Details");
-
-  const fetchRequest = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/payroll/leave/requests/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.request) setReq(data.request); })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  useEffect(() => { fetchRequest(); }, [fetchRequest]);
 
   async function handleApprove() {
     if (!orgId || approving || !req) return;
@@ -85,7 +75,6 @@ export default function LeaveRequestDetailPage() {
       });
       if (res.ok) {
         toast.success("Leave request approved");
-        fetchRequest();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Failed to approve");
@@ -108,13 +97,42 @@ export default function LeaveRequestDetailPage() {
         toast.success("Leave request rejected");
         setRejectOpen(false);
         setRejectReason("");
-        fetchRequest();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Failed to reject");
       }
     } finally {
       setRejecting(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!orgId || cancelling || !req) return;
+    const confirmed = await confirm({
+      title: "Cancel this leave?",
+      description: req.status === "approved"
+        ? `${req.employee?.name || "The employee"} gets the ${req.hours}h back on their leave balance.`
+        : "The request is withdrawn and won't need a decision.",
+      confirmLabel: "Cancel leave",
+      cancelLabel: "Keep it",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/v1/payroll/leave/requests/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (res.ok) {
+        toast.success("Leave cancelled");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(typeof data.error === "string" ? data.error : "Failed to cancel");
+      }
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -161,7 +179,15 @@ export default function LeaveRequestDetailPage() {
             <Button size="sm" variant="destructive" onClick={() => setRejectOpen(true)} disabled={approving}>
               <XCircle className="mr-1.5 size-3.5" /> Reject
             </Button>
+            <Button size="sm" variant="outline" onClick={handleCancel} disabled={approving || cancelling}>
+              <Ban className="mr-1.5 size-3.5" /> Cancel leave
+            </Button>
           </div>
+        )}
+        {req.status === "approved" && (
+          <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>
+            <Ban className="mr-1.5 size-3.5" /> Cancel leave
+          </Button>
         )}
       </div>
 

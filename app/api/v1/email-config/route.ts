@@ -9,11 +9,16 @@ import {
   removeEmailSettings,
   saveEmailSettings,
 } from "@/lib/email/email-settings";
+import { documentsFromAddress } from "@/lib/email/senders";
 
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    return ok({ emailConfig: await getEmailSettings(ctx.organizationId) });
+    return ok({
+      emailConfig: await getEmailSettings(ctx.organizationId),
+      // The shared sender used until the organization's own server is verified
+      platformFrom: documentsFromAddress(),
+    });
   } catch (err) {
     return handleError(err);
   }
@@ -22,7 +27,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:banking");
+    requireRole(ctx, "manage:integrations");
     const parsed = emailSettingsSchema.parse(await request.json());
     const result = await saveEmailSettings(ctx.organizationId, parsed);
     logAudit({ ctx, action: result.created ? "create" : "update", entityType: "email_config", entityId: result.emailConfig!.id, request });
@@ -36,7 +41,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:banking");
+    requireRole(ctx, "manage:integrations");
     const result = await removeEmailSettings(ctx.organizationId);
     logAudit({ ctx, action: "delete", entityType: "email_config", entityId: ctx.organizationId, request });
     return ok(result);

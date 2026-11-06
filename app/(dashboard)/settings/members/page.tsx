@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Plus, Users, MoreHorizontal, Shield, ShieldCheck, User, Loader2,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,12 +88,18 @@ const ROLE_COLORS = {
 
 export default function MembersPage() {
   const router = useRouter();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
-  const [capacity, setCapacity] = useState<Capacity | null>(null);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [inviteLinks, setInviteLinks] = useState<InviteLink[]>([]);
-  const [loading, setLoading] = useState(true);
+  const membersQuery = useApi<{ members?: Member[] }>("/api/v1/members");
+  const rolesQuery = useApi<{ roles?: CustomRole[] }>("/api/v1/roles");
+  const capacityQuery = useApi<Capacity>("/api/v1/members/capacity");
+  const invitationsQuery = useApi<{ invitations?: Invitation[] }>("/api/v1/invitations");
+  const linksQuery = useApi<{ links?: InviteLink[] }>("/api/v1/invite-links");
+  const loading = membersQuery.loading || rolesQuery.loading || capacityQuery.loading || invitationsQuery.loading || linksQuery.loading;
+  const members = membersQuery.data?.members ?? [];
+  const customRoles = rolesQuery.data?.roles ?? [];
+  const capacity = capacityQuery.data?.current !== undefined ? capacityQuery.data : null;
+  const invitationsData = invitationsQuery.data?.invitations;
+  const invitations = useMemo(() => (invitationsData ?? []).filter((i) => i.status === "pending"), [invitationsData]);
+  const inviteLinks = linksQuery.data?.links ?? [];
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
@@ -116,36 +123,6 @@ export default function MembersPage() {
     return h;
   }
 
-  const fetchAll = useCallback(async () => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    const h = { "x-organization-id": orgId };
-
-    try {
-      const [membersRes, rolesRes, capacityRes, invRes, linksRes] = await Promise.all([
-        fetch("/api/v1/members", { headers: h }),
-        fetch("/api/v1/roles", { headers: h }),
-        fetch("/api/v1/members/capacity", { headers: h }),
-        fetch("/api/v1/invitations", { headers: h }),
-        fetch("/api/v1/invite-links", { headers: h }),
-      ]);
-      const [membersData, rolesData, capacityData, invData, linksData] = await Promise.all([
-        membersRes.json(), rolesRes.json(), capacityRes.json(), invRes.json(), linksRes.json(),
-      ]);
-      if (membersData.members) setMembers(membersData.members);
-      if (rolesData.roles) setCustomRoles(rolesData.roles);
-      if (capacityData.current !== undefined) setCapacity(capacityData);
-      if (invData.invitations) setInvitations(invData.invitations.filter((i: Invitation) => i.status === "pending"));
-      if (linksData.links) setInviteLinks(linksData.links);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
   async function invite() {
     setSaving(true);
     try {
@@ -158,7 +135,6 @@ export default function MembersPage() {
       setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("member");
-      await fetchAll();
       toast.success("Invitation sent");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send invitation");
@@ -176,7 +152,6 @@ export default function MembersPage() {
         headers: headers(),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success("Invitation revoked");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to revoke");
@@ -201,7 +176,6 @@ export default function MembersPage() {
       setLinkRole("member");
       setLinkMaxUses("");
       setLinkExpiryDays("");
-      await fetchAll();
       toast.success("Invite link created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create link");
@@ -220,7 +194,6 @@ export default function MembersPage() {
         body: JSON.stringify({ isActive: !isActive }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success(isActive ? "Link disabled" : "Link enabled");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update link");
@@ -238,7 +211,6 @@ export default function MembersPage() {
         headers: headers(),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success("Invite link deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete link");
@@ -262,7 +234,6 @@ export default function MembersPage() {
         headers: headers(),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success("Member removed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to remove");
@@ -281,7 +252,6 @@ export default function MembersPage() {
         body: JSON.stringify({ customRoleId }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success(customRoleId ? "Custom role assigned" : "Custom role removed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to assign role");
@@ -300,7 +270,6 @@ export default function MembersPage() {
         body: JSON.stringify({ role }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      await fetchAll();
       toast.success("Role updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update role");

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { inventoryTransfer, inventoryTransferLine } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
+import { createTransfer, listTransfers } from "@/lib/api/inventory-transfers";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -22,23 +21,14 @@ const createSchema = z.object({
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-
-    const transfers = await db.query.inventoryTransfer.findMany({
-      where: eq(inventoryTransfer.organizationId, ctx.organizationId),
-      orderBy: desc(inventoryTransfer.createdAt),
-      with: {
-        fromWarehouse: true,
-        toWarehouse: true,
-        lines: true,
-      },
-    });
-
+    const transfers = await listTransfers(ctx.organizationId);
     return NextResponse.json({ data: transfers });
   } catch (err) {
     return handleError(err);
   }
 }
 
+/** Create a draft transfer. Stock moves when it's sent ("On the way") or completed. */
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
@@ -47,33 +37,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
-    const [transfer] = await db
-      .insert(inventoryTransfer)
-      .values({
-        organizationId: ctx.organizationId,
-        fromWarehouseId: parsed.fromWarehouseId,
-        toWarehouseId: parsed.toWarehouseId,
-        notes: parsed.notes,
-        transferredBy: ctx.userId,
-      })
-      .returning();
+    const transfer = await createTransfer(ctx, parsed);
+    logAudit({ ctx, action: "create", entityType: "inventory_transfer", entityId: transfer!.id, request });
 
-    if (parsed.lines.length > 0) {
-      await db.insert(inventoryTransferLine).values(
-        parsed.lines.map((line) => ({
-          transferId: transfer.id,
-          inventoryItemId: line.inventoryItemId,
-          quantity: line.quantity,
-        }))
-      );
-    }
-
-    const full = await db.query.inventoryTransfer.findFirst({
-      where: eq(inventoryTransfer.id, transfer.id),
-      with: { fromWarehouse: true, toWarehouse: true, lines: true },
-    });
-
-    return NextResponse.json({ transfer: full }, { status: 201 });
+    return NextResponse.json({ transfer }, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

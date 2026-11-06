@@ -19,6 +19,7 @@ import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { processReportScheduleById } from "@/lib/reports/schedule-processor";
+import { nextRunAfterResume } from "@/lib/reports/schedule-timing";
 
 export function registerReportScheduleTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -156,7 +157,7 @@ export function registerReportScheduleTools(server: McpServer, ctx: AuthContext)
 
   server.tool(
     "update_report_schedule",
-    "Update an existing report schedule by ID. Only provided fields will be changed.",
+    "Update an existing report schedule by ID. Only provided fields will be changed. Set isActive to false to pause the schedule (no emails are sent) and true to turn it back on; if the next send time passed while it was paused, it moves to the next future occurrence rather than sending straight away. Returns the updated schedule.",
     {
       id: z
         .string()
@@ -225,6 +226,10 @@ export function registerReportScheduleTools(server: McpServer, ctx: AuthContext)
         if (params.timeOfDay !== undefined) updates.timeOfDay = params.timeOfDay;
         if (params.timezone !== undefined) updates.timezone = params.timezone;
         if (params.isActive !== undefined) updates.isActive = params.isActive;
+        // Resuming: a send time that passed while paused moves to the next future one.
+        if (params.isActive === true && !existing.isActive) {
+          updates.nextRunAt = nextRunAfterResume(params.frequency ?? existing.frequency, existing.nextRunAt);
+        }
 
         const [updated] = await db
           .update(reportSchedule)
@@ -269,7 +274,7 @@ export function registerReportScheduleTools(server: McpServer, ctx: AuthContext)
 
   server.tool(
     "trigger_report_schedule",
-    "Immediately trigger a report schedule by ID, sending the report to all configured recipients regardless of the next scheduled run time.",
+    "Immediately trigger a report schedule by ID: runs the saved report and emails it to every recipient as an attachment in the schedule's format (PDF, CSV or XLSX, money as decimal amounts), with a preview of the first rows in the email body, regardless of the next scheduled run time. Returns { sent } (number of recipients).",
     {
       id: z
         .string()

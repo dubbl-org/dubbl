@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -32,6 +32,10 @@ import { DataTable, type Column } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { formatMoney } from "@/lib/money";
+import { downloadFile } from "@/components/dashboard/download-link";
+import { SAVED_REPORT_SOURCES, columnLabel } from "@/lib/reports/saved-report-sources";
 
 interface ReportConfig {
   dataSource: string;
@@ -59,14 +63,9 @@ interface ReportSchedule {
 }
 
 // Plain-language label for each data source (end users aren't accountants).
-const DATA_SOURCE_LABELS: Record<string, string> = {
-  invoices: "Invoices",
-  expenses: "Expenses",
-  transactions: "Bank transactions",
-  payroll: "Payroll",
-  inventory: "Inventory",
-  contacts: "Contacts",
-};
+const DATA_SOURCE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(SAVED_REPORT_SOURCES).map(([k, v]) => [k, v.label])
+);
 
 function formatDate(value: string | null): string {
   if (!value) return "Never";
@@ -81,18 +80,38 @@ function formatDate(value: string | null): string {
 
 export default function SavedReportsPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<SavedReport[]>([]);
+  // Saved reports + schedules (for last-run), fetched in parallel.
+  const { data: savedData, loading: savedLoading } = useApi<{ reports?: SavedReport[] }>("/api/v1/reports/saved");
+  const { data: scheduleData, loading: schedulesLoading } = useApi<{ data?: ReportSchedule[] }>("/api/v1/report-schedules?limit=200");
+  const loading = savedLoading || schedulesLoading;
+  const reports = Array.isArray(savedData?.reports) ? savedData.reports : [];
   // Last-run lives on report schedules, not on the saved report itself.
   // Map savedReportId -> most recent lastRunAt across its schedules.
-  const [lastRunByReport, setLastRunByReport] = useState<Record<string, string | null>>({});
+  const lastRunByReport = useMemo(() => {
+    const schedules: ReportSchedule[] = Array.isArray(scheduleData?.data)
+      ? scheduleData.data
+      : [];
+    const lastRun: Record<string, string | null> = {};
+    for (const s of schedules) {
+      if (!s.savedReportId || !s.lastRunAt) continue;
+      const existing = lastRun[s.savedReportId];
+      if (!existing || new Date(s.lastRunAt) > new Date(existing)) {
+        lastRun[s.savedReportId] = s.lastRunAt;
+      }
+    }
+    return lastRun;
+  }, [scheduleData]);
 
   // Run-inline state
   const [runOpen, setRunOpen] = useState(false);
   const [runReportItem, setRunReportItem] = useState<SavedReport | null>(null);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Record<string, unknown>[] | null>(null);
+  const [resultMeta, setResultMeta] = useState<{ columns: string[]; moneyColumns: string[]; currency: string }>({
+    columns: [],
+    moneyColumns: [],
+    currency: "USD",
+  });
 
   useDocumentTitle("Reports · Saved reports");
 
@@ -100,43 +119,6 @@ export default function SavedReportsPage() {
     const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") || "" : "";
     return { "x-organization-id": orgId, "Content-Type": "application/json" };
   }
-
-  const fetchReports = useCallback(() => {
-    setLoading(true);
-    // Fetch saved reports + schedules (for last-run) in parallel.
-    Promise.all([
-      fetch("/api/v1/reports/saved", { headers: getHeaders() })
-        .then((r) => r.json())
-        .catch(() => ({ reports: [] })),
-      fetch("/api/v1/report-schedules?limit=200", { headers: getHeaders() })
-        .then((r) => r.json())
-        .catch(() => ({ data: [] })),
-    ])
-      .then(([savedData, scheduleData]) => {
-        setReports(Array.isArray(savedData?.reports) ? savedData.reports : []);
-
-        const schedules: ReportSchedule[] = Array.isArray(scheduleData?.data)
-          ? scheduleData.data
-          : [];
-        const lastRun: Record<string, string | null> = {};
-        for (const s of schedules) {
-          if (!s.savedReportId || !s.lastRunAt) continue;
-          const existing = lastRun[s.savedReportId];
-          if (!existing || new Date(s.lastRunAt) > new Date(existing)) {
-            lastRun[s.savedReportId] = s.lastRunAt;
-          }
-        }
-        setLastRunByReport(lastRun);
-      })
-      .finally(() => {
-        setLoading(false);
-        setInitialLoad(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
 
   async function openRun(report: SavedReport) {
     setRunReportItem(report);
@@ -161,6 +143,11 @@ export default function SavedReportsPage() {
         setResults([]);
       } else {
         setResults(data.data || []);
+        setResultMeta({
+          columns: data.columns || report.config.columns,
+          moneyColumns: data.moneyColumns || [],
+          currency: data.currency || "USD",
+        });
       }
     } catch {
       toast.error("Failed to run report");
@@ -170,12 +157,25 @@ export default function SavedReportsPage() {
     }
   }
 
-  function handleExport(report: SavedReport) {
-    const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") || "" : "";
-    window.open(
-      `/api/v1/reports/saved/${report.id}/export?x-organization-id=${orgId}`,
-      "_blank"
-    );
+  async function handleExport(report: SavedReport) {
+    try {
+      await downloadFile(`/api/v1/reports/saved/${report.id}/export?format=csv`, `${report.name}.csv`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't export the report");
+    }
+  }
+
+  function formatCell(col: string, row: Record<string, unknown>): string {
+    const v = row[col];
+    if (v === null || v === undefined || v === "") return "-";
+    if (resultMeta.moneyColumns.includes(col)) {
+      const n = Number(v);
+      const currency = typeof row.currencyCode === "string" ? row.currencyCode : resultMeta.currency;
+      return Number.isFinite(n) ? formatMoney(n, currency) : String(v);
+    }
+    if (col === "percentage") return `${v}%`;
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    return String(v);
   }
 
   async function handleDelete(report: SavedReport) {
@@ -191,7 +191,6 @@ export default function SavedReportsPage() {
         });
         if (res.ok) {
           toast.success("Report deleted");
-          fetchReports();
         } else {
           toast.error("Failed to delete report");
         }
@@ -292,7 +291,7 @@ export default function SavedReportsPage() {
     },
   ];
 
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -314,9 +313,7 @@ export default function SavedReportsPage() {
         </Button>
       </PageHeader>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : reports.length === 0 ? (
+      {reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
             <BarChart3 className="size-6 text-muted-foreground" />
@@ -374,12 +371,12 @@ export default function SavedReportsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      {runReportItem.config.columns.map((col) => (
+                      {resultMeta.columns.map((col) => (
                         <th
                           key={col}
-                          className="px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap"
+                          className={`px-3 py-2 text-xs font-medium text-muted-foreground whitespace-nowrap ${resultMeta.moneyColumns.includes(col) ? "text-right" : "text-left"}`}
                         >
-                          {col}
+                          {columnLabel(col)}
                         </th>
                       ))}
                     </tr>
@@ -387,9 +384,12 @@ export default function SavedReportsPage() {
                   <tbody>
                     {results.slice(0, 50).map((row, i) => (
                       <tr key={i} className="border-b last:border-0">
-                        {runReportItem.config.columns.map((col) => (
-                          <td key={col} className="px-3 py-2 text-xs whitespace-nowrap">
-                            {String(row[col] ?? "-")}
+                        {resultMeta.columns.map((col) => (
+                          <td
+                            key={col}
+                            className={`px-3 py-2 text-xs whitespace-nowrap ${resultMeta.moneyColumns.includes(col) ? "text-right font-mono tabular-nums" : ""}`}
+                          >
+                            {formatCell(col, row)}
                           </td>
                         ))}
                       </tr>
@@ -397,7 +397,7 @@ export default function SavedReportsPage() {
                     {results.length === 0 && (
                       <tr>
                         <td
-                          colSpan={runReportItem.config.columns.length}
+                          colSpan={Math.max(resultMeta.columns.length, 1)}
                           className="px-3 py-8 text-center text-xs text-muted-foreground"
                         >
                           No data found

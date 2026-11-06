@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMember, member } from "@/lib/db/schema";
+import { projectMember, member } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
+import { requireProjectAccess } from "@/lib/api/project-access";
 import { handleError, notFound, validationError } from "@/lib/api/response";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { z } from "zod";
 
 const addMemberSchema = z.object({
@@ -25,15 +24,7 @@ export async function GET(
     const { id } = await params;
     const ctx = await getAuthContext(request);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
 
     const members = await db.query.projectMember.findMany({
       where: eq(projectMember.projectId, id),
@@ -57,20 +48,11 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = addMemberSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     // Verify the member belongs to this org
     const orgMember = await db.query.member.findFirst({
@@ -123,19 +105,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = updateMemberSchema.parse(body);
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     const existing = await db.query.projectMember.findFirst({
       where: and(
@@ -174,21 +148,12 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const url = new URL(request.url);
     const memberId = url.searchParams.get("memberId");
     if (!memberId) return validationError("memberId is required");
 
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "manage");
 
     await db
       .delete(projectMember)

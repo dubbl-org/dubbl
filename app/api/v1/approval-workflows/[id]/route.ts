@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
+import { assertValidWorkflow, replaceWorkflowSteps } from "@/lib/approvals/workflows";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -71,7 +72,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:bills");
+    requireRole(ctx, "manage:approvals");
 
     const existing = await db.query.approvalWorkflow.findFirst({
       where: and(
@@ -85,6 +86,14 @@ export async function PATCH(
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+    // Check the conditions against the (possibly new) record type, and the
+    // approvers against the organization.
+    await assertValidWorkflow(
+      ctx.organizationId,
+      parsed.entityType ?? existing.entityType,
+      parsed.conditions ?? (parsed.entityType ? existing.conditions : undefined),
+      parsed.steps
+    );
 
     const { steps, ...workflowFields } = parsed;
 
@@ -97,17 +106,7 @@ export async function PATCH(
 
     // Replace steps if provided
     if (steps) {
-      await db
-        .delete(approvalWorkflowStep)
-        .where(eq(approvalWorkflowStep.workflowId, id));
-      await db.insert(approvalWorkflowStep).values(
-        steps.map((step, i) => ({
-          workflowId: id,
-          stepOrder: i + 1,
-          approverId: step.approverId,
-          isRequired: step.isRequired,
-        }))
-      );
+      await replaceWorkflowSteps(id, steps);
     }
 
     const updated = await db.query.approvalWorkflow.findFirst({
@@ -135,7 +134,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:bills");
+    requireRole(ctx, "manage:approvals");
 
     const existing = await db.query.approvalWorkflow.findFirst({
       where: and(

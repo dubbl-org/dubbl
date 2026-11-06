@@ -17,6 +17,7 @@ import {
 } from "@/lib/api/amortization";
 import { getNextEntryNumber } from "@/lib/api/journal-automation";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -207,7 +208,7 @@ export function registerLoanTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "post_loan_payment",
-    "Post the next unposted scheduled loan payment to the ledger. Posts DR principal account (reduces the loan liability) + DR interest account (interest expense) / CR the loan's bank ledger account (cash out) for that period's amounts (all in integer cents). Marks the schedule entry posted and links it to the journal entry; when the final entry is posted the loan status becomes 'paid_off'. The loan must be active, have principal/interest accounts configured, and have a bank account selected. Returns the posted schedule entry, the journal entry, and the resulting loan status.",
+    "Post the next unposted scheduled loan payment to the ledger. Posts DR principal account (reduces the loan liability) + DR interest account (interest expense) / CR the loan's bank ledger account (cash out) for that period's amounts (all in integer cents). Marks the schedule entry posted and links it to the journal entry; when the final entry is posted the loan status becomes 'paid_off'. The loan must be active, have principal/interest accounts configured, and have a bank account selected (set it with update_loan). Fails if the payment's schedule date is in a locked period or closed financial year. Returns the posted schedule entry, the journal entry, and the resulting loan status.",
     {
       loanId: z.string().describe("The UUID of the loan to post the next payment for"),
     },
@@ -259,6 +260,8 @@ export function registerLoanTools(server: McpServer, ctx: AuthContext) {
           );
 
         const today = new Date().toISOString().slice(0, 10);
+        // The payment is dated on its schedule date; refuse a locked period.
+        await assertNotLocked(ctx.organizationId, nextEntry.date || today, ctx);
 
         const result = await db.transaction(async (tx) => {
           const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
@@ -340,7 +343,7 @@ export function registerLoanTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_loan",
-    "Update a loan's name and/or status. Status may be 'active', 'paid_off', or 'defaulted'. Does not regenerate the amortization schedule or post anything to the ledger. Returns the updated loan.",
+    "Update a loan's name, status and/or bank account. Status may be 'active', 'paid_off', or 'defaulted'. 'bankAccountId' is the bank account repayments come out of (required before post_loan_payment can post). Does not regenerate the amortization schedule or post anything to the ledger. Returns the updated loan.",
     {
       loanId: z.string().describe("The UUID of the loan to update"),
       name: z.string().min(1).optional().describe("New loan name/label"),
@@ -348,6 +351,12 @@ export function registerLoanTools(server: McpServer, ctx: AuthContext) {
         .enum(["active", "paid_off", "defaulted"])
         .optional()
         .describe("New loan status"),
+      bankAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("UUID of the bank account the loan is repaid from (null to clear)"),
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -362,9 +371,21 @@ export function registerLoanTools(server: McpServer, ctx: AuthContext) {
         });
         if (!existing) throw new Error("Loan not found");
 
-        const updates: { name?: string; status?: "active" | "paid_off" | "defaulted" } = {};
+        const updates: { name?: string; status?: "active" | "paid_off" | "defaulted"; bankAccountId?: string | null } = {};
         if (params.name !== undefined) updates.name = params.name;
         if (params.status !== undefined) updates.status = params.status;
+        if (params.bankAccountId !== undefined) {
+          if (params.bankAccountId) {
+            const bank = await db.query.bankAccount.findFirst({
+              where: and(
+                eq(bankAccount.id, params.bankAccountId),
+                eq(bankAccount.organizationId, ctx.organizationId)
+              ),
+            });
+            if (!bank) throw new Error("Bank account not found");
+          }
+          updates.bankAccountId = params.bankAccountId;
+        }
 
         const [updated] = await db
           .update(loan)

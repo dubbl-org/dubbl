@@ -7,6 +7,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import { wrapTool } from "@/lib/mcp/errors";
+import { assertValidLeaveRequest, syncLeaveBalances } from "@/lib/api/leave-balances";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 /** Only the employee fields a leave list needs: never pay or bank details. */
@@ -70,22 +71,14 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
       policyId: z.string().uuid().describe("UUID of the leave policy (see list_leave_policies)"),
       startDate: z.string().min(1).describe("First day off, YYYY-MM-DD"),
       endDate: z.string().min(1).describe("Last day off, YYYY-MM-DD"),
-      hours: z.number().min(0).describe("Total hours off, e.g. 16"),
+      hours: z.number().positive().describe("Total hours off, more than 0, e.g. 16"),
       reason: z.string().optional().describe("Optional note, e.g. 'Family holiday'"),
     },
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:leave");
-        const emp = await db.query.payrollEmployee.findFirst({
-          where: and(eq(payrollEmployee.id, params.employeeId), eq(payrollEmployee.organizationId, ctx.organizationId), notDeleted(payrollEmployee.deletedAt)),
-          columns: { id: true },
-        });
-        if (!emp) throw new Error("Employee not found");
-        const policy = await db.query.leavePolicy.findFirst({
-          where: and(eq(leavePolicy.id, params.policyId), eq(leavePolicy.organizationId, ctx.organizationId)),
-          columns: { id: true },
-        });
-        if (!policy) throw new Error("Leave policy not found");
+        // Employee and active policy in this org, dates in order, hours > 0.
+        await assertValidLeaveRequest(ctx.organizationId, params);
         const [req] = await db
           .insert(leaveRequest)
           .values({ organizationId: ctx.organizationId, ...params })
@@ -102,7 +95,7 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
       policyId: z.string().uuid().describe("UUID of the leave policy (see list_leave_policies)"),
       startDate: z.string().min(1).describe("First day off, YYYY-MM-DD"),
       endDate: z.string().min(1).describe("Last day off, YYYY-MM-DD"),
-      hours: z.number().min(0).describe("Total hours off, e.g. 8"),
+      hours: z.number().positive().describe("Total hours off, more than 0, e.g. 8"),
       reason: z.string().optional().describe("Optional note for the manager"),
     },
     (params) =>
@@ -118,6 +111,7 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
           columns: { id: true },
         });
         if (!emp) throw new Error("Your account isn't linked to a payroll employee record");
+        await assertValidLeaveRequest(ctx.organizationId, { employeeId: emp.id, ...params });
         const [req] = await db
           .insert(leaveRequest)
           .values({ organizationId: ctx.organizationId, employeeId: emp.id, ...params })
@@ -128,7 +122,7 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "approve_leave_request",
-    "Approve a pending time-off request. The hours are taken off the employee's balance for that leave policy this year. Requires the approve:payroll permission. Returns the updated request.",
+    "Approve a pending time-off request. The employee's balances are recalculated, so the hours come off their balance for that leave policy in the year the leave starts. Unpaid leave also reduces pay in the pay run covering those dates. Requires the approve:payroll permission. Returns the updated request.",
     {
       requestId: z.string().uuid().describe("UUID of the leave request"),
     },
@@ -151,14 +145,10 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
           .set({ status: "approved", approvedBy: me.id, approvedAt: new Date() })
           .where(and(eq(leaveRequest.id, req.id), eq(leaveRequest.organizationId, ctx.organizationId)))
           .returning();
-        await db
-          .update(employeeLeaveBalance)
-          .set({
-            usedHours: sql`${employeeLeaveBalance.usedHours} + ${req.hours}`,
-            balance: sql`${employeeLeaveBalance.balance} - ${req.hours}`,
-            updatedAt: new Date(),
-          })
-          .where(and(eq(employeeLeaveBalance.employeeId, req.employeeId), eq(employeeLeaveBalance.policyId, req.policyId), eq(employeeLeaveBalance.year, new Date().getFullYear())));
+        await syncLeaveBalances(ctx.organizationId, {
+          employeeIds: [req.employeeId],
+          year: Number(req.startDate.slice(0, 4)),
+        });
         logAudit({ ctx, action: "approve", entityType: "leaveRequest", entityId: req.id });
         return { request: updated };
       })
@@ -186,6 +176,66 @@ export function registerLeaveTools(server: McpServer, ctx: AuthContext) {
           .returning();
         logAudit({ ctx, action: "reject", entityType: "leaveRequest", entityId: req.id });
         return { request: updated };
+      })
+  );
+
+  server.tool(
+    "cancel_leave_request",
+    "Cancel a pending or approved time-off request. Cancelling approved leave gives the hours back to the employee's balance. Requires the manage:leave permission. Returns the updated request.",
+    {
+      requestId: z.string().uuid().describe("UUID of the leave request"),
+      reason: z.string().optional().describe("Why it was cancelled"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:leave");
+        const req = await db.query.leaveRequest.findFirst({
+          where: and(eq(leaveRequest.id, params.requestId), eq(leaveRequest.organizationId, ctx.organizationId)),
+        });
+        if (!req) throw new Error("Leave request not found");
+        if (req.status !== "pending" && req.status !== "approved") {
+          throw new Error("Only pending or approved requests can be cancelled");
+        }
+        const [updated] = await db
+          .update(leaveRequest)
+          .set({ status: "cancelled", ...(params.reason ? { rejectionReason: params.reason } : {}) })
+          .where(and(eq(leaveRequest.id, req.id), eq(leaveRequest.organizationId, ctx.organizationId)))
+          .returning();
+        if (req.status === "approved") {
+          await syncLeaveBalances(ctx.organizationId, {
+            employeeIds: [req.employeeId],
+            year: Number(req.startDate.slice(0, 4)),
+          });
+        }
+        logAudit({ ctx, action: "cancel", entityType: "leaveRequest", entityId: req.id });
+        return { request: updated };
+      })
+  );
+
+  server.tool(
+    "get_my_leave_balances",
+    "Get the signed-in user's own leave balances for this year (their linked payroll employee record), one per active leave policy, worked out fresh: carried over + accrued so far - approved leave, capped at the policy maximum. Hours are plain numbers. Requires the self-service:payroll permission. Returns { data: [{ policy, balance, usedHours, year }] }.",
+    {},
+    () =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "self-service:payroll");
+        const me = await db.query.member.findFirst({
+          where: and(eq(member.userId, ctx.userId), eq(member.organizationId, ctx.organizationId)),
+          columns: { id: true },
+        });
+        if (!me) throw new Error("You're not a member of this workspace");
+        const emp = await db.query.payrollEmployee.findFirst({
+          where: and(eq(payrollEmployee.organizationId, ctx.organizationId), eq(payrollEmployee.memberId, me.id), notDeleted(payrollEmployee.deletedAt)),
+          columns: { id: true },
+        });
+        if (!emp) throw new Error("Your account isn't linked to a payroll employee record");
+        await syncLeaveBalances(ctx.organizationId, { employeeIds: [emp.id] });
+        const year = new Date().getFullYear();
+        const balances = await db.query.employeeLeaveBalance.findMany({
+          where: and(eq(employeeLeaveBalance.employeeId, emp.id), eq(employeeLeaveBalance.year, year)),
+          with: { policy: true },
+        });
+        return { data: balances.filter((b) => b.policy?.isActive && !b.policy.deletedAt) };
       })
   );
 }

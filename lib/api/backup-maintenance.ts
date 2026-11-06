@@ -5,7 +5,9 @@ import { organization } from "@/lib/db/schema";
 import { eq, lt, and, gte, inArray, isNull } from "drizzle-orm";
 import { createOrgSnapshot } from "./backup-snapshot";
 import { deleteBackupObject } from "./backup-storage";
-import type { PlanName } from "@/lib/plans";
+import { getEffectiveLimits } from "@/lib/plans";
+import { isSelfHostedUnlimited } from "@/lib/site-settings";
+import { notifySafely, notifySystemAlert } from "@/lib/notifications/events";
 
 const SCHEDULED_BACKUP_INTERVAL_MS = 23 * 60 * 60 * 1000;
 
@@ -14,7 +16,7 @@ export async function processBackupMaintenance() {
   const orgs = await db
     .select({
       orgId: organization.id,
-      plan: subscription.plan,
+      sub: subscription,
     })
     .from(organization)
     .leftJoin(subscription, eq(subscription.organizationId, organization.id));
@@ -41,22 +43,29 @@ export async function processBackupMaintenance() {
         continue;
       }
 
-      const plan: PlanName = (org.plan as PlanName) || "free";
-      const retentionDays = plan === "pro" ? 30 : 7;
+      const retentionDays = getEffectiveLimits(org.sub, await isSelfHostedUnlimited()).backupRetentionDays;
 
       const backup = await createOrgSnapshot(org.orgId, null, "scheduled");
 
       // Set expiry
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + retentionDays);
-      await db
-        .update(dataBackup)
-        .set({ expiresAt })
-        .where(eq(dataBackup.id, backup.id));
+      if (Number.isFinite(retentionDays)) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + retentionDays);
+        await db
+          .update(dataBackup)
+          .set({ expiresAt })
+          .where(eq(dataBackup.id, backup.id));
+      }
 
       created++;
     } catch (err) {
       console.error(`Backup failed for org ${org.orgId}:`, err);
+      await notifySafely(
+        notifySystemAlert(org.orgId, {
+          title: "Scheduled backup failed",
+          body: "Today's automatic backup didn't complete. Open Settings > Backups to make one by hand.",
+        })
+      );
     }
   }
 

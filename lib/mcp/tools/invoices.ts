@@ -1,7 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { applyContactDefaults, fillSalesAccounts, loadContactDefaults } from "@/lib/api/contact-defaults";
+import { resolveTermsDays } from "@/lib/payment-terms";
+import { recordInvoicePayment } from "@/lib/api/invoice-payment";
+import { voidInvoice } from "@/lib/api/invoice-void";
+import { postDraftInvoice } from "@/lib/api/invoice-send";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoice, invoiceLine, invoiceSignature, emailConfig, organization, contact, approvalRequest, member } from "@/lib/db/schema";
+import { invoice, invoiceLine, invoiceSignature, emailConfig, organization, contact } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
@@ -9,13 +14,15 @@ import { getNextNumber } from "@/lib/api/numbering";
 import { decimalToMinorUnits } from "@/lib/money";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { preloadTaxRates, calcTax } from "@/lib/api/tax-calculator";
+import { assertLineStockRefs } from "@/lib/api/line-stock-refs";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkMonthlyLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { sendEmail } from "@/lib/email/smtp-client";
 import { randomBytes } from "crypto";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { emitInvoiceCreated } from "@/lib/webhooks/events";
 import { checkInvoiceCompliance } from "@/lib/documents/compliance";
-import { checkApprovalRequired, createApprovalRequest, processApprovalAction } from "@/lib/approvals/engine";
+import { submitForApproval, approveEntity, rejectEntity } from "@/lib/approvals/entities";
 
 export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -127,7 +134,7 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_invoice",
-    "Create a new invoice with line items. Unit prices are decimal numbers (e.g. 12.50 for $12.50). Quantities are decimal numbers. The system calculates totals and assigns an invoice number automatically.",
+    "Create a new invoice with line items. Unit prices are decimal numbers (e.g. 12.50 for $12.50). Quantities are decimal numbers. The system calculates totals and assigns an invoice number automatically. Lines without accountId get the customer's default income account, lines that omit taxRateId get the customer's default tax rate, and a customer marked 'Don't charge tax' gets no tax on any line (Contacts > Bookkeeping).",
     {
       contactId: z.string().describe("Customer contact UUID"),
       issueDate: z.string().describe("Issue date (YYYY-MM-DD)"),
@@ -215,10 +222,19 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     (params) =>
       wrapTool(ctx, async () => {
         requireRole(ctx, "manage:invoices");
+        await assertLineStockRefs(ctx.organizationId, params.lines);
 
         await assertNotLocked(ctx.organizationId, params.issueDate);
         await checkMonthlyLimit(ctx.organizationId, invoice, invoice.organizationId, invoice.createdAt, "invoicesPerMonth", invoice.deletedAt);
-        await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
+
+        // The customer's defaults: income account and tax rate for lines that
+        // don't set one, and no tax at all if they're marked "Don't charge tax".
+        params.lines = await fillSalesAccounts(ctx.organizationId, applyContactDefaults(
+          params.lines,
+          await loadContactDefaults(ctx.organizationId, params.contactId),
+          "sales"
+        ));
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
 
         // Auto-calculate due date if not provided
         let dueDate = params.dueDate;
@@ -233,10 +249,10 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
               where: eq(organization.id, ctx.organizationId),
               columns: { defaultPaymentTerms: true },
             });
-            termsDays = org?.defaultPaymentTerms ? parseInt(org.defaultPaymentTerms) : 30;
+            termsDays = resolveTermsDays(null, org?.defaultPaymentTerms);
           }
           const d = new Date(params.issueDate + "T00:00:00Z");
-          d.setUTCDate(d.getUTCDate() + (termsDays || 30));
+          d.setUTCDate(d.getUTCDate() + (termsDays ?? 30));
           dueDate = d.toISOString().split("T")[0];
         }
 
@@ -306,13 +322,28 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
           }))
         );
 
+        emitInvoiceCreated(ctx.organizationId, [created.id]);
         return { invoice: created };
       })
   );
 
   server.tool(
+    "send_invoice",
+    "Send (issue) a draft invoice without emailing it. Posts the sale to the ledger on the invoice's issue date (DR Accounts Receivable / CR the line income accounts and output tax), relieves stock and posts cost of goods sold for stock lines, records the sender and recipient details, and sets status to 'sent' so it can be paid and shows to the customer in the portal. Only drafts can be sent; an invoice waiting for approval must be approved first. Fails if the issue date is in a locked period or a foreign-currency invoice has no exchange rate. Returns the sent invoice.",
+    {
+      invoiceId: z.string().describe("The UUID of the draft invoice to send"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "approve:invoices");
+        const { invoice: sent } = await postDraftInvoice(ctx, params.invoiceId);
+        return { invoice: sent };
+      })
+  );
+
+  server.tool(
     "void_invoice",
-    "Void an invoice. Only non-paid invoices can be voided.",
+    "Void an invoice. Reverses its posted sale entry (revenue, output tax and Accounts Receivable) on the invoice date and restocks any stock lines (reversing cost of goods sold); a draft is simply marked void. Refuses invoices with payments or applied credit notes/prepayments (delete or unapply those first) and invoices with a revenue schedule in progress (cancel it first). Fails if the invoice date is in a locked period. Returns the voided invoice.",
     {
       invoiceId: z
         .string()
@@ -320,91 +351,58 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:invoices");
-
-        const existing = await db.query.invoice.findFirst({
-          where: and(
-            eq(invoice.id, params.invoiceId),
-            eq(invoice.organizationId, ctx.organizationId),
-            notDeleted(invoice.deletedAt)
-          ),
-        });
-
-        if (!existing) throw new Error("Invoice not found");
-        if (existing.status === "paid") {
-          throw new Error("Cannot void a fully paid invoice");
-        }
-        if (existing.status === "void") {
-          throw new Error("Invoice is already voided");
-        }
-
-        const [updated] = await db
-          .update(invoice)
-          .set({
-            status: "void",
-            voidedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(invoice.id, params.invoiceId))
-          .returning();
-
+        requireRole(ctx, "approve:invoices");
+        const { invoice: updated } = await voidInvoice(ctx, params.invoiceId);
         return { invoice: updated };
       })
   );
 
   server.tool(
     "pay_invoice",
-    "Record a payment against an invoice. Amount is in integer cents (e.g. 1250 = $12.50). Automatically updates the invoice status to 'paid' if fully paid or 'partial' if partially paid.",
+    "Record money received against an invoice. Amount is in integer cents (e.g. 1250 = $12.50), in the invoice's currency, and must not exceed the invoice's amountDue. The invoice must be approved and sent (not draft, void, pending_approval or rejected). Atomically creates the payment record and its allocation, posts the journal entry (DR the bank account's ledger account / CR Accounts Receivable, with realised FX for a foreign-currency invoice) and updates the invoice to 'paid' or 'partial'. Pass bankAccountId to record which bank account the money went into (it must be in the invoice's currency or the base currency); omit it to use the default bank account (1100). Fails if the date is in a locked period. Returns the updated invoice and the payment.",
     {
       invoiceId: z.string().describe("The UUID of the invoice"),
       amount: z
         .number()
         .int()
         .min(1)
-        .describe("Payment amount in cents"),
+        .describe("Payment amount in integer cents, in the invoice's currency"),
+      date: z
+        .string()
+        .optional()
+        .describe("Payment date (YYYY-MM-DD); defaults to today. The journal entry posts on this date"),
+      method: z
+        .enum(["bank_transfer", "cash", "check", "card", "other"])
+        .optional()
+        .default("bank_transfer")
+        .describe("How the money was received (defaults to bank_transfer)"),
+      reference: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("External reference (check number, transfer ref, etc.)"),
+      bankAccountId: z
+        .string()
+        .uuid()
+        .nullable()
+        .optional()
+        .describe("UUID of the bank account (from list_bank_accounts) the money went into. Omit for the default bank account (ledger account 1100)"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:invoices");
+        requireRole(ctx, "manage:payments");
 
-        const existing = await db.query.invoice.findFirst({
-          where: and(
-            eq(invoice.id, params.invoiceId),
-            eq(invoice.organizationId, ctx.organizationId),
-            notDeleted(invoice.deletedAt)
-          ),
+        const { invoice: updated, payment } = await recordInvoicePayment(ctx, {
+          invoiceId: params.invoiceId,
+          amount: params.amount,
+          date: params.date || new Date().toISOString().split("T")[0],
+          method: params.method,
+          reference: params.reference,
+          bankAccountId: params.bankAccountId,
         });
 
-        if (!existing) throw new Error("Invoice not found");
-        if (existing.status === "void") {
-          throw new Error("Cannot pay a voided invoice");
-        }
-        if (existing.status === "paid") {
-          throw new Error("Invoice is already fully paid");
-        }
-        if (params.amount > existing.amountDue) {
-          throw new Error(
-            `Payment amount (${params.amount}) exceeds amount due (${existing.amountDue})`
-          );
-        }
-
-        const newAmountPaid = existing.amountPaid + params.amount;
-        const newAmountDue = existing.total - newAmountPaid;
-        const newStatus = newAmountDue === 0 ? "paid" : "partial";
-
-        const [updated] = await db
-          .update(invoice)
-          .set({
-            amountPaid: newAmountPaid,
-            amountDue: newAmountDue,
-            status: newStatus,
-            paidAt: newAmountDue === 0 ? new Date() : null,
-            updatedAt: new Date(),
-          })
-          .where(eq(invoice.id, params.invoiceId))
-          .returning();
-
-        return { invoice: updated };
+        // payment.received (and invoice.paid when settled) are sent by the helper.
+        return { invoice: updated, payment };
       })
   );
 
@@ -762,75 +760,20 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "submit_invoice_for_approval",
-    "Submit a draft invoice into the approval workflow. Requires an active approval workflow (with steps) whose conditions match the invoice; throws if none is configured. Creates an approval request that tracks each step and moves the invoice to 'pending_approval' so it can't be sent until approved. Only draft invoices can be submitted.",
+    "Submit a draft invoice into the approval workflow. Requires an active approval workflow (with steps) whose conditions match the invoice; fails if none applies. When several workflows match, the one with the most conditions wins, then the oldest. Creates an approval request that tracks each step and moves the invoice to 'pending_approval' so it can't be sent until approved. Only draft invoices can be submitted. Returns the invoice and the approval request.",
     {
       invoiceId: z.string().describe("The UUID of the invoice to submit for approval"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:invoices");
-
-        const found = await db.query.invoice.findFirst({
-          where: and(
-            eq(invoice.id, params.invoiceId),
-            eq(invoice.organizationId, ctx.organizationId),
-            notDeleted(invoice.deletedAt)
-          ),
-        });
-
-        if (!found) throw new Error("Invoice not found");
-        if (found.status !== "draft") {
-          throw new Error("Only draft invoices can be submitted for approval");
-        }
-
-        // Resolve the member record for the requester (approval_request requires a
-        // member id, not a user id).
-        const requester = await db.query.member.findFirst({
-          where: and(
-            eq(member.userId, ctx.userId),
-            eq(member.organizationId, ctx.organizationId)
-          ),
-        });
-        if (!requester) throw new Error("Member not found");
-
-        // Find the active approval workflow whose conditions match this invoice.
-        const workflow = await checkApprovalRequired(
-          ctx.organizationId,
-          "invoice",
-          found as unknown as Record<string, unknown>
-        );
-
-        if (!workflow || workflow.steps.length === 0) {
-          throw new Error("No active approval workflow configured for invoices");
-        }
-
-        // Create the approval request (entityType "invoice") and move the invoice
-        // into the pending_approval state.
-        const request = await createApprovalRequest(
-          ctx.organizationId,
-          workflow.id,
-          "invoice",
-          found.id,
-          requester.id
-        );
-
-        const [updated] = await db
-          .update(invoice)
-          .set({ status: "pending_approval", updatedAt: new Date() })
-          .where(
-            and(eq(invoice.id, params.invoiceId), eq(invoice.organizationId, ctx.organizationId))
-          )
-          .returning();
-
-        if (!updated) throw new Error("Invoice not found");
-
-        return { invoice: updated, approvalRequest: request };
+        const outcome = await submitForApproval(ctx, "invoice", params.invoiceId);
+        return { invoice: outcome.entity, approvalRequest: outcome.request };
       })
   );
 
   server.tool(
     "approve_invoice",
-    "Approve an invoice that is pending approval. Records the approval action against the open approval request via the approval engine (enforcing approver-step validation and multi-step advance). Only returns the invoice to 'draft' (cleared to send) once the workflow is fully approved; if more steps remain the invoice stays pending_approval. Only invoices pending approval can be approved.",
+    "Approve an invoice that is pending approval (requires approve:invoices). Records the approval on the open approval request; only the current step's approver can act. Returns the invoice to 'draft' (cleared to send) once the last step approves; if more steps remain the invoice stays pending_approval. Returns the invoice, the request and finalized (true once fully approved).",
     {
       invoiceId: z.string().describe("The UUID of the invoice to approve"),
       comment: z
@@ -840,78 +783,14 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "approve:invoices");
-
-        // Resolve the member record for the approver (approval engine keys actions
-        // by member id, not user id).
-        const approver = await db.query.member.findFirst({
-          where: and(
-            eq(member.userId, ctx.userId),
-            eq(member.organizationId, ctx.organizationId)
-          ),
-        });
-        if (!approver) throw new Error("Member not found");
-
-        const found = await db.query.invoice.findFirst({
-          where: and(
-            eq(invoice.id, params.invoiceId),
-            eq(invoice.organizationId, ctx.organizationId),
-            notDeleted(invoice.deletedAt)
-          ),
-        });
-
-        if (!found) throw new Error("Invoice not found");
-        if (found.status !== "pending_approval") {
-          throw new Error("Only invoices pending approval can be approved");
-        }
-
-        // Find the open approval request for this invoice.
-        const pendingRequest = await db.query.approvalRequest.findFirst({
-          where: and(
-            eq(approvalRequest.organizationId, ctx.organizationId),
-            eq(approvalRequest.entityType, "invoice"),
-            eq(approvalRequest.entityId, params.invoiceId),
-            eq(approvalRequest.status, "pending")
-          ),
-        });
-        if (!pendingRequest) {
-          throw new Error("No pending approval request found for this invoice");
-        }
-
-        // Record the approval action; the engine advances the step or finalizes
-        // the request.
-        const requestResult = await processApprovalAction(
-          pendingRequest.id,
-          approver.id,
-          "approve",
-          params.comment
-        );
-
-        // When the request is fully approved, return the invoice to draft so it
-        // can be sent. If more steps remain, the invoice stays pending_approval.
-        let updated = found;
-        if (requestResult?.status === "approved") {
-          const [row] = await db
-            .update(invoice)
-            .set({ status: "draft", updatedAt: new Date() })
-            .where(
-              and(
-                eq(invoice.id, params.invoiceId),
-                eq(invoice.organizationId, ctx.organizationId)
-              )
-            )
-            .returning();
-          if (!row) throw new Error("Invoice not found");
-          updated = row;
-        }
-
-        return { invoice: updated, request: requestResult };
+        const outcome = await approveEntity(ctx, "invoice", params.invoiceId, params.comment);
+        return { invoice: outcome.entity, request: outcome.request, finalized: outcome.finalized };
       })
   );
 
   server.tool(
     "reject_invoice",
-    "Reject an invoice that is pending approval. Records the rejection on the open approval request via the approval engine (a reject at any step rejects the whole request) and moves the invoice to 'rejected'. Only invoices pending approval can be rejected.",
+    "Reject an invoice that is pending approval (requires approve:invoices; only the current step's approver can act). Records the rejection on the open approval request (a reject at any step rejects the whole request) and moves the invoice to 'rejected'. Returns the invoice and the request.",
     {
       invoiceId: z.string().describe("The UUID of the invoice to reject"),
       reason: z
@@ -921,64 +800,8 @@ export function registerInvoiceTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "approve:invoices");
-
-        // Resolve the member record for the approver (approval engine keys actions
-        // by member id, not user id).
-        const approver = await db.query.member.findFirst({
-          where: and(
-            eq(member.userId, ctx.userId),
-            eq(member.organizationId, ctx.organizationId)
-          ),
-        });
-        if (!approver) throw new Error("Member not found");
-
-        const found = await db.query.invoice.findFirst({
-          where: and(
-            eq(invoice.id, params.invoiceId),
-            eq(invoice.organizationId, ctx.organizationId),
-            notDeleted(invoice.deletedAt)
-          ),
-        });
-
-        if (!found) throw new Error("Invoice not found");
-        if (found.status !== "pending_approval") {
-          throw new Error("Only invoices pending approval can be rejected");
-        }
-
-        // Find the open approval request for this invoice.
-        const pendingRequest = await db.query.approvalRequest.findFirst({
-          where: and(
-            eq(approvalRequest.organizationId, ctx.organizationId),
-            eq(approvalRequest.entityType, "invoice"),
-            eq(approvalRequest.entityId, params.invoiceId),
-            eq(approvalRequest.status, "pending")
-          ),
-        });
-        if (!pendingRequest) {
-          throw new Error("No pending approval request found for this invoice");
-        }
-
-        // Record the rejection on the approval request (a reject at any step
-        // rejects the whole request).
-        const requestResult = await processApprovalAction(
-          pendingRequest.id,
-          approver.id,
-          "reject",
-          params.reason
-        );
-
-        const [updated] = await db
-          .update(invoice)
-          .set({ status: "rejected", updatedAt: new Date() })
-          .where(
-            and(eq(invoice.id, params.invoiceId), eq(invoice.organizationId, ctx.organizationId))
-          )
-          .returning();
-
-        if (!updated) throw new Error("Invoice not found");
-
-        return { invoice: updated, request: requestResult };
+        const outcome = await rejectEntity(ctx, "invoice", params.invoiceId, params.reason);
+        return { invoice: outcome.entity, request: outcome.request };
       })
   );
 }

@@ -22,6 +22,7 @@ const createSchema = z.object({
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:webhooks");
     const url = new URL(request.url);
     const { page, limit, offset } = parsePagination(url);
 

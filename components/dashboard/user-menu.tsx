@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { clearQueryCache } from "@/lib/query/client";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { LogOut, Monitor, Moon, Sparkles, Sun, User } from "lucide-react";
@@ -93,7 +94,7 @@ export function UserMenu() {
               className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px]"
             >
               <Sparkles className="size-4 text-muted-foreground" />
-              Upgrade to Pro
+              Plans & billing
             </DropdownMenuItem>
           </div>
 
@@ -126,7 +127,10 @@ export function UserMenu() {
 
           <div className="p-1">
             <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={async () => {
+                await clearQueryCache();
+                void signOut({ callbackUrl: "/" });
+              }}
               className="gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
             >
               <LogOut className="size-4" />

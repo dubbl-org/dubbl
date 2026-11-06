@@ -25,7 +25,7 @@ export interface FileRef {
   fileSize: number;
 }
 
-/* Anthropic-format conversation, as the server stores it. */
+/* The conversation in the stored message format, as the server keeps it. */
 export type Block =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
@@ -392,6 +392,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
                 patch(key, (c) => ({ live: [...c.live, { kind: "tool", id: event.id, name: event.name, status: "running", startedAt: Date.now() }] }));
                 break;
               case "tool_result":
+                // Tilly's tools write straight to the books; refresh whatever's cached.
+                if (event.ok && !event.skipped) window.dispatchEvent(new Event("dubbl:data-changed"));
                 patch(key, (c) => ({
                   live: c.live.map((b) =>
                     b.kind === "tool" && b.id === event.id

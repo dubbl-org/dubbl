@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, created } from "@/lib/api/response";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { logAudit } from "@/lib/api/audit";
+import { assertValidLeaveRequest } from "@/lib/api/leave-balances";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -13,7 +14,7 @@ const createSchema = z.object({
   policyId: z.string().uuid(),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
-  hours: z.number().min(0),
+  hours: z.number().positive(),
   reason: z.string().optional(),
 });
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
+    await assertValidLeaveRequest(ctx.organizationId, parsed);
 
     const [req] = await db
       .insert(leaveRequest)

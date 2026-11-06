@@ -22,7 +22,7 @@ import { useContactContext, getOrgId } from "../layout";
 
 export default function ContactPeoplePage() {
   const { id } = useParams<{ id: string }>();
-  const { contact, fetchContact } = useContactContext();
+  const { contact } = useContactContext();
 
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
@@ -61,7 +61,6 @@ export default function ContactPeoplePage() {
       toast.success("Person added");
       setNewPerson({ name: "", email: "", phone: "", jobTitle: "", isPrimary: false });
       setShowAddPerson(false);
-      fetchContact();
     } catch {
       toast.error("Failed to add person");
     } finally {

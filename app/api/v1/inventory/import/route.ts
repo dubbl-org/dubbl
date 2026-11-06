@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inventoryItem, journalEntry, journalLine } from "@/lib/db/schema";
+import { inventoryItem } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { createInventoryAdjustmentJournalEntry } from "@/lib/api/journal-automation";
+import type { ValuedItem } from "@/lib/api/inventory-valuation";
 import {
-  getNextEntryNumber,
-  ensureControlAccount,
-  ensureAccountByCode,
-  resolveBaseRate,
-} from "@/lib/api/journal-automation";
+  assertInventoryPeriodOpen,
+  getDefaultWarehouseId,
+  postOpeningStockEntry,
+  receiveOpeningStock,
+  todayIso,
+} from "@/lib/api/inventory-ops";
+import { resolveItemCategory } from "@/lib/api/inventory-categories";
 
 interface CsvRow {
   code?: string;
@@ -108,122 +112,130 @@ export async function POST(request: Request) {
 
     let created = 0;
     let updated = 0;
-    // Total cost of opening stock loaded for NEW items, posted as one combined
-    // opening-balance journal entry after the loop so imported stock has a real
-    // ledger value (not $0, which made later sales post $0 COGS).
-    let openingValueTotal = 0;
     const errors: { row: number; message: string }[] = [];
+    const today = todayIso();
+    if (rows.some((r) => r.quantityOnHand?.trim())) {
+      await assertInventoryPeriodOpen(ctx.organizationId, today, ctx);
+    }
+    const defaultWarehouseId = await getDefaultWarehouseId(ctx.organizationId);
+    const jctx = { organizationId: ctx.organizationId, userId: ctx.userId };
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.code || !row.name) {
-        errors.push({ row: i + 2, message: "Missing required field: code or name" });
-        continue;
-      }
+    await db.transaction(async (tx) => {
+      // Opening stock of NEW items, posted as one combined opening-balance entry
+      // at the end. Each item still gets its own movement (and FIFO layer), so
+      // its history and costing start from the import.
+      const opening: { item: { inventoryAccountId: string | null }; value: number; movementId: string }[] = [];
 
-      try {
-        const purchasePrice = row.purchasePrice ? Math.round(parseFloat(row.purchasePrice) * 100) : 0;
-        const salePrice = row.salePrice ? Math.round(parseFloat(row.salePrice) * 100) : 0;
-        const quantityOnHand = row.quantityOnHand ? parseInt(row.quantityOnHand) : 0;
-        const reorderPoint = row.reorderPoint ? parseInt(row.reorderPoint) : 0;
-
-        // Check if item already exists by code
-        const existing = await db.query.inventoryItem.findFirst({
-          where: and(
-            eq(inventoryItem.organizationId, ctx.organizationId),
-            eq(inventoryItem.code, row.code),
-            notDeleted(inventoryItem.deletedAt)
-          ),
-        });
-
-        if (existing) {
-          await db
-            .update(inventoryItem)
-            .set({
-              name: row.name,
-              description: row.description || existing.description,
-              category: row.category || existing.category,
-              sku: row.sku || existing.sku,
-              purchasePrice: purchasePrice || existing.purchasePrice,
-              salePrice: salePrice || existing.salePrice,
-              quantityOnHand: quantityOnHand || existing.quantityOnHand,
-              reorderPoint: reorderPoint || existing.reorderPoint,
-              updatedAt: new Date(),
-            })
-            .where(eq(inventoryItem.id, existing.id));
-          updated++;
-        } else {
-          const opening = quantityOnHand > 0 && purchasePrice > 0;
-          await db.insert(inventoryItem).values({
-            organizationId: ctx.organizationId,
-            code: row.code,
-            name: row.name,
-            description: row.description || null,
-            category: row.category || null,
-            sku: row.sku || null,
-            purchasePrice,
-            salePrice,
-            quantityOnHand,
-            reorderPoint,
-            // Value the opening stock (moving-average items): unit cost =
-            // purchase price, book value = qty * cost. Without this, stock sat
-            // at $0 and every later sale posted $0 cost of goods.
-            ...(opening
-              ? { averageCost: purchasePrice, totalValue: quantityOnHand * purchasePrice }
-              : {}),
-          });
-          if (opening) openingValueTotal += quantityOnHand * purchasePrice;
-          created++;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.code || !row.name) {
+          errors.push({ row: i + 2, message: "Missing required field: code or name" });
+          continue;
         }
-      } catch (err) {
-        errors.push({
-          row: i + 2,
-          message: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
-    }
 
-    // One combined opening-balance entry for all the imported stock:
-    // DR Inventory control / CR Opening Balance Equity.
-    if (openingValueTotal > 0) {
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const { base } = await resolveBaseRate(ctx.organizationId, undefined, today);
-        await db.transaction(async (tx) => {
-          const inv = await ensureControlAccount(ctx.organizationId, "inventory", base, tx);
-          const openingEquity = await ensureAccountByCode(
-            ctx.organizationId,
-            { code: "3000", name: "Opening Balance Equity", type: "equity", subType: "other_equity" },
-            base,
-            tx
-          );
-          if (!inv?.id || !openingEquity?.id) return;
-          const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
-          const [entry] = await tx
-            .insert(journalEntry)
-            .values({
-              organizationId: ctx.organizationId,
-              entryNumber,
-              date: today,
-              description: `Opening stock — imported (${created} item${created === 1 ? "" : "s"})`,
-              reference: "INV-IMPORT",
-              status: "posted",
-              sourceType: "inventory_opening",
-              postedAt: new Date(),
-              createdBy: ctx.userId,
-            })
-            .returning();
-          await tx.insert(journalLine).values([
-            { journalEntryId: entry.id, accountId: inv.id, description: "Opening stock (import)", debitAmount: openingValueTotal, creditAmount: 0, currencyCode: base },
-            { journalEntryId: entry.id, accountId: openingEquity.id, description: "Opening stock (import)", debitAmount: 0, creditAmount: openingValueTotal, currencyCode: base },
-          ]);
-        });
-      } catch (err) {
-        // The items imported fine; surface a posting problem without failing the
-        // whole import.
-        errors.push({ row: 0, message: `Items imported, but the opening-balance entry failed: ${err instanceof Error ? err.message : "unknown error"}` });
+        try {
+          // A savepoint per row: a bad row rolls back alone.
+          await tx.transaction(async (sp) => {
+            const purchasePrice = row.purchasePrice ? Math.round(parseFloat(row.purchasePrice) * 100) : 0;
+            const salePrice = row.salePrice ? Math.round(parseFloat(row.salePrice) * 100) : 0;
+            const hasQuantity = !!row.quantityOnHand?.trim();
+            const quantityOnHand = hasQuantity ? parseInt(row.quantityOnHand!) : 0;
+            const reorderPoint = row.reorderPoint ? parseInt(row.reorderPoint) : 0;
+            if (hasQuantity && (Number.isNaN(quantityOnHand) || quantityOnHand < 0)) {
+              throw new Error("Quantity must be a whole number of 0 or more");
+            }
+            const categoryFields = row.category
+              ? await resolveItemCategory(sp, ctx.organizationId, { category: row.category })
+              : null;
+
+            // Check if item already exists by code
+            const existing = await sp.query.inventoryItem.findFirst({
+              where: and(
+                eq(inventoryItem.organizationId, ctx.organizationId),
+                eq(inventoryItem.code, row.code!),
+                notDeleted(inventoryItem.deletedAt)
+              ),
+            });
+
+            if (existing) {
+              await sp
+                .update(inventoryItem)
+                .set({
+                  name: row.name,
+                  description: row.description || existing.description,
+                  ...(categoryFields ?? {}),
+                  sku: row.sku || existing.sku,
+                  purchasePrice: purchasePrice || existing.purchasePrice,
+                  salePrice: salePrice || existing.salePrice,
+                  reorderPoint: reorderPoint || existing.reorderPoint,
+                  updatedAt: new Date(),
+                })
+                .where(eq(inventoryItem.id, existing.id));
+              // A new count goes through a stock adjustment (movement + shrinkage
+              // or found-stock entry), not a silent overwrite of the quantity.
+              const delta = hasQuantity ? quantityOnHand - existing.quantityOnHand : 0;
+              if (delta !== 0) {
+                await createInventoryAdjustmentJournalEntry(
+                  jctx,
+                  {
+                    item: existing as ValuedItem & { inventoryAccountId?: string | null },
+                    qtyDelta: delta,
+                    reason: "Count updated by import",
+                    date: today,
+                  },
+                  sp
+                );
+              }
+              updated++;
+            } else {
+              const [item] = await sp
+                .insert(inventoryItem)
+                .values({
+                  organizationId: ctx.organizationId,
+                  code: row.code!,
+                  name: row.name!,
+                  description: row.description || null,
+                  ...(categoryFields ?? {}),
+                  sku: row.sku || null,
+                  purchasePrice,
+                  salePrice,
+                  reorderPoint,
+                })
+                .returning();
+              if (quantityOnHand > 0 && purchasePrice > 0) {
+                const r = await receiveOpeningStock(sp, {
+                  item: item as ValuedItem,
+                  quantity: quantityOnHand,
+                  unitCost: purchasePrice,
+                  warehouseId: defaultWarehouseId,
+                  createdBy: ctx.userId,
+                });
+                opening.push({ item, value: r.value, movementId: r.movementId });
+              } else if (quantityOnHand > 0) {
+                errors.push({
+                  row: i + 2,
+                  message: `Created ${row.code} with no stock: add a purchase price to bring in its opening quantity`,
+                });
+              }
+              created++;
+            }
+          });
+        } catch (err) {
+          errors.push({
+            row: i + 2,
+            message: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
       }
-    }
+
+      // DR Inventory / CR Opening Balance Equity for all the imported stock.
+      await postOpeningStockEntry(tx, jctx, {
+        lines: opening,
+        description: `Opening stock: imported (${opening.length} item${opening.length === 1 ? "" : "s"})`,
+        reference: "INV-IMPORT",
+        date: today,
+      });
+    });
 
     return NextResponse.json({ created, updated, errors, total: rows.length });
   } catch (err) {

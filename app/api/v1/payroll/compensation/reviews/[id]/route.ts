@@ -6,13 +6,14 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { updateReviewStatus } from "@/lib/api/compensation-reviews";
 import { z } from "zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  effectiveDate: z.string().optional(),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.enum(["draft", "in_progress", "completed", "cancelled"]).optional(),
-  totalBudget: z.number().int().nullable().optional(),
+  totalBudget: z.number().int().min(0).nullable().optional(), // cents
 });
 
 export async function GET(
@@ -50,22 +51,35 @@ export async function PATCH(
     requireRole(ctx, "manage:compensation");
 
     const body = await request.json();
-    const parsed = updateSchema.parse(body);
+    const { status, ...fields } = updateSchema.parse(body);
 
-    const [updated] = await db
-      .update(compensationReview)
-      .set({ ...parsed, updatedAt: new Date() })
-      .where(and(
-        eq(compensationReview.id, id),
-        eq(compensationReview.organizationId, ctx.organizationId)
-      ))
-      .returning();
+    let updated: typeof compensationReview.$inferSelect | undefined;
+    if (Object.keys(fields).length > 0) {
+      [updated] = await db
+        .update(compensationReview)
+        .set({ ...fields, updatedAt: new Date() })
+        .where(and(
+          eq(compensationReview.id, id),
+          eq(compensationReview.organizationId, ctx.organizationId),
+          notDeleted(compensationReview.deletedAt)
+        ))
+        .returning();
+      if (!updated) return notFound("Compensation review");
+    }
+
+    // Status changes follow the review workflow; completing applies the raises
+    let salariesUpdated: number | undefined;
+    if (status) {
+      const result = await updateReviewStatus(ctx, id, status);
+      updated = result.review;
+      salariesUpdated = result.salariesUpdated;
+    }
 
     if (!updated) return notFound("Compensation review");
 
-    logAudit({ ctx, action: "update", entityType: "compensationReview", entityId: id, changes: parsed, request });
+    logAudit({ ctx, action: "update", entityType: "compensationReview", entityId: id, changes: { ...fields, status, salariesUpdated }, request });
 
-    return ok({ review: updated });
+    return ok({ review: updated, ...(salariesUpdated !== undefined ? { salariesUpdated } : {}) });
   } catch (err) {
     return handleError(err);
   }

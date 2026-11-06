@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus, ArrowRight, Check, X as XIcon, Warehouse } from "lucide-react";
+import { useMemo } from "react";
+import { Plus, ArrowRight, Check, X as XIcon, Warehouse, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -46,13 +46,15 @@ interface InventoryItemOption {
   name: string;
   code: string;
   purchasePrice: number;
+  /** Moving average cost, cents per unit. */
+  averageCost: number;
 }
 
 const STATUSES: ExplorerStatus[] = [
   { value: "draft", label: "Draft", color: "#A1A1AA", hint: "Planned. No stock has moved yet" },
-  { value: "in_transit", label: "On the way", color: "#0EA5E9", hint: "Sent, but not yet marked as arrived" },
+  { value: "in_transit", label: "On the way", color: "#0EA5E9", hint: "Sent: the stock has left the source location but isn't marked as arrived" },
   { value: "completed", label: "Arrived", color: "#10B981", hint: "Done. Stock levels at both locations are updated" },
-  { value: "cancelled", label: "Cancelled", color: "#D4D4D8", hint: "Called off, so nothing moved" },
+  { value: "cancelled", label: "Cancelled", color: "#D4D4D8", hint: "Called off. Anything on the way went back to the source" },
 ];
 
 const OPEN = new Set(["draft", "in_transit"]);
@@ -86,21 +88,17 @@ export default function TransfersPage() {
   const { open: openDrawer } = useCreateDrawer();
   const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Inventory · Transfers");
-  const [version, setVersion] = useState(0);
 
   // Item names and costs for the lines (every page, not just the first 100)
   const { rows: items } = useRecords<InventoryItemOption>("/api/v1/inventory");
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  // A new transfer from the create drawer reloads the list
-  useEffect(() => {
-    const handler = () => setVersion((v) => v + 1);
-    window.addEventListener("refetch-transfers", handler);
-    return () => window.removeEventListener("refetch-transfers", handler);
-  }, []);
-
   const config = useMemo<ExplorerConfig<Transfer>>(() => {
-    const value = (t: Transfer) => t.lines.reduce((s, l) => s + l.quantity * (itemMap.get(l.inventoryItemId)?.purchasePrice ?? 0), 0);
+    const unitCost = (id: string) => {
+      const item = itemMap.get(id);
+      return item ? item.averageCost || item.purchasePrice : 0;
+    };
+    const value = (t: Transfer) => t.lines.reduce((s, l) => s + l.quantity * unitCost(l.inventoryItemId), 0);
     return {
       id: "inventory-transfers",
       endpoint: "/api/v1/inventory/transfers",
@@ -196,12 +194,26 @@ export default function TransfersPage() {
           actions={
             OPEN.has(t.status) && (
               <>
+                {t.status === "draft" && (
+                  <ActionButton
+                    icon={<Truck className="size-3.5" />}
+                    run={async () => {
+                      const ok = await confirm({ title: "Mark as on the way?", description: `The stock leaves ${t.fromWarehouse?.name ?? "the source location"} now. It lands at ${t.toWarehouse?.name ?? "the destination"} when you mark the transfer as arrived.`, confirmLabel: "Mark on the way" });
+                      if (!ok) return false;
+                      await patchJson(`/api/v1/inventory/transfers/${t.id}`, { status: "in_transit" });
+                      toast.success("Transfer on the way");
+                      helpers.refresh();
+                    }}
+                  >
+                    Mark on the way
+                  </ActionButton>
+                )}
                 <ActionButton
                   primary
                   icon={<Check className="size-3.5" />}
                   run={async () => {
-                    const ok = await confirm({ title: "Complete transfer?", description: "This will update warehouse stock levels and cannot be undone.", confirmLabel: "Complete" });
-                    if (!ok) return;
+                    const ok = await confirm({ title: "Complete transfer?", description: "The stock is added to the destination location (and taken from the source, if it hasn't left yet). This can't be undone.", confirmLabel: "Complete" });
+                    if (!ok) return false;
                     await postJson(`/api/v1/inventory/transfers/${t.id}/complete`);
                     toast.success("Transfer completed");
                     helpers.refresh();
@@ -213,8 +225,8 @@ export default function TransfersPage() {
                   icon={<XIcon className="size-3.5" />}
                   className="text-red-600"
                   run={async () => {
-                    const ok = await confirm({ title: "Cancel transfer?", description: "This will mark the transfer as cancelled.", confirmLabel: "Cancel Transfer", destructive: true });
-                    if (!ok) return;
+                    const ok = await confirm({ title: "Cancel transfer?", description: t.status === "in_transit" ? "The stock on the way goes back to the source location." : "Nothing has moved yet, so stock levels stay the same.", confirmLabel: "Cancel Transfer", destructive: true });
+                    if (!ok) return false;
                     await patchJson(`/api/v1/inventory/transfers/${t.id}`, { status: "cancelled" });
                     toast.success("Transfer cancelled");
                     helpers.refresh();
@@ -261,7 +273,7 @@ export default function TransfersPage() {
                           <td className={cn("px-2 py-2 text-right tabular-nums", short ? "text-amber-600" : "text-muted-foreground")}>
                             {l.receivedQuantity != null ? l.receivedQuantity.toLocaleString() : "—"}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{item ? formatMoney(l.quantity * item.purchasePrice) : "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{item ? formatMoney(l.quantity * unitCost(l.inventoryItemId)) : "—"}</td>
                         </tr>
                       );
                     })}
@@ -278,7 +290,7 @@ export default function TransfersPage() {
 
   return (
     <>
-      <Explorer key={version} config={config} />
+      <Explorer config={config} />
       {confirmDialog}
     </>
   );
@@ -372,8 +384,8 @@ function TransfersEmpty({ onCreate }: { onCreate: () => void }) {
         <div className="flex items-center justify-center gap-4 flex-wrap">
           {[
             { label: "Draft", color: "bg-slate-400" },
-            { label: "In Transit", color: "bg-blue-400" },
-            { label: "Completed", color: "bg-brand-400" },
+            { label: "On the way", color: "bg-blue-400" },
+            { label: "Arrived", color: "bg-brand-400" },
             { label: "Cancelled", color: "bg-red-400" },
           ].map(({ label, color }) => (
             <div key={label} className="flex items-center gap-1.5">

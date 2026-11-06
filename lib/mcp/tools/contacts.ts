@@ -35,6 +35,7 @@ import { wrapTool } from "@/lib/mcp/errors";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { logAudit } from "@/lib/api/audit";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { emitContactCreated } from "@/lib/webhooks/events";
 
 // Tables with both organization_id and contact_id, repointed on merge.
 const CONTACT_FK_TABLES_ORG_SCOPED = [
@@ -214,7 +215,7 @@ export function registerContactTools(server: McpServer, ctx: AuthContext) {
         requireRole(ctx, "manage:contacts");
 
         await checkResourceLimit(ctx.organizationId, contact, contact.organizationId, "contacts", contact.deletedAt);
-        await checkMultiCurrency(ctx.organizationId, params.currencyCode ?? "USD");
+        await checkMultiCurrency(ctx.organizationId, params.currencyCode);
 
         const [created] = await db
           .insert(contact)
@@ -234,6 +235,7 @@ export function registerContactTools(server: McpServer, ctx: AuthContext) {
             ...(params.backupWithholding !== undefined && { backupWithholding: params.backupWithholding }),
           })
           .returning();
+        emitContactCreated(ctx.organizationId, [created.id]);
 
         return { contact: created };
       })

@@ -19,11 +19,23 @@
  */
 import { db } from "@/lib/db";
 import {
+  bill,
   chartAccount,
+  entityTag,
+  expenseClaim,
+  invoice,
   journalEntry,
   journalLine,
+  payment,
+  paymentAllocation,
 } from "@/lib/db/schema";
-import { and, eq, gte, isNull, lte, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
+import { CASH_SOURCE_TYPES } from "@/lib/reports/cash-basis";
+import {
+  loadCashRealisedLines,
+  type CashRealisedLine,
+  type CashWindow,
+} from "@/lib/reports/cash-basis-ledger";
 
 /** Reporting basis. */
 export type ReportBasis = "accrual" | "cash";
@@ -32,29 +44,18 @@ export type ReportBasis = "accrual" | "cash";
 export type Dimension = "costCenterId" | "projectId";
 
 /**
- * Source types that represent cash-realized movement for cash-basis reporting.
- *
- * Cash-basis heuristic (documented):
- *   An entry counts on the CASH basis when EITHER
- *     (a) its `sourceType` is one of these cash/payment sources
- *         ('payment', 'bank_categorization', 'bank'), OR
- *     (b) the entry touches a bank/cash chart account (a line whose account
- *         has `subType = 'bank'`) — i.e. money actually moved through a bank
- *         or cash account.
- *   Pure accrual-recognition entries (invoice/bill recognition, accruals,
- *   depreciation, manual adjustments) that do NOT move cash are EXCLUDED.
- *
- * This is a deliberately simple, explainable heuristic rather than a full
- * payment-allocation walk: it keeps the aggregation a single SQL pass while
- * matching how cash actually enters/leaves the books in this system (bank-feed
- * categorization + payment postings both either carry one of these source
- * types or hit a `subType = 'bank'` account).
+ * Cash basis (see lib/reports/cash-basis.ts for the full model):
+ *   An entry counts on the CASH basis on its own date when EITHER
+ *     (a) its `sourceType` is a cash source (payments, bank-feed
+ *         categorisations, sales receipts), OR
+ *     (b) it touches a bank/cash chart account (`subType = 'bank'`).
+ *   Invoice, bill and credit note entries never move cash themselves; they
+ *   count pro rata to their settlements instead: a payment (or applied credit)
+ *   of 40% of the document realises 40% of every line of the document's entry
+ *   on the payment date. Other accrual-only entries (accruals, depreciation,
+ *   manual adjustments) are excluded.
  */
-export const CASH_SOURCE_TYPES = [
-  "payment",
-  "bank_categorization",
-  "bank",
-] as const;
+export { CASH_SOURCE_TYPES };
 
 /** chartAccount.subType values treated as bank/cash accounts for cash basis. */
 const CASH_ACCOUNT_SUBTYPES = ["bank"] as const;
@@ -96,6 +97,12 @@ export interface GLQueryOptions {
   dimension?: Dimension;
   dimensionValue?: string | null;
   /**
+   * Optional tag filter: only include lines whose entry carries this tag (see
+   * {@link tagPredicate} for how a tag on an invoice, bill, expense, contact or
+   * project reaches its postings).
+   */
+  tagId?: string;
+  /**
    * Include accounts that have no matching activity (zero debit/credit).
    * Defaults to false (only accounts with activity are returned), matching
    * the entry-driven reports (P&L / GL). Balance sheet / trial balance can set
@@ -114,6 +121,46 @@ export interface DateRange {
 
 function isDebitNormal(type: AccountAggregate["type"]): boolean {
   return type === "asset" || type === "expense";
+}
+
+/**
+ * Line-level predicate for the tag filter. A journal line matches tag `tagId`
+ * when the tag is attached to:
+ *   - the journal entry itself (entity type `journal_entry`);
+ *   - a document the entry posts: an invoice, bill or expense claim whose
+ *     `journalEntryId` is the entry, whose id is the entry's `sourceId` (voids,
+ *     write-offs, reversals, claim payments), or that a payment on the entry
+ *     is allocated to;
+ *   - the contact on one of those invoices / bills, or on a payment posted by
+ *     the entry;
+ *   - the project on the line (`journalLine.projectId`).
+ * Correlated on the unaliased `journal_line` row of the outer query.
+ */
+function tagPredicate(tagId: string): SQL {
+  const je = journalLine.journalEntryId;
+  const docIds = sql`
+    select tag_je.source_id from ${journalEntry} tag_je
+      where tag_je.id = ${je} and tag_je.source_id is not null
+    union all select tag_inv.id from ${invoice} tag_inv where tag_inv.journal_entry_id = ${je}
+    union all select tag_bill.id from ${bill} tag_bill where tag_bill.journal_entry_id = ${je}
+    union all select tag_exp.id from ${expenseClaim} tag_exp where tag_exp.journal_entry_id = ${je}
+    union all select tag_pa.document_id from ${paymentAllocation} tag_pa
+      join ${payment} tag_pay on tag_pay.id = tag_pa.payment_id
+      where tag_pay.journal_entry_id = ${je}`;
+  return sql`exists (
+    select 1 from ${entityTag} tag_et
+    where tag_et.tag_id = ${tagId}
+      and (
+        (tag_et.entity_type = 'journal_entry' and tag_et.entity_id = ${je})
+        or (tag_et.entity_type = 'project' and tag_et.entity_id = ${journalLine.projectId})
+        or (tag_et.entity_type in ('invoice', 'bill', 'expense') and tag_et.entity_id in (${docIds}))
+        or (tag_et.entity_type = 'contact' and tag_et.entity_id in (
+          select tag_ci.contact_id from ${invoice} tag_ci where tag_ci.id in (${docIds})
+          union all select tag_cb.contact_id from ${bill} tag_cb where tag_cb.id in (${docIds})
+          union all select tag_cp.contact_id from ${payment} tag_cp where tag_cp.journal_entry_id = ${je}
+        ))
+      )
+  )`;
 }
 
 /**
@@ -152,6 +199,8 @@ function buildWhere(
       clauses.push(eq(col, opts.dimensionValue));
     }
   }
+
+  if (opts.tagId) clauses.push(tagPredicate(opts.tagId));
 
   if (opts.basis === "cash") {
     // Cash-basis filter (see CASH_SOURCE_TYPES doc): keep the entry if its
@@ -283,6 +332,17 @@ async function aggregate(
       .orderBy(chartAccount.code)) as typeof rows;
   }
 
+  if (opts.basis === "cash") {
+    // Add the realised share of invoices / bills / credit notes (dated on
+    // their settlements), which the cash-entry SQL above never sees.
+    const window: CashWindow =
+      joinDate?.kind === "range"
+        ? { startDate: joinDate.startDate, endDate: joinDate.endDate }
+        : { endDate: joinDate?.kind === "asAt" ? joinDate.asAt : "9999-12-31" };
+    const realised = await cashRealisedFor(organizationId, window, opts);
+    rows = mergeRealised(rows, realised);
+  }
+
   return rows.map((r) => {
     const debit = Number(r.debit);
     const credit = Number(r.credit);
@@ -298,6 +358,65 @@ async function aggregate(
       balance,
     };
   });
+}
+
+/**
+ * Realised invoice / bill / credit note lines for the cash basis, filtered the
+ * same way as the SQL aggregation (account types, dimension, tag).
+ */
+async function cashRealisedFor(
+  organizationId: string,
+  window: CashWindow,
+  opts: Omit<GLQueryOptions, "includeEmptyAccounts">
+): Promise<CashRealisedLine[]> {
+  let lines = await loadCashRealisedLines(organizationId, window);
+  if (opts.accountTypes && opts.accountTypes.length > 0) {
+    const types = new Set(opts.accountTypes);
+    lines = lines.filter((l) => types.has(l.type));
+  }
+  if (opts.dimension && opts.dimensionValue !== undefined) {
+    const dim = opts.dimension;
+    lines = lines.filter((l) => (l[dim] ?? null) === opts.dimensionValue);
+  }
+  if (opts.tagId && lines.length > 0) {
+    const ids = [...new Set(lines.map((l) => l.journalLineId))];
+    const tagged = await db
+      .select({ id: journalLine.id })
+      .from(journalLine)
+      .where(and(inArray(journalLine.id, ids), tagPredicate(opts.tagId)));
+    const keep = new Set(tagged.map((t) => t.id));
+    lines = lines.filter((l) => keep.has(l.journalLineId));
+  }
+  return lines;
+}
+
+type AggregateRow = {
+  accountId: string;
+  code: string;
+  name: string;
+  type: AccountAggregate["type"];
+  subType: string | null;
+  debit: number;
+  credit: number;
+};
+
+/** Add realised lines into per-account rows (new accounts are appended, sorted by code). */
+function mergeRealised(rows: AggregateRow[], lines: CashRealisedLine[]): AggregateRow[] {
+  if (lines.length === 0) return rows;
+  const byId = new Map(rows.map((r) => [r.accountId, { ...r, debit: Number(r.debit), credit: Number(r.credit) }]));
+  let added = false;
+  for (const l of lines) {
+    let row = byId.get(l.accountId);
+    if (!row) {
+      row = { accountId: l.accountId, code: l.code, name: l.name, type: l.type, subType: l.subType, debit: 0, credit: 0 };
+      byId.set(l.accountId, row);
+      added = true;
+    }
+    row.debit += l.debit;
+    row.credit += l.credit;
+  }
+  const merged = [...byId.values()];
+  return added ? merged.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)) : merged;
 }
 
 /**
@@ -325,6 +444,8 @@ function buildEntryJoinPredicate(
       clauses.push(eq(col, opts.dimensionValue));
     }
   }
+
+  if (opts.tagId) clauses.push(tagPredicate(opts.tagId));
 
   // Entry-level predicates referenced via a correlated EXISTS so they apply to
   // the matched line's entry without changing the LEFT-JOIN cardinality.
@@ -442,7 +563,7 @@ export async function aggregateByDimension(
   );
   const where = buildWhere(organizationId, dateClause, opts);
 
-  const rows = (await db
+  let rows = (await db
     .select({
       dimensionValue: dimCol,
       accountId: journalLine.accountId,
@@ -475,6 +596,29 @@ export async function aggregateByDimension(
     debit: number;
     credit: number;
   }>;
+
+  if (opts.basis === "cash") {
+    // Merge the realised share of settled invoices / bills / credit notes into
+    // the matching (dimension value, account) rows.
+    const realised = await cashRealisedFor(organizationId, range, opts);
+    if (realised.length > 0) {
+      const byKey = new Map(
+        rows.map((r) => [`${r.dimensionValue ?? ""}|${r.accountId}`, { ...r, debit: Number(r.debit), credit: Number(r.credit) }])
+      );
+      for (const l of realised) {
+        const dimensionValue = l[dimension] ?? null;
+        const key = `${dimensionValue ?? ""}|${l.accountId}`;
+        let row = byKey.get(key);
+        if (!row) {
+          row = { dimensionValue, accountId: l.accountId, code: l.code, name: l.name, type: l.type, subType: l.subType, debit: 0, credit: 0 };
+          byKey.set(key, row);
+        }
+        row.debit += l.debit;
+        row.credit += l.credit;
+      }
+      rows = [...byKey.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+    }
+  }
 
   const buckets = new Map<string, DimensionGroup>();
   for (const r of rows) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,15 +10,27 @@ import {
   X,
   FileText,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
+import { useApi } from "@/lib/query/use-api";
+import { ContactPicker } from "@/components/dashboard/contact-picker";
+import { postJson } from "@/components/dashboard/explorer/action-button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RequisitionSheet, type EditableRequisition } from "../requisition-sheet";
 import {
   Sheet,
   SheetContent,
@@ -41,6 +53,8 @@ interface RequisitionDetail {
   total: number;
   rejectionReason: string | null;
   convertedPoId: string | null;
+  contactId: string | null;
+  currencyCode: string;
   contact: { name: string } | null;
   lines: {
     id: string;
@@ -48,9 +62,20 @@ interface RequisitionDetail {
     quantity: number;
     unitPrice: number;
     amount: number;
+    accountId: string | null;
+    taxRateId: string | null;
     account: { code: string; name: string } | null;
   }[];
 }
+
+// Same wording as the requisitions list
+const statusLabels: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Waiting for approval",
+  approved: "Approved",
+  converted: "Ordered",
+  rejected: "Rejected",
+};
 
 const statusColors: Record<string, string> = {
   draft: "",
@@ -67,153 +92,56 @@ const statusColors: Record<string, string> = {
 export default function RequisitionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [req, setReq] = useState<RequisitionDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/purchase-requisitions/${id}`;
+  const { data, loading, refetch } = useApi<RequisitionDetail>(url);
+  const req = data?.id ? data : null;
   const [rejectSheetOpen, setRejectSheetOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [acting, setActing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierId, setSupplierId] = useState("");
   useDocumentTitle("Purchases · Requisition Details");
   useEntityTitle(req?.requisitionNumber);
-  const orgId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("activeOrgId")
-      : null;
+  const editable = useMemo<EditableRequisition | null>(() => (data?.id ? data : null), [data]);
 
-  useEffect(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/purchase-requisitions/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.id) setReq(data);
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
-  async function handleSubmit() {
-    if (!orgId || !req) return;
+  /** Run a status change, report the server's own error, then reload the requisition. */
+  async function act(path: string, success: string, body?: unknown) {
     setActing(true);
     try {
-      const res = await fetch(`/api/v1/purchase-requisitions/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": orgId,
-        },
-        body: JSON.stringify({}),
-      });
-      // Use a separate submit-like approach: update status to submitted
-      const submitRes = await fetch(`/api/v1/purchase-requisitions/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": orgId,
-        },
-        body: JSON.stringify({ status: "submitted" }),
-      });
-      if (submitRes.ok) {
-        const data = await submitRes.json();
-        setReq((prev) => (prev ? { ...prev, ...data, status: data.status || "submitted" } : prev));
-        toast.success("Requisition submitted for approval");
-      } else {
-        toast.error("Failed to submit");
-      }
-    } catch {
-      toast.error("Failed to submit");
-    } finally {
-      setActing(false);
-    }
-  }
-
-  async function handleApprove() {
-    if (!orgId) return;
-    setActing(true);
-    try {
-      const res = await fetch(
-        `/api/v1/purchase-requisitions/${id}/approve`,
-        {
-          method: "POST",
-          headers: { "x-organization-id": orgId },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setReq((prev) =>
-          prev ? { ...prev, ...data, status: "approved" } : prev
-        );
-        toast.success("Requisition approved");
-      } else {
-        toast.error("Failed to approve");
-      }
-    } catch {
-      toast.error("Failed to approve");
+      await postJson(`${url}/${path}`, body);
+      toast.success(success);
+      await refetch();
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      return false;
     } finally {
       setActing(false);
     }
   }
 
   async function handleReject() {
-    if (!orgId) return;
-    setActing(true);
-    try {
-      const res = await fetch(
-        `/api/v1/purchase-requisitions/${id}/reject`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-organization-id": orgId,
-          },
-          body: JSON.stringify({ reason: rejectReason || undefined }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setReq((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...data,
-                status: "rejected",
-                rejectionReason: rejectReason || null,
-              }
-            : prev
-        );
-        setRejectSheetOpen(false);
-        setRejectReason("");
-        toast.success("Requisition rejected");
-      } else {
-        toast.error("Failed to reject");
-      }
-    } catch {
-      toast.error("Failed to reject");
-    } finally {
-      setActing(false);
+    if (await act("reject", "Requisition rejected", { reason: rejectReason || undefined })) {
+      setRejectSheetOpen(false);
+      setRejectReason("");
     }
   }
 
-  async function handleConvert() {
-    if (!orgId) return;
+  async function handleConvert(contactId?: string) {
+    // Ordering needs a supplier: ask for one first if the request doesn't have it
+    if (!contactId && !req?.contactId) {
+      setSupplierId("");
+      setSupplierOpen(true);
+      return;
+    }
     setActing(true);
     try {
-      const res = await fetch(
-        `/api/v1/purchase-requisitions/${id}/convert`,
-        {
-          method: "POST",
-          headers: { "x-organization-id": orgId },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        toast.success("Purchase order created from this request");
-        router.push(`/purchases/orders/${data.purchaseOrder.id}`);
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Couldn't create a purchase order");
-      }
-    } catch {
-      toast.error("Failed to convert");
+      const data = await postJson<{ purchaseOrder: { id: string } }>(`${url}/convert`, contactId ? { contactId } : undefined);
+      toast.success("Purchase order created from this request");
+      router.push(`/purchases/orders/${data.purchaseOrder.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create a purchase order");
     } finally {
       setActing(false);
     }
@@ -244,22 +172,28 @@ export default function RequisitionDetailPage() {
             Back
           </Link>
         </Button>
-        {req.status === "draft" && (
-          <Button
-            size="sm"
-            onClick={handleSubmit}
-            disabled={acting}
-            className="bg-brand-600 hover:bg-brand-700"
-          >
-            <Send className="mr-2 size-4" />
-            Submit
-          </Button>
+        {(req.status === "draft" || req.status === "rejected") && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={acting}>
+              <Pencil className="mr-2 size-4" />
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => act("submit", "Requisition submitted for approval")}
+              disabled={acting}
+              className="bg-brand-600 hover:bg-brand-700"
+            >
+              <Send className="mr-2 size-4" />
+              {req.status === "rejected" ? "Resubmit" : "Submit"}
+            </Button>
+          </>
         )}
         {req.status === "submitted" && (
           <>
             <Button
               size="sm"
-              onClick={handleApprove}
+              onClick={() => act("approve", "Requisition approved")}
               disabled={acting}
               className="bg-brand-600 hover:bg-brand-700"
             >
@@ -281,7 +215,7 @@ export default function RequisitionDetailPage() {
         {req.status === "approved" && (
           <Button
             size="sm"
-            onClick={handleConvert}
+            onClick={() => handleConvert()}
             disabled={acting}
             className="bg-brand-600 hover:bg-brand-700"
           >
@@ -296,7 +230,7 @@ export default function RequisitionDetailPage() {
           variant="outline"
           className={statusColors[req.status] || ""}
         >
-          {req.status}
+          {statusLabels[req.status] ?? req.status}
         </Badge>
         <span className="text-xs sm:text-sm text-muted-foreground">
           Requested {req.requestDate}
@@ -355,8 +289,13 @@ export default function RequisitionDetailPage() {
       {/* Total */}
       <div className="rounded-lg border p-4">
         <p className="text-xl font-bold font-mono">
-          {formatMoney(req.total)}
+          {formatMoney(req.total, req.currencyCode)}
         </p>
+        {req.taxTotal > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatMoney(req.subtotal, req.currencyCode)} before tax · {formatMoney(req.taxTotal, req.currencyCode)} tax
+          </p>
+        )}
       </div>
 
       {/* Line items */}
@@ -384,10 +323,10 @@ export default function RequisitionDetailPage() {
               {(line.quantity / 100).toFixed(0)}
             </span>
             <span className="text-right text-sm font-mono">
-              {formatMoney(line.unitPrice)}
+              {formatMoney(line.unitPrice, req.currencyCode)}
             </span>
             <span className="text-right text-sm font-mono font-medium">
-              {formatMoney(line.amount)}
+              {formatMoney(line.amount, req.currencyCode)}
             </span>
           </div>
         ))}
@@ -420,6 +359,36 @@ export default function RequisitionDetailPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Edit a draft or rejected request */}
+      <RequisitionSheet open={editOpen} onOpenChange={setEditOpen} requisition={editable} onSaved={() => refetch()} />
+
+      {/* Ask for the supplier before ordering */}
+      <Dialog open={supplierOpen} onOpenChange={setSupplierOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Who are you ordering from?</DialogTitle>
+            <DialogDescription>A purchase order needs a supplier. Choose one and dubbl creates the order for them.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Supplier</Label>
+            <ContactPicker value={supplierId} onChange={setSupplierId} type="supplier" placeholder="Select supplier..." />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSupplierOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => handleConvert(supplierId)}
+              disabled={acting || !supplierId}
+              className="bg-brand-600 hover:bg-brand-700"
+            >
+              <FileText className="mr-2 size-4" />
+              Create a purchase order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

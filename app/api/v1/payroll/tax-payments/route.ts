@@ -13,6 +13,7 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, created, ok } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { getPayrollTaxLiabilities, incomeTaxAccountCode } from "@/lib/api/payroll-tax-liabilities";
 import {
   getNextEntryNumber,
   findAccountByCode,
@@ -121,9 +122,13 @@ export async function POST(request: Request) {
     // Collapse allocations onto their target GL codes so multiple buckets that
     // map to the same account (e.g. medicare + social_security → 2235) post as
     // one debit leg.
+    // Income tax is cleared from the same account pay runs credit it to (the
+    // payroll-settings income-tax account when one is set).
+    const incomeTaxCode = incomeTaxAccountCode(settings?.taxPayableAccountCode);
     const debitByCode = new Map<string, number>();
     for (const a of parsed.allocations) {
-      const code = resolveLiabilityCode(a.bucket);
+      const resolved = resolveLiabilityCode(a.bucket);
+      const code = resolved === INCOME_TAX_PAYABLE_CODE && !/^\d{3,}$/.test(a.bucket) ? incomeTaxCode : resolved;
       debitByCode.set(code, (debitByCode.get(code) ?? 0) + a.amount);
     }
 
@@ -263,7 +268,10 @@ export async function GET(request: Request) {
       .where(and(...conditions))
       .orderBy(desc(payrollTaxPayment.periodEnd), desc(payrollTaxPayment.createdAt));
 
-    return ok({ payments });
+    // Owed / paid / outstanding per liability bucket (all time, base currency)
+    const liabilities = await getPayrollTaxLiabilities(ctx);
+
+    return ok({ payments, liabilities });
   } catch (err) {
     return handleError(err);
   }

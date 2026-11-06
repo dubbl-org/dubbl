@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { formatMoney } from "@/lib/money";
+import { decimalToCents, formatMoney } from "@/lib/money";
+import { AccountPicker } from "@/components/dashboard/account-picker";
+import { PurchaseDocumentPicker } from "@/components/dashboard/purchase-document-picker";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
@@ -49,8 +51,15 @@ const STATUSES: ExplorerStatus[] = [
 const METHODS: Record<string, string> = {
   by_value: "By value",
   by_quantity: "By quantity",
+  // Older records only: items have no weight, so this can't be chosen any more.
   by_weight: "By weight",
   manual: "Manual",
+};
+
+const METHOD_HINTS: Record<string, string> = {
+  by_value: "Each purchase order line gets a share in proportion to its amount.",
+  by_quantity: "Each purchase order line gets a share in proportion to its units.",
+  manual: "You type the amount for each purchase order line when you apply it.",
 };
 
 function linkedTo(c: LandedCost) {
@@ -78,7 +87,6 @@ export default function LandedCostsPage() {
   const router = useRouter();
   const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Purchases · Landed Costs");
-  const [version, setVersion] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -122,21 +130,21 @@ export default function LandedCostsPage() {
     }
     setSaving(true);
     try {
-      await postJson("/api/v1/landed-costs", {
+      const res = await postJson<{ allocation?: { id: string } }>("/api/v1/landed-costs", {
         name,
         purchaseOrderId: purchaseOrderId || null,
         billId: billId || null,
         allocationMethod,
         components: components.map((c) => ({
           description: c.description,
-          amount: parseFloat(c.amount) || 0,
+          amount: decimalToCents(c.amount || "0"),
           accountId: c.accountId || null,
         })),
       });
-      toast.success("Landed cost allocation created");
+      toast.success("Landed cost created");
+      if (res.allocation?.id) router.push(`/purchases/landed-costs/${res.allocation.id}`);
       setSheetOpen(false);
       resetForm();
-      setVersion((v) => v + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create");
     } finally {
@@ -237,23 +245,32 @@ export default function LandedCostsPage() {
             <>
               {c.status === "draft" && (
                 <>
-                  <ActionButton
-                    primary
-                    icon={<Layers className="size-3.5" />}
-                    success="Costs allocated successfully"
-                    run={async () => {
-                      await postJson(`/api/v1/landed-costs/${c.id}/allocate`);
-                      helpers.refresh();
-                    }}
-                  >
-                    Allocate
-                  </ActionButton>
+                  {c.allocationMethod === "manual" ? (
+                    <ActionButton primary icon={<Layers className="size-3.5" />} run={async () => router.push(`/purchases/landed-costs/${c.id}`)}>
+                      Apply
+                    </ActionButton>
+                  ) : (
+                    <ActionButton
+                      primary
+                      icon={<Layers className="size-3.5" />}
+                      success="Costs applied to the stock"
+                      run={async () => {
+                        if (!c.purchaseOrderId) throw new Error("Link a purchase order first");
+                        const ok = await confirm({ title: `Apply ${c.name}?`, description: "The costs are spread across the purchase order's lines and posted. Stock still on hand gets more expensive; the share for units already sold goes to cost of sales. This can't be undone.", confirmLabel: "Apply" });
+                        if (!ok) return false;
+                        await postJson(`/api/v1/landed-costs/${c.id}/allocate`);
+                        helpers.refresh();
+                      }}
+                    >
+                      Apply
+                    </ActionButton>
+                  )}
                   <ActionButton
                     icon={<Trash2 className="size-3.5" />}
                     className="text-red-600"
                     run={async () => {
                       const ok = await confirm({ title: `Delete ${c.name}?`, description: "This removes the allocation and its cost lines.", confirmLabel: "Delete", destructive: true });
-                      if (!ok) return;
+                      if (!ok) return false;
                       await deleteRecord(`/api/v1/landed-costs/${c.id}`);
                       toast.success("Allocation deleted");
                       helpers.refresh();
@@ -277,7 +294,7 @@ export default function LandedCostsPage() {
           }
         />
       ),
-      create: { label: "New allocation", onClick: () => setSheetOpen(true) },
+      create: { label: "New landed cost", onClick: () => setSheetOpen(true) },
       empty: <LandedCostsEmpty onCreate={() => setSheetOpen(true)} />,
     }),
     [router, confirm]
@@ -285,7 +302,7 @@ export default function LandedCostsPage() {
 
   return (
     <>
-      <Explorer key={version} config={config} />
+      <Explorer config={config} />
 
       {/* New Allocation Sheet */}
       <Sheet
@@ -297,7 +314,7 @@ export default function LandedCostsPage() {
       >
         <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
-            <SheetTitle>New Allocation</SheetTitle>
+            <SheetTitle>New landed cost</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-6 px-4 py-4 sm:px-6 sm:py-5">
@@ -309,28 +326,31 @@ export default function LandedCostsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Purchase Order ID</label>
-                    <Input value={purchaseOrderId} onChange={(e) => setPurchaseOrderId(e.target.value)} placeholder="PO ID" />
+                    <label className="text-sm font-medium">Purchase order</label>
+                    <PurchaseDocumentPicker kind="purchase_order" value={purchaseOrderId} onChange={(id) => setPurchaseOrderId(id)} placeholder="The goods these costs are for" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Bill ID</label>
-                    <Input value={billId} onChange={(e) => setBillId(e.target.value)} placeholder="Bill ID" />
+                    <label className="text-sm font-medium">Bill</label>
+                    <PurchaseDocumentPicker kind="bill" value={billId} onChange={(id) => setBillId(id)} placeholder="The freight or duty bill (optional)" />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  The costs are spread across the purchase order&apos;s lines. Link its lines to stock items so the costs reach your stock.
+                </p>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Allocation Method</label>
+                  <label className="text-sm font-medium">Split</label>
                   <Select value={allocationMethod} onValueChange={setAllocationMethod}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="by_value">By Value</SelectItem>
-                      <SelectItem value="by_quantity">By Quantity</SelectItem>
-                      <SelectItem value="by_weight">By Weight</SelectItem>
+                      <SelectItem value="by_value">By value</SelectItem>
+                      <SelectItem value="by_quantity">By quantity</SelectItem>
                       <SelectItem value="manual">Manual</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">{METHOD_HINTS[allocationMethod]}</p>
                 </div>
               </div>
 
@@ -338,7 +358,7 @@ export default function LandedCostsPage() {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Cost Components *</label>
+                  <label className="text-sm font-medium">Costs *</label>
                   <Button type="button" variant="outline" size="sm" onClick={addComponent}>
                     <Plus className="mr-2 size-3.5" />
                     Add
@@ -347,7 +367,7 @@ export default function LandedCostsPage() {
                 {components.map((comp, index) => (
                   <div key={index} className="rounded-lg border p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Component {index + 1}</span>
+                      <span className="text-sm font-medium text-muted-foreground">Cost {index + 1}</span>
                       {components.length > 1 && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => removeComponent(index)} className="text-red-600 hover:text-red-700">
                           <Trash2 className="size-4" />
@@ -364,12 +384,15 @@ export default function LandedCostsPage() {
                         <Input type="number" step="0.01" min="0" value={comp.amount} onChange={(e) => updateComponent(index, { amount: e.target.value })} placeholder="0.00" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-medium">Account ID</label>
-                        <Input value={comp.accountId} onChange={(e) => updateComponent(index, { accountId: e.target.value })} placeholder="Account ID" />
+                        <label className="text-xs font-medium">Booked to</label>
+                        <AccountPicker value={comp.accountId} onChange={(accountId) => updateComponent(index, { accountId })} placeholder="Landed Costs Clearing (2160)" />
                       </div>
                     </div>
                   </div>
                 ))}
+                <p className="text-xs text-muted-foreground">
+                  &quot;Booked to&quot; is the account the bill for this cost was coded to, so applying moves the cost from there into your stock. Leave it empty to use Landed Costs Clearing (2160), then code the freight bill to 2160 too.
+                </p>
               </div>
             </div>
 
@@ -378,7 +401,7 @@ export default function LandedCostsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={saving} className="bg-brand-600 hover:bg-brand-700">
-                {saving ? "Creating..." : "Create Allocation"}
+                {saving ? "Creating..." : "Create landed cost"}
               </Button>
             </div>
           </form>
@@ -395,12 +418,12 @@ function LandedCostsEmpty({ onCreate }: { onCreate: () => void }) {
     <ContentReveal>
       <EmptyState
         icon={Ship}
-        title="No landed cost allocations yet"
+        title="No landed costs yet"
         description="Extra costs like freight & duty added to the cost of stock. Record them here so each item's true cost includes them."
       >
         <Button onClick={onCreate} className="bg-brand-600 hover:bg-brand-700">
           <Plus className="mr-2 size-4" />
-          New Allocation
+          New landed cost
         </Button>
       </EmptyState>
     </ContentReveal>

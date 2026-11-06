@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMember, timeEntry } from "@/lib/db/schema";
+import { projectTask, timeEntry } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
-import { requireRole } from "@/lib/api/require-role";
+import { requireProjectAccess } from "@/lib/api/project-access";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import { notDeleted } from "@/lib/db/soft-delete";
+import { resolveTimeEntryRate, syncProjectBilling } from "@/lib/api/project-billing";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { z } from "zod";
 
@@ -30,15 +30,9 @@ export async function GET(
     const { page, limit, offset } = parsePagination(url);
 
     // Verify project belongs to org
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
-
-    if (!proj) return notFound("Project");
+    await requireProjectAccess(ctx, id, "view");
+    // Entries on voided/deleted invoices become unbilled again.
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     const entries = await db.query.timeEntry.findMany({
       where: eq(timeEntry.projectId, id),
@@ -68,32 +62,23 @@ export async function POST(
   try {
     const { id } = await params;
     const ctx = await getAuthContext(request);
-    requireRole(ctx, "manage:projects");
 
     const body = await request.json();
     const parsed = createSchema.parse(body);
 
     // Verify project belongs to org
-    const proj = await db.query.project.findFirst({
-      where: and(
-        eq(project.id, id),
-        eq(project.organizationId, ctx.organizationId),
-        notDeleted(project.deletedAt)
-      ),
-    });
+    const { project: proj } = await requireProjectAccess(ctx, id, "contribute");
 
-    if (!proj) return notFound("Project");
+    if (parsed.taskId) {
+      const task = await db.query.projectTask.findFirst({
+        where: and(eq(projectTask.id, parsed.taskId), eq(projectTask.projectId, id)),
+        columns: { id: true },
+      });
+      if (!task) return notFound("Task");
+    }
 
     // Rate cascade: explicit > member rate > project rate
-    let rate = parsed.hourlyRate;
-    if (rate == null) {
-      const pms = await db.query.projectMember.findMany({
-        where: eq(projectMember.projectId, id),
-        with: { member: { columns: { userId: true } } },
-      });
-      const userPm = pms.find(pm => pm.member?.userId === ctx.userId);
-      rate = userPm?.hourlyRate ?? proj.hourlyRate;
-    }
+    const rate = parsed.hourlyRate ?? (await resolveTimeEntryRate(db, proj, ctx.userId));
 
     const [created] = await db
       .insert(timeEntry)
@@ -109,14 +94,7 @@ export async function POST(
       })
       .returning();
 
-    // Update project totals
-    await db
-      .update(project)
-      .set({
-        totalHours: proj.totalHours + parsed.minutes,
-        updatedAt: new Date(),
-      })
-      .where(eq(project.id, id));
+    await syncProjectBilling(db, ctx.organizationId, [id]);
 
     logAudit({ ctx, action: "create", entityType: "time_entry", entityId: created.id, request });
 

@@ -8,6 +8,7 @@ import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { z } from "zod";
+import { updateInventoryItem } from "@/lib/api/inventory-items";
 
 const updateSchema = z.object({
   code: z.string().min(1).optional(),
@@ -18,9 +19,12 @@ const updateSchema = z.object({
   sku: z.string().nullable().optional(),
   purchasePrice: z.number().int().min(0).optional(),
   salePrice: z.number().int().min(0).optional(),
-  costAccountId: z.string().nullable().optional(),
-  revenueAccountId: z.string().nullable().optional(),
-  inventoryAccountId: z.string().nullable().optional(),
+  costAccountId: z.string().uuid().nullable().optional(),
+  revenueAccountId: z.string().uuid().nullable().optional(),
+  inventoryAccountId: z.string().uuid().nullable().optional(),
+  costMethod: z.enum(["average", "fifo"]).optional(),
+  trackingMethod: z.enum(["none", "serial", "lot", "batch"]).optional(),
+  unitOfMeasure: z.string().nullable().optional(),
   reorderPoint: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });
@@ -60,21 +64,7 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateSchema.parse(body);
 
-    const existing = await db.query.inventoryItem.findFirst({
-      where: and(
-        eq(inventoryItem.id, id),
-        eq(inventoryItem.organizationId, ctx.organizationId),
-        notDeleted(inventoryItem.deletedAt)
-      ),
-    });
-
-    if (!existing) return notFound("Inventory item");
-
-    const [updated] = await db
-      .update(inventoryItem)
-      .set({ ...parsed, updatedAt: new Date() })
-      .where(eq(inventoryItem.id, id))
-      .returning();
+    const { existing, updated } = await updateInventoryItem(ctx, id, parsed);
 
     logAudit({ ctx, action: "update", entityType: "inventory_item", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { portalAccessToken, invoice } from "@/lib/db/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, notInArray } from "drizzle-orm";
+import { PORTAL_HIDDEN_INVOICE_STATUSES } from "@/lib/api/portal-access";
 
 async function validateToken(token: string) {
   const access = await db.query.portalAccessToken.findFirst({
@@ -31,6 +32,8 @@ export async function GET(
       where: and(
         eq(invoice.organizationId, access.organizationId),
         eq(invoice.contactId, access.contactId),
+        // Unissued invoices aren't owed yet and voided ones aren't owed at all.
+        notInArray(invoice.status, [...PORTAL_HIDDEN_INVOICE_STATUSES, "void"]),
         isNull(invoice.deletedAt)
       ),
       orderBy: desc(invoice.issueDate),
@@ -56,6 +59,7 @@ export async function GET(
       organization: { name: access.organization.name },
       lines: statementLines,
       totalOutstanding: runningBalance,
+      currencyCode: invoices[0]?.currencyCode || access.contact.currencyCode || "USD",
     });
   } catch {
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

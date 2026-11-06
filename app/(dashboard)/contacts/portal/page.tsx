@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Copy, ExternalLink, FileText, Globe, Power, RefreshCw, ScrollText, CreditCard, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { DateCell, DueCell, PartyCell, StatusPill, formatDay } from "@/component
 import type { ExplorerConfig, ExplorerStatus } from "@/components/dashboard/explorer/types";
 import { PortalInviteDialog } from "@/components/dashboard/contacts/portal-invite-dialog";
 import { copyText, invitePortal, portalLink, revokePortal } from "@/components/dashboard/contacts/actions";
+import { useApi } from "@/lib/query/use-api";
 
 /** One row of GET /api/v1/portal/access?status=all. */
 interface Access {
@@ -72,24 +73,11 @@ function ago(value: string | null) {
   return formatDay(value);
 }
 
-function useActivity(contactId?: string, refreshKey?: unknown) {
-  const key = `${contactId ?? "all"}:${String(refreshKey)}`;
-  const [state, setState] = useState<{ key: string; rows: ActivityRow[] } | null>(null);
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const params = new URLSearchParams({ limit: contactId ? "12" : "25" });
-    if (contactId) params.set("contactId", contactId);
-    fetch(`/api/v1/portal/activity?${params}`, { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((json: { data?: ActivityRow[] }) => !cancelled && setState({ key, rows: json.data ?? [] }))
-      .catch(() => !cancelled && setState({ key, rows: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [key, contactId]);
-  return state?.key === key ? state.rows : null;
+function useActivity(contactId?: string) {
+  const params = new URLSearchParams({ limit: contactId ? "12" : "25" });
+  if (contactId) params.set("contactId", contactId);
+  const { data, error } = useApi<{ data?: ActivityRow[] }>(`/api/v1/portal/activity?${params}`);
+  return data ? data.data ?? [] : error ? [] : null;
 }
 
 function ActivityList({ rows, showName }: { rows: ActivityRow[] | null; showName?: boolean }) {
@@ -129,9 +117,7 @@ export default function PortalPage() {
   useDocumentTitle("Contacts · Customer portal");
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [inviting, setInviting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const bump = () => setRefreshKey((k) => k + 1);
-  const recent = useActivity(undefined, refreshKey);
+  const recent = useActivity();
 
   const config = useMemo<ExplorerConfig<Access>>(
     () => ({
@@ -209,8 +195,6 @@ export default function PortalPage() {
                     await Promise.all(live.map((a) => revokePortal(a.id)));
                     toast.success(`Switched off ${live.length} link${live.length === 1 ? "" : "s"}`);
                     helpers.clearSelection();
-                    helpers.refresh();
-                    bump();
                   },
                 })
               }
@@ -220,7 +204,7 @@ export default function PortalPage() {
           </>
         );
       },
-      preview: (a, helpers) => (
+      preview: (a) => (
         <DocumentPreview
           plainTitle
           number="Portal link"
@@ -253,8 +237,6 @@ export default function PortalPage() {
                   const res = await invitePortal({ contactId: a.contactId, expiresInDays: 30 });
                   if (a.status === "active") await revokePortal(a.id);
                   await copyText(portalLink(res.portalUrl), "New 30-day link created and copied");
-                  helpers.refresh();
-                  bump();
                 }}
               >
                 {a.status === "active" ? "Replace link" : "Send new link"}
@@ -272,8 +254,6 @@ export default function PortalPage() {
                       onConfirm: async () => {
                         await revokePortal(a.id);
                         toast.success("Portal link switched off");
-                        helpers.refresh();
-                        bump();
                       },
                     })
                   }
@@ -295,18 +275,18 @@ export default function PortalPage() {
               </div>
             </div>
           )}
-          <PreviewActivity contactId={a.contactId} refreshKey={refreshKey} />
+          <PreviewActivity contactId={a.contactId} />
         </DocumentPreview>
       ),
       create: { label: "Invite a customer", onClick: () => setInviting(true) },
       empty: <PortalEmpty onInvite={() => setInviting(true)} />,
     }),
-    [confirm, refreshKey]
+    [confirm]
   );
 
   return (
     <div className="space-y-8">
-      <Explorer config={config} refreshKey={refreshKey} />
+      <Explorer config={config} />
       {recent && recent.length > 0 && (
         <section className="@container">
           <div className="mb-3 flex items-end justify-between">
@@ -318,14 +298,14 @@ export default function PortalPage() {
           <ActivityList rows={recent} showName />
         </section>
       )}
-      <PortalInviteDialog open={inviting} onOpenChange={setInviting} onCreated={bump} />
+      <PortalInviteDialog open={inviting} onOpenChange={setInviting} />
       {confirmDialog}
     </div>
   );
 }
 
-function PreviewActivity({ contactId, refreshKey }: { contactId: string; refreshKey: number }) {
-  const rows = useActivity(contactId, refreshKey);
+function PreviewActivity({ contactId }: { contactId: string }) {
+  const rows = useActivity(contactId);
   return (
     <div className="mt-6">
       <p className="mb-2 text-[12.5px] font-medium text-muted-foreground">Their portal activity</p>

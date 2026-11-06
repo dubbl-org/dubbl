@@ -2,13 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ClipboardCheck, Loader2, Trash2, Check, X as XIcon, FileText, Send } from "lucide-react";
+import { Plus, ClipboardCheck, Loader2, Check, X as XIcon, FileText, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
@@ -18,6 +16,7 @@ import { DocumentPreview } from "@/components/dashboard/explorer/document-previe
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
 import { DateCell, DueCell, MoneyCell, MutedCell, NumberCell, PartyCell, StatusPill, daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
 import type { ExplorerConfig, ExplorerHelpers, ExplorerStatus } from "@/components/dashboard/explorer/types";
+import { RequisitionSheet } from "./requisition-sheet";
 
 interface RequisitionLine {
   id: string;
@@ -48,12 +47,6 @@ interface Requisition {
   lines: RequisitionLine[];
 }
 
-interface LineInput {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
-
 const STATUSES: ExplorerStatus[] = [
   { value: "draft", label: "Draft", color: "#A1A1AA", hint: "Started but not sent for approval yet" },
   { value: "submitted", label: "Waiting for approval", color: "#6366F1", hint: "Sent to a manager who needs to approve or reject it" },
@@ -64,8 +57,6 @@ const STATUSES: ExplorerStatus[] = [
 
 /** Still heading towards a purchase: the "needed by" date matters for these. */
 const OPEN = new Set(["draft", "submitted", "approved"]);
-
-const emptyLine = (): LineInput => ({ description: "", quantity: 1, unitPrice: 0 });
 
 function sum(rows: Requisition[]) {
   return rows.reduce((s, r) => s + r.total, 0);
@@ -90,59 +81,11 @@ export default function RequisitionsPage() {
 
   // New requisition sheet
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [formRequestDate, setFormRequestDate] = useState(new Date().toISOString().split("T")[0]);
-  const [formRequiredDate, setFormRequiredDate] = useState("");
-  const [formReference, setFormReference] = useState("");
-  const [formNotes, setFormNotes] = useState("");
-  const [formLines, setFormLines] = useState<LineInput[]>([emptyLine()]);
 
   // Reject dialog
   const [rejecting, setRejecting] = useState<{ row: Requisition; helpers: ExplorerHelpers } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectBusy, setRejectBusy] = useState(false);
-
-  function updateLine(idx: number, field: keyof LineInput, value: string | number) {
-    setFormLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
-  }
-
-  function removeLine(idx: number) {
-    setFormLines((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function resetForm() {
-    setFormRequestDate(new Date().toISOString().split("T")[0]);
-    setFormRequiredDate("");
-    setFormReference("");
-    setFormNotes("");
-    setFormLines([emptyLine()]);
-  }
-
-  async function handleCreate() {
-    const validLines = formLines.filter((l) => l.description.trim());
-    if (validLines.length === 0) {
-      toast.error("Add at least one line item");
-      return;
-    }
-    setCreating(true);
-    try {
-      await postJson("/api/v1/purchase-requisitions", {
-        requestDate: formRequestDate,
-        requiredDate: formRequiredDate || null,
-        reference: formReference || null,
-        notes: formNotes || null,
-        lines: validLines,
-      });
-      toast.success("Requisition created");
-      setSheetOpen(false);
-      resetForm();
-      setVersion((v) => v + 1);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create requisition");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function handleReject() {
     if (!rejecting) return;
@@ -315,7 +258,7 @@ export default function RequisitionsPage() {
                   </ActionButton>
                 </>
               )}
-              {r.status === "approved" && (
+              {r.status === "approved" && r.contact && (
                 <ActionButton
                   primary
                   icon={<FileText className="size-3.5" />}
@@ -328,9 +271,15 @@ export default function RequisitionsPage() {
                   Create a purchase order
                 </ActionButton>
               )}
-              {r.status === "draft" && (
+              {r.status === "approved" && !r.contact && (
+                // Ordering needs a supplier: the requisition page asks for one first
+                <ActionButton primary icon={<FileText className="size-3.5" />} run={async () => router.push(`/purchases/requisitions/${r.id}`)}>
+                  Choose supplier and order
+                </ActionButton>
+              )}
+              {(r.status === "draft" || r.status === "rejected") && (
                 <ActionButton primary icon={<Send className="size-3.5" />} run={async () => router.push(`/purchases/requisitions/${r.id}`)}>
-                  Review and submit
+                  {r.status === "draft" ? "Review and submit" : "Revise and resubmit"}
                 </ActionButton>
               )}
               {r.convertedPoId && (
@@ -353,71 +302,7 @@ export default function RequisitionsPage() {
       <Explorer key={version} config={config} />
 
       {/* New requisition */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="max-h-[85vh]">
-          <SheetHeader>
-            <SheetTitle>New Purchase Requisition</SheetTitle>
-          </SheetHeader>
-          <div className="overflow-y-auto px-4 pb-6 space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Request Date</Label>
-                <Input type="date" value={formRequestDate} onChange={(e) => setFormRequestDate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Required By</Label>
-                <Input type="date" value={formRequiredDate} onChange={(e) => setFormRequiredDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">Reference</Label>
-              <Input value={formReference} onChange={(e) => setFormReference(e.target.value)} placeholder="Optional reference" />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">Notes</Label>
-              <Textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Optional notes" rows={2} />
-            </div>
-
-            {/* Line items */}
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Line Items</Label>
-              {formLines.map((line, idx) => (
-                <div key={idx} className="flex items-start gap-2 rounded-lg border p-3">
-                  <div className="flex-1 space-y-2">
-                    <Input placeholder="Description" value={line.description} onChange={(e) => updateLine(idx, "description", e.target.value)} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Qty</Label>
-                        <Input type="number" min={1} value={line.quantity} onChange={(e) => updateLine(idx, "quantity", Number(e.target.value))} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Unit Price</Label>
-                        <Input type="number" min={0} step={0.01} value={line.unitPrice} onChange={(e) => updateLine(idx, "unitPrice", Number(e.target.value))} />
-                      </div>
-                    </div>
-                  </div>
-                  {formLines.length > 1 && (
-                    <Button variant="ghost" size="icon" className="shrink-0 size-8 text-muted-foreground hover:text-red-600" onClick={() => removeLine(idx)}>
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button variant="outline" size="sm" className="w-full" onClick={() => setFormLines((prev) => [...prev, emptyLine()])}>
-                <Plus className="mr-2 size-3.5" />
-                Add Line
-              </Button>
-            </div>
-
-            <Button onClick={handleCreate} disabled={creating} className="w-full bg-brand-600 hover:bg-brand-700">
-              {creating ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
-              Create Requisition
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <RequisitionSheet open={sheetOpen} onOpenChange={setSheetOpen} onSaved={() => setVersion((v) => v + 1)} />
 
       {/* Reject with a reason */}
       <Dialog

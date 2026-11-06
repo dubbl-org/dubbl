@@ -1,26 +1,14 @@
-import { db } from "@/lib/db";
-import { assemblyOrder } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
-import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
+import { logAudit } from "@/lib/api/audit";
+import { createAssemblyOrder, listAssemblyOrders } from "@/lib/api/assembly";
 import { z } from "zod";
 
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
-
-    const orders = await db.query.assemblyOrder.findMany({
-      where: and(
-        eq(assemblyOrder.organizationId, ctx.organizationId),
-        notDeleted(assemblyOrder.deletedAt)
-      ),
-      with: { bom: { with: { assemblyItem: true } } },
-      orderBy: assemblyOrder.createdAt,
-    });
-
-    return ok({ data: orders });
+    return ok({ data: await listAssemblyOrders(ctx.organizationId) });
   } catch (err) {
     return handleError(err);
   }
@@ -36,18 +24,9 @@ export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:inventory");
-
-    const body = await request.json();
-    const parsed = createSchema.parse(body);
-
-    const [order] = await db
-      .insert(assemblyOrder)
-      .values({
-        organizationId: ctx.organizationId,
-        ...parsed,
-      })
-      .returning();
-
+    const parsed = createSchema.parse(await request.json());
+    const order = await createAssemblyOrder(ctx, parsed);
+    logAudit({ ctx, action: "create", entityType: "assembly_order", entityId: order.id, changes: parsed, request });
     return created({ order });
   } catch (err) {
     return handleError(err);

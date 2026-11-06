@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Calendar, ClipboardList, Mail, MessageSquare, Phone, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useApi } from "@/lib/query/use-api";
 
 export const ACTIVITY_TYPES: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   note: { label: "Note", icon: MessageSquare, color: "#64748B" },
@@ -53,33 +53,16 @@ interface PeekActivity {
 
 /** The latest few activities on a deal, for previews. */
 export function DealActivityPeek({ dealId }: { dealId: string }) {
-  const [state, setState] = useState<{ id: string; items: PeekActivity[]; total: number } | null>(null);
-
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    fetch(`/api/v1/crm/deals/${dealId}/activities?limit=5`, { headers: { "x-organization-id": orgId } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled) setState({ id: dealId, items: json?.activities ?? [], total: json?.totalAll ?? 0 });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ id: dealId, items: [], total: 0 });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dealId]);
-
-  const loading = state?.id !== dealId;
+  const { data, error } = useApi<{ activities?: PeekActivity[]; totalAll?: number }>(`/api/v1/crm/deals/${dealId}/activities?limit=5`);
+  const state = data ? { items: data.activities ?? [], total: data.totalAll ?? 0 } : error ? { items: [] as PeekActivity[], total: 0 } : null;
+  const loading = !state;
 
   return (
     <div className="mt-6">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-[12.5px] font-medium text-muted-foreground">Recent activity</p>
         <Link href={`/crm/deals/${dealId}/activity`} className="text-[12.5px] text-muted-foreground hover:text-foreground">
-          {state && state.id === dealId && state.total > 0 ? `All ${state.total}` : "Log activity"}
+          {state && state.total > 0 ? `All ${state.total}` : "Log activity"}
         </Link>
       </div>
       {loading ? (

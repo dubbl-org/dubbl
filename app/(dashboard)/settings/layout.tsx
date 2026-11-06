@@ -59,7 +59,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Preferences",
     items: [
-      { href: "/settings/notifications", label: "Notifications", icon: BellRing },
+      { href: "/notifications?preferences=1", label: "Notifications", icon: BellRing },
       { href: "/settings/reminders", label: "Reminders", icon: Bell },
       { href: "/settings/cost-centers", label: "Cost Centers", icon: GitBranch },
       { href: "/settings/tags", label: "Tags", icon: Tags },

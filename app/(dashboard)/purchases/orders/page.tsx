@@ -10,6 +10,8 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
+import { apiGet } from "@/lib/query/api";
+import { useApi } from "@/lib/query/use-api";
 import { Explorer } from "@/components/dashboard/explorer/explorer";
 import { DocumentPreview } from "@/components/dashboard/explorer/document-preview";
 import { ActionButton, postJson } from "@/components/dashboard/explorer/action-button";
@@ -64,11 +66,43 @@ function sum(rows: PO[]) {
   return rows.reduce((s, p) => s + p.total, 0);
 }
 
-async function getJson<T>(url: string) {
-  const orgId = localStorage.getItem("activeOrgId");
-  const res = await fetch(url, { headers: orgId ? { "x-organization-id": orgId } : {} });
-  if (!res.ok) throw new Error("Couldn't load this order");
-  return (await res.json()) as T;
+type OrderJson = { purchaseOrder?: { lines?: POLine[] } };
+
+/** "Mark items received" in the preview: reads the order's lines from the same cached answer the preview shows. */
+function ReceiveAllButton({ po, primary, confirm, onDone }: { po: PO; primary: boolean; confirm: ReturnType<typeof useConfirm>["confirm"]; onDone: () => void }) {
+  const url = `/api/v1/purchase-orders/${po.id}`;
+  const { data } = useApi<OrderJson>(url);
+  return (
+    <ActionButton
+      primary={primary}
+      icon={<PackageCheck className="size-3.5" />}
+      run={async () => {
+        const order =
+          data ??
+          (await apiGet<OrderJson>(url).catch(() => {
+            throw new Error("Couldn't load this order");
+          }));
+        const lines = (order.purchaseOrder?.lines ?? [])
+          .map((l) => ({ purchaseOrderLineId: l.id, quantity: (l.quantity - l.quantityReceived) / 100 }))
+          .filter((l) => l.quantity > 0);
+        if (lines.length === 0) {
+          toast.info("All items on this order are already marked as received");
+          return;
+        }
+        const ok = await confirm({
+          title: "Mark all items as received?",
+          description: "Records that everything still outstanding on this order has arrived. Anything you track as stock is added to your inventory.",
+          confirmLabel: "Mark items as received",
+        });
+        if (!ok) return;
+        await postJson("/api/v1/goods-receipts", { purchaseOrderId: po.id, date: toDayKey(new Date()), lines });
+        toast.success("Items marked as received");
+        onDone();
+      }}
+    >
+      Mark items received
+    </ActionButton>
+  );
 }
 
 function Progress({ label, done, of, color }: { label: string; done: number; of: number; color: string }) {
@@ -207,31 +241,7 @@ export default function PurchaseOrdersPage() {
                 </ActionButton>
               )}
               {AWAITING.has(p.status) && (
-                <ActionButton
-                  primary={!canBill(p)}
-                  icon={<PackageCheck className="size-3.5" />}
-                  run={async () => {
-                    const data = await getJson<{ purchaseOrder?: { lines?: POLine[] } }>(`/api/v1/purchase-orders/${p.id}`);
-                    const lines = (data.purchaseOrder?.lines ?? [])
-                      .map((l) => ({ purchaseOrderLineId: l.id, quantity: (l.quantity - l.quantityReceived) / 100 }))
-                      .filter((l) => l.quantity > 0);
-                    if (lines.length === 0) {
-                      toast.info("All items on this order are already marked as received");
-                      return;
-                    }
-                    const ok = await confirm({
-                      title: "Mark all items as received?",
-                      description: "Records that everything still outstanding on this order has arrived. Anything you track as stock is added to your inventory.",
-                      confirmLabel: "Mark items as received",
-                    });
-                    if (!ok) return;
-                    await postJson("/api/v1/goods-receipts", { purchaseOrderId: p.id, date: toDayKey(new Date()), lines });
-                    toast.success("Items marked as received");
-                    helpers.refresh();
-                  }}
-                >
-                  Mark items received
-                </ActionButton>
+                <ReceiveAllButton po={p} primary={!canBill(p)} confirm={confirm} onDone={helpers.refresh} />
               )}
               {canBill(p) && (
                 <ActionButton

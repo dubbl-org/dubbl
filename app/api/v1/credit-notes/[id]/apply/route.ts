@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { getNextNumber } from "@/lib/api/numbering";
 import { z } from "zod";
+import { emitInvoicePaid } from "@/lib/webhooks/events";
 
 const applySchema = z.object({
   invoiceId: z.string().min(1),
@@ -60,7 +61,7 @@ export async function POST(
     });
 
     if (!foundInvoice) return notFound("Invoice");
-    if (foundInvoice.status === "draft" || foundInvoice.status === "void") {
+    if (["draft", "void", "pending_approval", "rejected"].includes(foundInvoice.status)) {
       return NextResponse.json(
         { error: "Cannot apply credit to this invoice status" },
         { status: 400 }
@@ -145,6 +146,8 @@ export async function POST(
             createdBy: ctx.userId,
           })
           .returning();
+        // A credit applied, not money received: only invoice.paid can apply
+        emitInvoicePaid(ctx.organizationId, [foundInvoice.id]);
 
         // Record the credit-note allocation linking credit note -> invoice. The
         // credit_note allocation is the authoritative open-item link; the invoice

@@ -8,6 +8,7 @@ import { wrapTool } from "@/lib/mcp/errors";
 import { softDelete } from "@/lib/db/soft-delete";
 import { deliverWebhook } from "@/lib/webhooks/deliver";
 import type { AuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
 
 export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
   server.tool(
@@ -32,6 +33,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         const offset = (params.page - 1) * params.limit;
 
         const conditions = [
@@ -78,6 +80,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         const secret = crypto.randomBytes(32).toString("hex");
 
         const [created] = await db
@@ -118,6 +121,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         const existing = await db.query.webhook.findFirst({
           where: and(
             eq(webhook.id, params.webhookId),
@@ -155,6 +159,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         const existing = await db.query.webhook.findFirst({
           where: and(
             eq(webhook.id, params.webhookId),
@@ -201,6 +206,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         // Verify webhook belongs to org
         const existing = await db.query.webhook.findFirst({
           where: and(
@@ -249,6 +255,7 @@ export function registerWebhookTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, "manage:webhooks");
         const existing = await db.query.webhook.findFirst({
           where: and(
             eq(webhook.id, params.webhookId),

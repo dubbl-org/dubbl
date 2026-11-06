@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
+import { memberCapacity } from "@/lib/api/check-limit";
 import { db } from "@/lib/db";
 import { orgInviteLink, member } from "@/lib/db/schema";
-import { subscription } from "@/lib/db/schema/billing";
-import { eq, and, count } from "drizzle-orm";
-import { getEffectiveLimits } from "@/lib/plans";
+import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 
@@ -58,31 +57,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check seat capacity
-    const sub = await db.query.subscription.findFirst({
-      where: eq(subscription.organizationId, link.organizationId),
-    });
-    const [memberCountResult] = await db
-      .select({ count: count() })
-      .from(member)
-      .where(eq(member.organizationId, link.organizationId));
-
-    const limits = getEffectiveLimits(sub ?? null);
-    const plan = sub?.plan ?? "free";
-    const seatCount = sub?.seatCount ?? 1;
-
-    let memberMax: number;
-    if (sub?.overrideMembers != null) {
-      memberMax = sub.overrideMembers;
-    } else if (plan === "pro") {
-      memberMax = seatCount;
-    } else {
-      memberMax = limits.members;
-    }
-
-    if (memberCountResult.count >= memberMax) {
+    // Check member capacity
+    const capacity = await memberCapacity(link.organizationId);
+    if (!capacity.canAdd) {
       return NextResponse.json(
-        { error: "This organization has reached its member limit. Ask the admin to add more seats." },
+        { error: "This organization can't add more members on its current plan. Ask an admin to upgrade." },
         { status: 403 }
       );
     }

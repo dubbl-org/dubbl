@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { ArrowLeft, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -11,6 +11,7 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ExportButton } from "@/components/dashboard/export-button";
+import { useApi } from "@/lib/query/use-api";
 
 interface PerformanceEntry {
   contactId: string;
@@ -27,43 +28,18 @@ interface PerformanceEntry {
 
 export default function PaymentPerformancePage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
-  const [receivables, setReceivables] = useState<PerformanceEntry[]>([]);
-  const [payables, setPayables] = useState<PerformanceEntry[]>([]);
-  const [avgCollect, setAvgCollect] = useState(0);
-  const [avgPay, setAvgPay] = useState(0);
+  const { data, loading } = useApi<{ receivables?: PerformanceEntry[]; payables?: PerformanceEntry[]; avgDaysToCollect?: number; avgDaysToPay?: number }>(
+    `/api/v1/reports/payment-performance?${new URLSearchParams({ startDate, endDate })}`,
+    { keepPrevious: true }
+  );
+  const receivables = data?.receivables || [];
+  const payables = data?.payables || [];
+  const avgCollect = data?.avgDaysToCollect || 0;
+  const avgPay = data?.avgDaysToPay || 0;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate });
-    fetch(`/api/v1/reports/payment-performance?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setReceivables(data.receivables || []);
-        setPayables(data.payables || []);
-        setAvgCollect(data.avgDaysToCollect || 0);
-        setAvgPay(data.avgDaysToPay || 0);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   return (
     <ContentReveal className="space-y-6">
@@ -81,46 +57,42 @@ export default function PaymentPerformancePage() {
 
       <DateRangeFilter startDate={startDate} endDate={endDate} onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : (
-        <ContentReveal>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard title="Average days customers take to pay you" value={`${avgCollect}d`} icon={TrendingDown} changeType={avgCollect <= 30 ? "positive" : "negative"} />
-            <StatCard title="Average days you take to pay suppliers" value={`${avgPay}d`} icon={TrendingUp} changeType={avgPay <= 30 ? "positive" : "neutral"} />
-          </div>
+      <ContentReveal>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard title="Average days customers take to pay you" value={`${avgCollect}d`} icon={TrendingDown} changeType={avgCollect <= 30 ? "positive" : "negative"} />
+          <StatCard title="Average days you take to pay suppliers" value={`${avgPay}d`} icon={TrendingUp} changeType={avgPay <= 30 ? "positive" : "neutral"} />
+        </div>
 
-          {receivables.length > 0 && (
-            <div className="mt-4">
-              <PerformanceTable
-                title="How quickly customers pay you"
-                entries={receivables}
-                countLabel="Invoices"
-                totalLabel="Collected"
-                getCount={(e) => e.invoiceCount || 0}
-                getTotal={(e) => e.totalCollected || 0}
-              />
-            </div>
-          )}
-          {payables.length > 0 && (
-            <div className="mt-4">
-              <PerformanceTable
-                title="How quickly you pay suppliers"
-                entries={payables}
-                countLabel="Bills"
-                totalLabel="Paid"
-                getCount={(e) => e.billCount || 0}
-                getTotal={(e) => e.totalPaid || 0}
-              />
-            </div>
-          )}
-          {receivables.length === 0 && payables.length === 0 && (
-            <div className="rounded-xl border border-dashed py-12 text-center mt-4">
-              <p className="text-sm text-muted-foreground">No payment data for this period. Pay or collect invoices/bills to see performance.</p>
-            </div>
-          )}
-        </ContentReveal>
-      )}
+        {receivables.length > 0 && (
+          <div className="mt-4">
+            <PerformanceTable
+              title="How quickly customers pay you"
+              entries={receivables}
+              countLabel="Invoices"
+              totalLabel="Collected"
+              getCount={(e) => e.invoiceCount || 0}
+              getTotal={(e) => e.totalCollected || 0}
+            />
+          </div>
+        )}
+        {payables.length > 0 && (
+          <div className="mt-4">
+            <PerformanceTable
+              title="How quickly you pay suppliers"
+              entries={payables}
+              countLabel="Bills"
+              totalLabel="Paid"
+              getCount={(e) => e.billCount || 0}
+              getTotal={(e) => e.totalPaid || 0}
+            />
+          </div>
+        )}
+        {receivables.length === 0 && payables.length === 0 && (
+          <div className="rounded-xl border border-dashed py-12 text-center mt-4">
+            <p className="text-sm text-muted-foreground">No payment data for this period. Pay or collect invoices/bills to see performance.</p>
+          </div>
+        )}
+      </ContentReveal>
     </ContentReveal>
   );
 }

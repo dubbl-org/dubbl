@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Mail, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useApi } from "@/lib/query/use-api";
 
 interface EmailLogEntry {
   id: string;
@@ -32,27 +33,11 @@ function timeAgo(dateStr: string) {
 }
 
 export function EmailHistory({ documentType, documentId }: EmailHistoryProps) {
-  const [emails, setEmails] = useState<EmailLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ emails?: EmailLogEntry[] }>(`/api/v1/document-emails?documentType=${documentType}&documentId=${documentId}`);
+  const emails = data?.emails ?? [];
   const [resendingId, setResendingId] = useState<string | null>(null);
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
-
-  const loadEmails = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/document-emails?documentType=${documentType}&documentId=${documentId}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.emails) setEmails(data.emails);
-      })
-      .finally(() => setLoading(false));
-  }, [orgId, documentType, documentId]);
-
-  useEffect(() => {
-    loadEmails();
-  }, [loadEmails]);
 
   async function handleResend(emailId: string) {
     if (!orgId) return;
@@ -64,7 +49,6 @@ export function EmailHistory({ documentType, documentId }: EmailHistoryProps) {
       });
       if (res.ok) {
         toast.success("Email resent");
-        loadEmails();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(typeof data.error === "string" ? data.error : "Failed to resend");

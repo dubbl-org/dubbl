@@ -8,9 +8,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://dubbl:dubbl@postgres:5432/dubbl}
-      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.production}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env.production}
+      # Start with: docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+      # (--env-file is what lets the checks below see .env.production).
+      # Without DATABASE_URL, the bundled database is used with POSTGRES_PASSWORD.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-dubbl}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production and start with --env-file .env.production}@postgres:5432/${POSTGRES_DB:-dubbl}}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.production and start with --env-file .env.production}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env.production and start with --env-file .env.production}
+      # Encrypts saved SMTP passwords. Generate with: openssl rand -hex 32
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY:?Set EMAIL_ENCRYPTION_KEY in .env.production (openssl rand -hex 32)}
+
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      RESEND_DOCUMENTS_FROM: ${RESEND_DOCUMENTS_FROM:-}
 
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
@@ -19,10 +28,22 @@ services:
 
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_STANDARD_PRICE_ID: ${STRIPE_STANDARD_PRICE_ID:-}
+      STRIPE_STANDARD_ANNUAL_PRICE_ID: ${STRIPE_STANDARD_ANNUAL_PRICE_ID:-}
+      STRIPE_PREMIUM_PRICE_ID: ${STRIPE_PREMIUM_PRICE_ID:-}
+      STRIPE_PREMIUM_ANNUAL_PRICE_ID: ${STRIPE_PREMIUM_ANNUAL_PRICE_ID:-}
+      STRIPE_ULTIMATE_PRICE_ID: ${STRIPE_ULTIMATE_PRICE_ID:-}
+      STRIPE_ULTIMATE_ANNUAL_PRICE_ID: ${STRIPE_ULTIMATE_ANNUAL_PRICE_ID:-}
       STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-openai/gpt-6-luna}
+      ASSISTANT_REASONING_EFFORT: ${ASSISTANT_REASONING_EFFORT:-medium}
 
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       S3_BUCKET: ${S3_BUCKET:-dubbl}
@@ -34,7 +55,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-dubbl}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production and start with --env-file .env.production}
       POSTGRES_DB: ${POSTGRES_DB:-dubbl}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"

@@ -24,14 +24,13 @@ import {
 import {
   COUNTRIES,
   getBusinessTypesForCountry,
-  type Country,
-  type BusinessType,
 } from "@/lib/data/business-types";
-import { INDUSTRIES, type Industry } from "@/lib/data/industries";
-import { REFERRAL_SOURCES, type ReferralSource } from "@/lib/data/referral-sources";
+import { INDUSTRIES } from "@/lib/data/industries";
+import { REFERRAL_SOURCES } from "@/lib/data/referral-sources";
 import { BrandGrain } from "@/components/shared/brand-grain";
 import { getCountrySetup, fiscalYearEndLabel, MONTH_NAMES } from "@/lib/country-setup";
 import { chartTemplateForCountry, seededAccountsFor } from "@/lib/db/chart-templates";
+import { takePlanIntentUrl } from "@/lib/plan-intent";
 
 const STEPS = [
   { label: "Organization", icon: Building2 },
@@ -225,7 +224,7 @@ export function OnboardingWizard() {
         throw new Error(data.error || "Failed to update organization");
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = takePlanIntentUrl() ?? "/dashboard";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
       setSubmitting(false);

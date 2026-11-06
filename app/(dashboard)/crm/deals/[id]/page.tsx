@@ -8,8 +8,6 @@ import {
   Phone,
   Calendar,
   ClipboardList,
-  Trophy,
-  XCircle,
   Activity,
   DollarSign,
   Target,
@@ -70,8 +68,8 @@ export default function DealOverviewPage() {
                 )}
               </div>
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Assigned To</p>
-                <p className="text-sm">{deal.assignedUser?.name || "-"}</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Owner</p>
+                <p className="text-sm">{deal.assignedUser?.name || "Unassigned"}</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -83,7 +81,7 @@ export default function DealOverviewPage() {
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Expected Close</p>
                 <p className="text-sm">
                   {deal.expectedCloseDate
-                    ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+                    ? new Date(deal.expectedCloseDate.slice(0, 10) + "T00:00:00").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
                     : "-"}
                 </p>
               </div>
@@ -144,7 +142,7 @@ export default function DealOverviewPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium">{activity.user?.name || "System"}</span>
+                        <span className="text-xs font-medium">{activity.user?.name || activity.user?.email || "Someone"}</span>
                         <Badge variant="outline" className="text-[9px] px-1 py-0 capitalize h-3.5">{activity.type}</Badge>
                         <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{timeAgo(activity.createdAt)}</span>
                       </div>

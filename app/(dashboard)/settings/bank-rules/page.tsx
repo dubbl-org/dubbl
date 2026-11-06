@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useApi } from "@/lib/query/use-api";
 import { ContentReveal } from "@/components/ui/content-reveal";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -94,6 +95,18 @@ interface BankRule {
 interface AccountOption {
   id: string;
   name: string;
+}
+
+// A rule learned from lines you've already categorized (GET /bank-rules/suggestions).
+interface RuleSuggestion {
+  matchField: "description";
+  matchType: "contains";
+  matchValue: string;
+  accountId: string;
+  accountName: string;
+  accountCode: string;
+  occurrences: number;
+  sampleDescription: string;
 }
 
 interface ContactOption {
@@ -204,6 +217,9 @@ function summarizeRule(
       contacts.find((c) => c.id === rule.contactId)?.name ?? "Contact"
     );
   }
+  if (rule.autoReconcile && rule.accountId && !(rule.splitAllocations && rule.splitAllocations.length > 0)) {
+    actions.push("Categorizes automatically");
+  }
   return { match, actions };
 }
 
@@ -214,8 +230,8 @@ const emptyCondition = (): RuleCondition => ({
 });
 
 export default function BankRulesPage() {
-  const [rules, setRules] = useState<BankRule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rulesData, loading } = useApi<{ data?: BankRule[]; rules?: BankRule[] }>("/api/v1/bank-rules");
+  const rules = rulesData?.data || rulesData?.rules || [];
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<BankRule | null>(null);
   const [saving, setSaving] = useState(false);
@@ -234,43 +250,17 @@ export default function BankRulesPage() {
   const [useSplits, setUseSplits] = useState(false);
   const [autoReconcile, setAutoReconcile] = useState(false);
 
+  // Suggested rules (null = not asked for yet)
+  const [suggestions, setSuggestions] = useState<RuleSuggestion[] | null>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   // Select options
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
-  const [contacts, setContacts] = useState<ContactOption[]>([]);
-  const [taxRates, setTaxRates] = useState<TaxRateOption[]>([]);
-
-  const fetchRules = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    fetch("/api/v1/bank-rules", {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => setRules(data.data || data.rules || []))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const fetchOptions = useCallback(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-
-    fetch("/api/v1/accounts", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => setAccounts(data.accounts || []));
-
-    fetch("/api/v1/contacts", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => setContacts(data.contacts || data.data || []));
-
-    fetch("/api/v1/tax-rates", { headers: { "x-organization-id": orgId } })
-      .then((r) => r.json())
-      .then((data) => setTaxRates(data.taxRates || []));
-  }, []);
-
-  useEffect(() => {
-    fetchRules();
-    fetchOptions();
-  }, [fetchRules, fetchOptions]);
+  const { data: accountsData } = useApi<{ accounts?: AccountOption[] }>("/api/v1/accounts");
+  const { data: contactsData } = useApi<{ contacts?: ContactOption[]; data?: ContactOption[] }>("/api/v1/contacts");
+  const { data: taxRatesData } = useApi<{ taxRates?: TaxRateOption[] }>("/api/v1/tax-rates");
+  const accounts = accountsData?.accounts || [];
+  const contacts = contactsData?.contacts || contactsData?.data || [];
+  const taxRates = taxRatesData?.taxRates || [];
 
   const resetForm = () => {
     setName("");
@@ -288,6 +278,17 @@ export default function BankRulesPage() {
   const openCreate = () => {
     setEditingRule(null);
     resetForm();
+    setSheetOpen(true);
+  };
+
+  // Start a new rule from a suggestion: its keyword as the condition, its
+  // category as the action. The user can still change anything before saving.
+  const openFromSuggestion = (s: RuleSuggestion) => {
+    setEditingRule(null);
+    resetForm();
+    setName(s.matchValue);
+    setConditions([{ field: "description", op: "contains", value: s.matchValue }]);
+    setAccountId(s.accountId);
     setSheetOpen(true);
   };
 
@@ -482,7 +483,20 @@ export default function BankRulesPage() {
 
       toast.success(editingRule ? "Rule updated" : "Rule created");
       setSheetOpen(false);
-      fetchRules();
+      // A suggestion that just became a rule is no longer a suggestion.
+      if (!editingRule && suggestions) {
+        const first = conditionsPayload[0];
+        setSuggestions((prev) =>
+          prev?.filter(
+            (sg) =>
+              !(
+                first?.field === "description" &&
+                first.op === "contains" &&
+                first.value.toLowerCase() === sg.matchValue.toLowerCase()
+              )
+          ) ?? null
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -499,7 +513,6 @@ export default function BankRulesPage() {
 
     if (res.ok) {
       toast.success("Rule deleted");
-      fetchRules();
     } else {
       toast.error("Failed to delete rule");
     }
@@ -520,7 +533,6 @@ export default function BankRulesPage() {
 
     if (res.ok) {
       toast.success(rule.isActive ? "Rule disabled" : "Rule enabled");
-      fetchRules();
     } else {
       toast.error("Failed to update rule");
     }
@@ -530,8 +542,7 @@ export default function BankRulesPage() {
     const orgId = localStorage.getItem("activeOrgId");
     if (!orgId) return;
 
-    toast.info("Analyzing transactions for rule suggestions...");
-
+    setLoadingSuggestions(true);
     try {
       const res = await fetch("/api/v1/bank-rules/suggestions", {
         headers: { "x-organization-id": orgId },
@@ -543,18 +554,17 @@ export default function BankRulesPage() {
       }
 
       const data = await res.json();
-      const count = data.suggestions?.length ?? 0;
-      if (count === 0) {
+      const list: RuleSuggestion[] = data.suggestions ?? [];
+      setSuggestions(list);
+      if (list.length === 0) {
         toast.info(
-          "No suggestions found. Assign more transactions to categories first."
-        );
-      } else {
-        toast.success(
-          `Found ${count} rule suggestion${count === 1 ? "" : "s"}`
+          "No suggestions found. Categorize the same payee a couple of times first."
         );
       }
     } catch {
       toast.error("Failed to get suggestions");
+    } finally {
+      setLoadingSuggestions(false);
     }
   };
 
@@ -581,6 +591,7 @@ export default function BankRulesPage() {
               size="sm"
               className="h-8 text-xs gap-1.5"
               onClick={handleGetSuggestions}
+              loading={loadingSuggestions}
             >
               <Sparkles className="size-3.5" />
               Get Suggestions
@@ -591,6 +602,60 @@ export default function BankRulesPage() {
             </Button>
           </div>
         </div>
+
+        {/* Suggested rules */}
+        {suggestions && suggestions.length > 0 && (
+          <div className="rounded-lg border">
+            <div className="flex items-center justify-between border-b px-4 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Suggested rules</p>
+                <p className="text-xs text-muted-foreground">
+                  Payees you&apos;ve put in the same category more than once.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground"
+                onClick={() => setSuggestions(null)}
+                aria-label="Hide suggestions"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="divide-y">
+              {suggestions.map((sg) => (
+                <div
+                  key={`${sg.matchValue}-${sg.accountId}`}
+                  className="flex items-center gap-4 px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                        Description contains &quot;{sg.matchValue}&quot;
+                      </code>
+                      <Badge variant="secondary" className="text-xs">
+                        {sg.accountName}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      Categorized {sg.occurrences} times, like &quot;{sg.sampleDescription}&quot;
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1.5 shrink-0"
+                    onClick={() => openFromSuggestion(sg)}
+                  >
+                    <Plus className="size-3.5" />
+                    Create rule
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -1094,19 +1159,19 @@ export default function BankRulesPage() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
-                  <Label title="Marking as cleared moves no money — it just confirms the transaction matches your bank.">
-                    Mark matching transactions as cleared
-                  </Label>
+                  <Label>Categorize matching transactions automatically</Label>
                   <p className="text-xs text-muted-foreground">
-                    Tick off matching transactions automatically. This moves no
-                    money.
+                    {useSplits
+                      ? "Split rules always record each match in your books straight away."
+                      : "Record each match in your books straight away, just like choosing Categorize. Leave off to fill in the category for you to check first."}
                   </p>
                 </div>
                 <Switch
-                  checked={autoReconcile}
+                  checked={useSplits || autoReconcile}
                   onCheckedChange={setAutoReconcile}
+                  disabled={useSplits}
                 />
               </div>
             </div>

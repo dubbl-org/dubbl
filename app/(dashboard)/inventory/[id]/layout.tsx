@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { ArrowLeft, Package, ArrowUpDown, Power, PowerOff, Settings2, Clock, Truck, Layers, TrendingDown } from "lucide-react";
@@ -23,6 +23,7 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { setEntityTitle } from "@/lib/hooks/use-entity-title";
 import { cn } from "@/lib/utils";
+import { useApi, useApiCache } from "@/lib/query/use-api";
 
 export interface InventoryItemDetail {
   id: string;
@@ -37,7 +38,16 @@ export interface InventoryItemDetail {
   salePrice: number;
   quantityOnHand: number;
   reorderPoint: number;
+  /** Book value of what's on hand, cents. */
   totalValue?: number;
+  /** Moving average cost, cents per unit. */
+  averageCost?: number;
+  costMethod?: "average" | "fifo" | "standard";
+  trackingMethod?: string;
+  unitOfMeasure?: string | null;
+  inventoryAccountId?: string | null;
+  costAccountId?: string | null;
+  revenueAccountId?: string | null;
   isActive: boolean;
 }
 
@@ -66,8 +76,10 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
-  const [item, setItemRaw] = useState<InventoryItemDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = `/api/v1/inventory/${id}`;
+  const cache = useApiCache();
+  const { data, loading, refetch } = useApi<{ inventoryItem?: InventoryItemDetail }>(url);
+  const item = data?.inventoryItem ?? null;
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustment, setAdjustment] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
@@ -79,27 +91,14 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
 
   const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
 
-  const fetchItem = useCallback(() => {
-    if (!orgId) return;
-    fetch(`/api/v1/inventory/${id}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.inventoryItem) {
-          setItemRaw(data.inventoryItem);
-          setEntityTitle(data.inventoryItem.name);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [id, orgId]);
-
+  const itemName = item?.name;
   useEffect(() => {
-    fetchItem();
-  }, [fetchItem]);
+    if (itemName) setEntityTitle(itemName);
+  }, [itemName]);
 
+  const setItemRaw = (next: InventoryItemDetail) => cache.update<{ inventoryItem?: InventoryItemDetail }>(url, (d) => ({ ...d, inventoryItem: next }));
   const setItem = (fn: (prev: InventoryItemDetail) => InventoryItemDetail) => {
-    setItemRaw((prev) => prev ? fn(prev) : prev);
+    cache.update<{ inventoryItem?: InventoryItemDetail }>(url, (d) => (d.inventoryItem ? { ...d, inventoryItem: fn(d.inventoryItem) } : d));
   };
 
   async function handleAdjust() {
@@ -199,9 +198,12 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
   }
 
   const isLowStock = item.quantityOnHand <= item.reorderPoint && item.isActive;
-  const stockValue = item.quantityOnHand * item.purchasePrice;
-  const margin = item.purchasePrice > 0
-    ? ((item.salePrice - item.purchasePrice) / item.purchasePrice * 100)
+  // Book value: what the stock cost, after write-downs and landed costs.
+  const stockValue = item.totalValue ?? item.quantityOnHand * item.purchasePrice;
+  const unitCost = item.quantityOnHand > 0 ? Math.round(stockValue / item.quantityOnHand) : (item.averageCost || item.purchasePrice);
+  // Profit as a share of the selling price.
+  const margin = item.salePrice > 0
+    ? ((item.salePrice - item.purchasePrice) / item.salePrice * 100)
     : 0;
   const stockPercent = item.reorderPoint > 0
     ? Math.min((item.quantityOnHand / (item.reorderPoint * 3)) * 100, 100)
@@ -217,7 +219,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
         : "details";
 
   return (
-    <InventoryItemContext.Provider value={{ item, setItem, refetch: fetchItem }}>
+    <InventoryItemContext.Provider value={{ item, setItem, refetch: () => void refetch() }}>
       <ContentReveal>
         {/* Back link */}
         <button
@@ -342,7 +344,7 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
               {formatMoney(stockValue)}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {item.quantityOnHand} x {formatMoney(item.purchasePrice)}
+              {item.quantityOnHand} x {formatMoney(unitCost)} book cost
             </p>
           </motion.div>
           <motion.div
@@ -370,10 +372,10 @@ export default function InventoryItemLayout({ children }: { children: React.Reac
               "mt-1.5 text-2xl font-bold font-mono tabular-nums truncate",
               margin > 0 ? "text-brand-600 dark:text-brand-400" : margin < 0 ? "text-red-600" : ""
             )}>
-              {item.purchasePrice > 0 ? `${margin.toFixed(1)}%` : "-"}
+              {item.salePrice > 0 && item.purchasePrice > 0 ? `${margin.toFixed(1)}%` : "-"}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {item.purchasePrice > 0 ? `${formatMoney(item.salePrice - item.purchasePrice)} per unit` : "No cost set"}
+              {item.purchasePrice <= 0 ? "No cost set" : item.salePrice <= 0 ? "No selling price set" : `${formatMoney(item.salePrice - item.purchasePrice)} per unit`}
             </p>
           </motion.div>
         </div>

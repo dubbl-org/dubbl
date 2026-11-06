@@ -7,12 +7,13 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { resumeSchedule } from "@/lib/api/recurring-schedule";
 
 /**
  * Toggle a recurring journal template between active and paused. A paused
  * template is skipped by the daily recurring-journals scheduler; resuming it
- * does NOT back-fill the gap (nextRunDate is unchanged), it simply resumes from
- * wherever the schedule currently sits.
+ * does NOT back-fill the gap: dates missed while paused are skipped and the
+ * next run moves forward to the first scheduled date on or after today.
  */
 export async function POST(
   request: Request,
@@ -41,11 +42,15 @@ export async function POST(
       );
     }
 
-    const newStatus = existing.status === "active" ? "paused" : "active";
+    const today = new Date().toISOString().split("T")[0];
+    const changes =
+      existing.status === "active"
+        ? { status: "paused" as const }
+        : resumeSchedule(existing, today);
 
     const [updated] = await db
       .update(recurringTemplate)
-      .set({ status: newStatus, updatedAt: new Date() })
+      .set({ ...changes, updatedAt: new Date() })
       .where(eq(recurringTemplate.id, id))
       .returning();
 
@@ -54,7 +59,7 @@ export async function POST(
       action: "update",
       entityType: "recurring_journal",
       entityId: id,
-      changes: { status: newStatus },
+      changes,
       request,
     });
 

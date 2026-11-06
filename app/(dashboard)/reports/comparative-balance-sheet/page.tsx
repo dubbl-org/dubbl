@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -9,18 +9,35 @@ import { ContentReveal } from "@/components/ui/content-reveal";
 import { ExportButton } from "@/components/dashboard/export-button";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useApis } from "@/lib/query/use-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AccountBalance {
   code: string;
   name: string;
+  /** Integer cents (converted from the API's decimal string). */
   balance: number;
 }
 
 interface BalanceSection {
   type: string;
   accounts: AccountBalance[];
+  /** Integer cents (converted from the API's decimal string). */
   total: number;
+}
+
+/** The balance sheet API returns decimal strings ("123.45"); the page works in cents. */
+function toCents(v: unknown): number {
+  const n = typeof v === "number" ? v : parseFloat(String(v ?? "0"));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+function sectionInCents(section: Partial<BalanceSection> | undefined, type: string): BalanceSection {
+  return {
+    type,
+    accounts: (section?.accounts ?? []).map((a) => ({ code: a.code, name: a.name, balance: toCents(a.balance) })),
+    total: toCents(section?.total),
+  };
 }
 
 interface PeriodBalance {
@@ -32,56 +49,35 @@ interface PeriodBalance {
 }
 
 export default function ComparativeBalanceSheetPage() {
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [periods, setPeriods] = useState<PeriodBalance[]>([]);
   const [compareMonths, setCompareMonths] = useState(3);
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-
-    // Fetch balance sheet for each period end
-    const now = new Date();
-    const fetches: Promise<PeriodBalance | null>[] = [];
-
-    for (let i = 0; i < compareMonths; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 0);
-      if (i === 0) d.setTime(now.getTime()); // Current = today
-      const asOf = d.toISOString().slice(0, 10);
-      const label = i === 0 ? "Current" : d.toLocaleString("en-US", { month: "short", year: "numeric" });
-
-      fetches.push(
-        fetch(`/api/v1/reports/balance-sheet?asOf=${asOf}`, {
-          headers: { "x-organization-id": orgId },
-        })
-          .then((r) => r.json())
-          .then((data) => ({
-            label,
-            asOf,
-            assets: data.assets || { type: "asset", accounts: [], total: 0 },
-            liabilities: data.liabilities || { type: "liability", accounts: [], total: 0 },
-            equity: data.equity || { type: "equity", accounts: [], total: 0 },
-          }))
-          .catch(() => null)
-      );
-    }
-
-    Promise.all(fetches).then((results) => {
-      if (cancelled) return;
-      setPeriods(results.filter((r): r is PeriodBalance => r !== null).reverse());
-    }).finally(() => {
-      if (!cancelled) {
-        setLoading(false);
-        setInitialLoad(false);
-      }
-    });
-
-    return () => { cancelled = true; };
-  }, [compareMonths]);
+  // One balance sheet per period end
+  const now = new Date();
+  const requests = Array.from({ length: compareMonths }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    if (i === 0) d.setTime(now.getTime()); // Current = today
+    // Local calendar date (toISOString would shift it a day in some time zones).
+    const asOf = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const label = i === 0 ? "Current" : d.toLocaleString("en-US", { month: "short", year: "numeric" });
+    return { label, asOf, url: `/api/v1/reports/balance-sheet?asOf=${asOf}` };
+  });
+  const results = useApis<Partial<PeriodBalance>>(requests.map((r) => r.url));
+  // Adding periods only loads the new ones; the full-page loader is for a first visit.
+  const loading = results.loading;
+  const initialLoad = results.data.every((d) => d === undefined);
+  const periods: PeriodBalance[] = requests
+    .flatMap((r, i) => {
+      const data = results.data[i];
+      if (!data) return [];
+      return [{
+        label: r.label,
+        asOf: r.asOf,
+        assets: sectionInCents(data.assets, "asset"),
+        liabilities: sectionInCents(data.liabilities, "liability"),
+        equity: sectionInCents(data.equity, "equity"),
+      }];
+    })
+    .reverse();
 
   // Collect all unique account names across periods
   const allAccounts = new Map<string, { code: string; name: string; section: string }>();
@@ -111,8 +107,13 @@ export default function ComparativeBalanceSheetPage() {
         <ArrowLeft className="size-3.5" /> Back to reports
       </Link>
 
-      <PageHeader title="What you own and owe — compared" description="What the business owns and owes at several dates, side by side, to show what changed.">
-        <ExportButton data={exportData} columns={["section", "code", "name", ...periods.map((p) => p.label)]} filename="comparative-balance-sheet" />
+      <PageHeader title="What you own and owe, compared" description="What the business owns and owes at several dates, side by side, to show what changed.">
+        <ExportButton
+          data={exportData}
+          columns={["section", "code", "name", ...periods.map((p) => p.label)]}
+          moneyColumns={periods.map((p) => p.label)}
+          filename="comparative-balance-sheet"
+        />
       </PageHeader>
 
       <div className="flex items-center gap-3">
@@ -197,7 +198,7 @@ export default function ComparativeBalanceSheetPage() {
                         {periods.map((p) => {
                           const total = section === "Assets" ? p.assets.total : section === "Liabilities" ? p.liabilities.total : p.equity.total;
                           return (
-                            <td key={p.label} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">{formatMoney(Math.round(parseFloat(String(total)) * 100))}</td>
+                            <td key={p.label} className="px-4 py-2 text-right font-mono tabular-nums font-semibold">{formatMoney(total)}</td>
                           );
                         })}
                         {periods.length >= 2 && <td />}

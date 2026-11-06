@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
+import { useConfirm } from "@/lib/hooks/use-confirm";
 import { cn } from "@/lib/utils";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -47,6 +49,8 @@ interface TaxPeriod {
   filedReference: string | null;
   notes: string | null;
   createdAt: string;
+  /** Filing deadline (YYYY-MM-DD), worked out from the period end and the organization's country. */
+  dueDate?: string;
 }
 
 function getDaysUntil(dateStr: string): number {
@@ -72,13 +76,19 @@ function getFilingStatus(period: TaxPeriod): {
     };
   }
 
-  const days = getDaysUntil(period.endDate);
+  const deadline = period.dueDate ?? period.endDate;
+  const days = getDaysUntil(deadline);
+  const dueText = `Due ${new Date(deadline + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
 
   if (days < 0) {
     return {
       label: "Overdue",
       variant: "overdue",
-      daysText: `${Math.abs(days)} day${Math.abs(days) !== 1 ? "s" : ""} overdue`,
+      daysText: `${dueText} · ${Math.abs(days)} day${Math.abs(days) !== 1 ? "s" : ""} overdue`,
     };
   }
 
@@ -88,14 +98,14 @@ function getFilingStatus(period: TaxPeriod): {
       variant: "due-soon",
       daysText: days === 0
         ? "Due today"
-        : `${days} day${days !== 1 ? "s" : ""} left`,
+        : `${dueText} · ${days} day${days !== 1 ? "s" : ""} left`,
     };
   }
 
   return {
     label: "Open",
     variant: "open",
-    daysText: `${days} day${days !== 1 ? "s" : ""} left`,
+    daysText: `${dueText} · ${days} day${days !== 1 ? "s" : ""} left`,
   };
 }
 
@@ -117,12 +127,10 @@ const FILING_BADGE_STYLES: Record<string, string> = {
 function CreatePeriodSheet({
   open,
   setOpen,
-  onCreated,
   orgId,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
-  onCreated: () => void;
   orgId: string | null;
 }) {
   const [name, setName] = useState("");
@@ -158,7 +166,6 @@ function CreatePeriodSheet({
       setStartDate("");
       setEndDate("");
       setNotes("");
-      onCreated();
     } catch {
       toast.error("Failed to create tax period");
     } finally {
@@ -247,12 +254,10 @@ function CreatePeriodSheet({
 function FileSheet({
   period,
   onClose,
-  onFiled,
   orgId,
 }: {
   period: TaxPeriod | null;
   onClose: () => void;
-  onFiled: () => void;
   orgId: string | null;
 }) {
   const [reference, setReference] = useState("");
@@ -271,13 +276,15 @@ function FileSheet({
         },
         body: JSON.stringify({ filedReference: reference || undefined }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Couldn't mark this period as submitted");
+      }
       toast.success("Marked as submitted");
       onClose();
       setReference("");
-      onFiled();
-    } catch {
-      toast.error("Couldn't mark this period as submitted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't mark this period as submitted");
     } finally {
       setSaving(false);
     }
@@ -327,12 +334,10 @@ function FileSheet({
 function EmptyState({
   createOpen,
   setCreateOpen,
-  fetchPeriods,
   orgId,
 }: {
   createOpen: boolean;
   setCreateOpen: (v: boolean) => void;
-  fetchPeriods: () => void;
   orgId: string | null;
 }) {
   return (
@@ -397,7 +402,6 @@ function EmptyState({
           <CreatePeriodSheet
             open={createOpen}
             setOpen={setCreateOpen}
-            onCreated={fetchPeriods}
             orgId={orgId}
           />
         </div>
@@ -411,10 +415,11 @@ function EmptyState({
 /* ------------------------------------------------------------------ */
 
 export default function TaxPeriodsPage() {
-  const [periods, setPeriods] = useState<TaxPeriod[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ taxPeriods?: TaxPeriod[] }>("/api/v1/tax-periods");
+  const periods = data?.taxPeriods ?? [];
   const [createOpen, setCreateOpen] = useState(false);
   const [filing, setFiling] = useState<TaxPeriod | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   useDocumentTitle("Tax · Periods");
 
   const orgId =
@@ -422,36 +427,26 @@ export default function TaxPeriodsPage() {
       ? localStorage.getItem("activeOrgId")
       : null;
 
-  const fetchPeriods = useCallback(async () => {
+  function handleDelete(period: TaxPeriod) {
     if (!orgId) return;
-    try {
-      const res = await fetch("/api/v1/tax-periods", {
-        headers: { "x-organization-id": orgId },
-      });
-      const data = await res.json();
-      if (data.taxPeriods) setPeriods(data.taxPeriods);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    fetchPeriods();
-  }, [fetchPeriods]);
-
-  async function handleDelete(id: string) {
-    if (!orgId) return;
-    try {
-      const res = await fetch(`/api/v1/tax-periods/${id}`, {
-        method: "DELETE",
-        headers: { "x-organization-id": orgId },
-      });
-      if (!res.ok) throw new Error("Failed");
-      toast.success("Tax period deleted");
-      fetchPeriods();
-    } catch {
-      toast.error("Failed to delete tax period");
-    }
+    confirm({
+      title: `Delete ${period.name}?`,
+      description: "The period is removed from your list. Only open periods can be deleted; submitted periods stay on record.",
+      confirmLabel: "Delete period",
+      destructive: true,
+      onConfirm: async () => {
+        const res = await fetch(`/api/v1/tax-periods/${period.id}`, {
+          method: "DELETE",
+          headers: { "x-organization-id": orgId },
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          toast.error(body.error || "Failed to delete tax period");
+          return;
+        }
+        toast.success("Tax period deleted");
+      },
+    });
   }
 
   const openCount = periods.filter((p) => p.status === "open").length;
@@ -461,6 +456,7 @@ export default function TaxPeriodsPage() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <PageHeader
         title="Tax Periods"
         description="Track filing deadlines, manage tax periods, and stay on top of submissions."
@@ -469,7 +465,6 @@ export default function TaxPeriodsPage() {
           <CreatePeriodSheet
             open={createOpen}
             setOpen={setCreateOpen}
-            onCreated={fetchPeriods}
             orgId={orgId}
           />
         )}
@@ -482,7 +477,6 @@ export default function TaxPeriodsPage() {
           <EmptyState
             createOpen={createOpen}
             setCreateOpen={setCreateOpen}
-            fetchPeriods={fetchPeriods}
             orgId={orgId}
           />
         </ContentReveal>
@@ -657,14 +651,17 @@ export default function TaxPeriodsPage() {
                               Mark submitted
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDelete(p.id)}
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
+                          {p.status === "open" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete ${p.name}`}
+                              className="size-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(p)}
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -677,7 +674,6 @@ export default function TaxPeriodsPage() {
           <FileSheet
             period={filing}
             onClose={() => setFiling(null)}
-            onFiled={fetchPeriods}
             orgId={orgId}
           />
         </ContentReveal>

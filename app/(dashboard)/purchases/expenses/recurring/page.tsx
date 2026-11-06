@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sheet";
 import { Plus, Trash2 } from "lucide-react";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useApi } from "@/lib/query/use-api";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 
@@ -70,8 +71,8 @@ const emptyLine = (): LineItem => ({
 });
 
 export default function RecurringExpensesPage() {
-  const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useApi<{ data?: RecurringTemplate[] }>("/api/v1/recurring?type=expense");
+  const templates = data?.data || [];
 
   useDocumentTitle("Purchases · Recurring Expenses");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -92,20 +93,6 @@ export default function RecurringExpensesPage() {
     }),
     []
   );
-
-  const fetchTemplates = useCallback(() => {
-    setLoading(true);
-    fetch("/api/v1/recurring?type=expense", {
-      headers: orgHeaders(),
-    })
-      .then((r) => r.json())
-      .then((data) => setTemplates(data.data || []))
-      .finally(() => setLoading(false));
-  }, [orgHeaders]);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
 
   const resetForm = () => {
     setName("");
@@ -151,7 +138,6 @@ export default function RecurringExpensesPage() {
       if (res.ok) {
         setDrawerOpen(false);
         resetForm();
-        fetchTemplates();
       }
     } finally {
       setSubmitting(false);

@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { taxPeriod, taxReturnLine, chartAccount } from "@/lib/db/schema";
+import { taxPeriod, chartAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
-import {
-  createVatReturnClearingJournalEntry,
-  recordTaxSettlementJournalEntry,
-} from "@/lib/api/journal-automation";
-import {
-  getOrgTaxConfig,
-  resolveBasis,
-  controlAccountMovement,
-  computeEcSales,
-} from "@/lib/reports/tax-return";
+import { recordTaxSettlementJournalEntry } from "@/lib/api/journal-automation";
+import { fileTaxPeriod, TaxFilingError } from "@/lib/reports/tax-filing";
 import { z } from "zod";
 
 /**
@@ -24,8 +16,9 @@ import { z } from "zod";
  * mode "file" (default): marks the open period filed and posts the VAT-return
  * clearing entry (DR Output VAT 2200, CR Input VAT 1500, net to VAT Suspense
  * 2240). It ALSO freezes the computed box figures into taxReturnLine
- * (isCalculated=true) so the filed numbers are auditable and do not drift if
- * later entries are backdated into the period. Returns the clearing
+ * (isCalculated=true): all nine VAT boxes, or the BAS fields for an Australian
+ * organization, so the filed numbers are auditable and do not drift if later
+ * entries are backdated into the period. See lib/reports/tax-filing.ts. Returns the clearing
  * journalEntryId, net amount (positive = payable, negative = refund) and the
  * persisted box lines.
  *
@@ -112,112 +105,24 @@ export async function POST(
       });
     }
 
-    // mode "file" — gate: only an open period can be filed (the lock).
-    if (period.status !== "open") {
-      return NextResponse.json(
-        { error: "Only open tax periods can be filed" },
-        { status: 400 }
-      );
-    }
-
-    // Compute the box figures NOW so we can freeze them at filing time. Use the
-    // org's vatScheme unless the caller overrides the basis.
-    const config = await getOrgTaxConfig(ctx.organizationId);
-    const basis = resolveBasis(parsed.basis, config);
-    const flatRateApplied = parsed.flatRatePercent != null && parsed.flatRatePercent > 0;
-
-    const [outputMovement, inputMovement, ec] = await Promise.all([
-      controlAccountMovement(ctx.organizationId, "2200", period.startDate, period.endDate, basis),
-      controlAccountMovement(ctx.organizationId, "1500", period.startDate, period.endDate, basis),
-      computeEcSales(ctx.organizationId, period.startDate, period.endDate, config.country),
-    ]);
-
-    const box1 = flatRateApplied
-      ? 0 // flat-rate box 1 is computed from gross turnover in the report; not frozen here without turnover read
-      : outputMovement.credits - outputMovement.debits;
-    const box4 = flatRateApplied ? 0 : inputMovement.debits - inputMovement.credits;
-    const box2 = 0;
-    const box3 = box1 + box2;
-    const box5 = box3 - box4;
-    const box8 = ec.ecSalesNet;
-    const box9 = ec.ecAcquisitionsNet;
-
-    const frozenLines: {
-      boxNumber: string;
-      label: string;
-      amount: number;
-      sortOrder: number;
-    }[] = [
-      { boxNumber: "1", label: "VAT due on sales", amount: box1, sortOrder: 1 },
-      { boxNumber: "2", label: "VAT due on EU acquisitions", amount: box2, sortOrder: 2 },
-      { boxNumber: "3", label: "Total VAT due (Box 1 + 2)", amount: box3, sortOrder: 3 },
-      { boxNumber: "4", label: "VAT reclaimed on purchases", amount: box4, sortOrder: 4 },
-      { boxNumber: "5", label: "Net VAT to pay/reclaim (Box 3 - 4)", amount: box5, sortOrder: 5 },
-      { boxNumber: "8", label: "Total supplies to EU ex-VAT", amount: box8, sortOrder: 8 },
-      { boxNumber: "9", label: "Total acquisitions from EU ex-VAT", amount: box9, sortOrder: 9 },
-    ];
-
-    const result = await db.transaction(async (tx) => {
-      // Post the clearing entry against the SAME basis-aware figures we freeze
-      // into the return (box1 = output balance, box4 = input balance), so the
-      // 2200/1500 clearing exactly matches the filed boxes — including the
-      // cash-basis case (and flat-rate, where both are 0 → nothing to clear).
-      // Without this, the helper would re-derive on the accrual basis and drift.
-      const clearing = await createVatReturnClearingJournalEntry(
+    // mode "file": compute, freeze and clear (shared with the MCP tools).
+    let filed;
+    try {
+      filed = await fileTaxPeriod(
         { organizationId: ctx.organizationId, userId: ctx.userId },
+        id,
         {
-          date: period.endDate,
-          periodStartDate: period.startDate,
-          periodEndDate: period.endDate,
-          reference: parsed.filedReference || period.name,
-          outputBalance: box1,
-          inputBalance: box4,
-        },
-        tx
+          basis: parsed.basis,
+          flatRatePercent: parsed.flatRatePercent ?? null,
+          filedReference: parsed.filedReference ?? null,
+        }
       );
-
-      const [updated] = await tx
-        .update(taxPeriod)
-        .set({
-          status: "filed",
-          filedAt: new Date(),
-          filedBy: ctx.userId,
-          filedReference: parsed.filedReference || null,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(taxPeriod.id, id),
-            eq(taxPeriod.organizationId, ctx.organizationId),
-            eq(taxPeriod.status, "open")
-          )
-        )
-        .returning();
-
-      if (!updated) return { clearing, updated: null, lines: [] };
-
-      // Freeze the box figures: clear any prior calculated lines for this period
-      // (e.g. from a re-file after an amendment) and persist the current set.
-      await tx.delete(taxReturnLine).where(eq(taxReturnLine.taxPeriodId, id));
-      const lines = await tx
-        .insert(taxReturnLine)
-        .values(
-          frozenLines.map((l) => ({
-            taxPeriodId: id,
-            boxNumber: l.boxNumber,
-            label: l.label,
-            amount: l.amount,
-            isCalculated: true,
-            sourceDescription: `Filed ${basis}-basis${flatRateApplied ? " (flat-rate)" : ""}`,
-            sortOrder: l.sortOrder,
-          }))
-        )
-        .returning();
-
-      return { clearing, updated, lines };
-    });
-
-    if (!result.updated) return notFound("Tax period");
+    } catch (err) {
+      if (err instanceof TaxFilingError) {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+      throw err;
+    }
 
     logAudit({
       ctx,
@@ -225,22 +130,22 @@ export async function POST(
       entityType: "tax_period",
       entityId: id,
       changes: {
-        basis,
+        basis: filed.basis,
         filedReference: parsed.filedReference ?? null,
-        net: result.clearing?.net ?? 0,
-        boxes: frozenLines.map((l) => ({ box: l.boxNumber, amount: l.amount })),
+        net: filed.net,
+        boxes: filed.frozenLines.map((l) => ({ box: l.boxNumber, amount: l.amount })),
       },
       request,
     });
 
     return NextResponse.json({
-      taxPeriod: result.updated,
-      clearingJournalEntryId: result.clearing?.entry.id ?? null,
-      net: result.clearing?.net ?? 0,
-      outputVat: result.clearing?.outputBalance ?? 0,
-      inputVat: result.clearing?.inputBalance ?? 0,
-      basis,
-      filedLines: result.lines,
+      taxPeriod: filed.taxPeriod,
+      clearingJournalEntryId: filed.clearingJournalEntryId,
+      net: filed.net,
+      outputVat: filed.outputVat,
+      inputVat: filed.inputVat,
+      basis: filed.basis,
+      filedLines: filed.filedLines,
     });
   } catch (err) {
     return handleError(err);

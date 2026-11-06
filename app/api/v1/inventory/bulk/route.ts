@@ -10,6 +10,8 @@ import { logAudit } from "@/lib/api/audit";
 import { createInventoryAdjustmentJournalEntry } from "@/lib/api/journal-automation";
 import { type ValuedItem } from "@/lib/api/inventory-valuation";
 import { z } from "zod";
+import { resolveItemCategory } from "@/lib/api/inventory-categories";
+import { assertInventoryPeriodOpen, todayIso } from "@/lib/api/inventory-ops";
 
 const bulkSchema = z.object({
   action: z.enum(["delete", "set_active", "set_inactive", "set_category", "adjust_stock"]),
@@ -91,15 +93,20 @@ export async function POST(request: Request) {
         if (category === undefined) {
           return NextResponse.json({ error: "Category required" }, { status: 400 });
         }
-        await db
-          .update(inventoryItem)
-          .set({ category: category || null, updatedAt: new Date() })
-          .where(
-            and(
-              eq(inventoryItem.organizationId, ctx.organizationId),
-              inArray(inventoryItem.id, ids)
-            )
-          );
+        {
+          // A text category is matched to (or creates) a real category, so the
+          // list, filters and the Categories page all agree.
+          const fields = await resolveItemCategory(db, ctx.organizationId, { category: category || null });
+          await db
+            .update(inventoryItem)
+            .set({ ...(fields ?? { categoryId: null, category: null }), updatedAt: new Date() })
+            .where(
+              and(
+                eq(inventoryItem.organizationId, ctx.organizationId),
+                inArray(inventoryItem.id, ids)
+              )
+            );
+        }
         break;
 
       case "adjust_stock":
@@ -120,7 +127,8 @@ export async function POST(request: Request) {
         // vs Inventory) — instead of silently changing only the count, which
         // left the balance sheet out of step with units.
         {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = todayIso();
+          await assertInventoryPeriodOpen(ctx.organizationId, today, ctx);
           await db.transaction(async (tx) => {
             for (const item of items) {
               await createInventoryAdjustmentJournalEntry(

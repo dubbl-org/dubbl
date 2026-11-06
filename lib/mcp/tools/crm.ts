@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { db } from "@/lib/db";
-import { deal, dealActivity, pipeline } from "@/lib/db/schema";
+import { contact, deal, dealActivity, pipeline } from "@/lib/db/schema";
 import {
   eq,
   and,
@@ -21,6 +21,20 @@ import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { wrapTool } from "@/lib/mcp/errors";
+import {
+  CRM_PERMISSION,
+  CrmError,
+  applyPipelineStages,
+  assertOrgUser,
+  assertStageInPipeline,
+  clearOtherDefaults,
+  computeCrmAnalytics,
+  deletePipelineMovingDeals,
+  findDeal,
+  findPipeline,
+  moveDealToStage,
+} from "@/lib/api/crm-deals";
+import { LOST_STAGE, WON_STAGE, dealStageChange, normalizePipelineStages } from "@/lib/crm/rules";
 
 /**
  * MCP tools for the CRM: sales pipelines, deals and their lifecycle
@@ -30,10 +44,9 @@ import { wrapTool } from "@/lib/mcp/errors";
  * A deal's monetary value (`valueCents`) is in integer cents (e.g. $12.50 =
  * 1250). Direct DB access via Drizzle (no HTTP self-calls); every query is
  * org-scoped via the AuthContext and excludes soft-deleted rows where the
- * table supports it. Permission gates mirror the matching REST routes exactly:
- * deal create/update/stage/won/lost and activities are NOT role-gated in the
- * routes, so they are not gated here either; pipeline mutations use the
- * "manage:contacts" permission.
+ * table supports it. Permission gates mirror the matching REST routes: every
+ * change to deals, activities and pipelines needs the "manage:contacts"
+ * permission; reading needs none.
  */
 export function registerCrmTools(server: McpServer, ctx: AuthContext) {
   // --- Pipelines ---
@@ -207,7 +220,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "get_deal",
-    "Get a single deal by ID with its contact, assigned user, pipeline and activities. valueCents is in integer cents. Excludes deleted deals.",
+    "Get a single deal by ID with its contact, owner (assignedUser), pipeline and activities (newest first, each with the user who logged it). valueCents is in integer cents. Excludes deleted deals.",
     {
       dealId: z.string().describe("The UUID of the deal"),
     },
@@ -222,18 +235,21 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
           with: {
             contact: true,
             assignedUser: { columns: { id: true, name: true, email: true } },
-            activities: true,
+            activities: {
+              with: { user: { columns: { id: true, name: true, email: true } } },
+              orderBy: (a, { desc: d }) => [d(a.createdAt)],
+            },
             pipeline: true,
           },
         });
-        if (!found) throw new Error("Deal not found");
+        if (!found) throw new CrmError("Deal not found", 404);
         return { deal: found };
       })
   );
 
   server.tool(
     "create_deal",
-    "Create a new deal in a pipeline stage. valueCents is the deal value in integer cents (e.g. 1250 = $12.50), defaulting to 0. probability is a win likelihood 0-100. The deal starts active (not won/lost). Returns the created deal.",
+    "Create a new deal in a pipeline stage. stageId must be one of the pipeline's stages. valueCents is the deal value in integer cents (e.g. 1250 = $12.50), defaulting to 0. probability is a win likelihood 0-100. assignedTo (the owner) must be a user in this organization. Creating it in 'closed_won' or 'closed_lost' closes it straight away; otherwise it starts open. Requires the manage:contacts permission. Returns the created deal.",
     {
       pipelineId: z.string().describe("UUID of the pipeline this deal belongs to"),
       stageId: z
@@ -259,8 +275,9 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
         .int()
         .min(0)
         .max(100)
+        .nullable()
         .optional()
-        .describe("Win probability as a percentage 0-100"),
+        .describe("Win probability as a percentage 0-100, or null for unknown"),
       expectedCloseDate: z
         .string()
         .nullable()
@@ -280,6 +297,11 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, CRM_PERMISSION);
+        const p = await findPipeline(ctx, params.pipelineId);
+        assertStageInPipeline(p, params.stageId);
+        await assertOrgUser(ctx, params.assignedTo);
+        const closed = dealStageChange({ stageId: "", wonAt: null, lostAt: null, probability: null }, params.stageId);
         const [created] = await db
           .insert(deal)
           .values({
@@ -295,6 +317,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
             assignedTo: params.assignedTo ?? null,
             source: params.source ?? null,
             notes: params.notes ?? null,
+            ...(closed.wonAt || closed.lostAt ? closed : {}),
           })
           .returning();
 
@@ -311,7 +334,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_deal",
-    "Update an existing deal's editable fields. Only provided fields are changed. valueCents is in integer cents; probability is 0-100. This does NOT move the deal between stages (use move_deal_stage) and does NOT mark it won/lost. Returns the updated deal.",
+    "Update an existing deal's editable fields: title, value, probability, expected close, owner, contact, source and notes. Only provided fields are changed; null clears a field. valueCents is in integer cents; probability is 0-100. This does NOT move the deal between stages (use move_deal_stage) and does NOT mark it won/lost. Requires the manage:contacts permission. Returns the updated deal.",
     {
       dealId: z.string().describe("The UUID of the deal to update"),
       title: z.string().min(1).optional().describe("New deal title"),
@@ -326,8 +349,9 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
         .int()
         .min(0)
         .max(100)
+        .nullable()
         .optional()
-        .describe("New win probability as a percentage 0-100"),
+        .describe("New win probability as a percentage 0-100, or null to clear"),
       expectedCloseDate: z
         .string()
         .nullable()
@@ -344,17 +368,24 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
         .nullable()
         .optional()
         .describe("New associated contact UUID, or null to clear"),
+      source: z
+        .enum(["website", "referral", "cold_outreach", "event", "other"])
+        .nullable()
+        .optional()
+        .describe("New lead source, or null to clear"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const existing = await db.query.deal.findFirst({
-          where: and(
-            eq(deal.id, params.dealId),
-            eq(deal.organizationId, ctx.organizationId),
-            notDeleted(deal.deletedAt)
-          ),
-        });
-        if (!existing) throw new Error("Deal not found");
+        requireRole(ctx, CRM_PERMISSION);
+        await findDeal(ctx, params.dealId);
+        await assertOrgUser(ctx, params.assignedTo);
+        if (params.contactId) {
+          const c = await db.query.contact.findFirst({
+            where: and(eq(contact.id, params.contactId), eq(contact.organizationId, ctx.organizationId)),
+            columns: { id: true },
+          });
+          if (!c) throw new CrmError("Contact not found", 404);
+        }
 
         const { dealId, ...updates } = params;
         const cleanUpdates = Object.fromEntries(
@@ -382,42 +413,29 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "move_deal_stage",
-    "Move a deal to a different stage within its pipeline by setting its stageId. Use this for drag-between-columns style stage changes; for closing a deal use mark_deal_won / mark_deal_lost instead. Returns the updated deal.",
+    "Move a deal to another stage of its pipeline. Moving to 'closed_won' or 'closed_lost' closes the deal exactly like mark_deal_won / mark_deal_lost (reason is used for lost). Moving a closed deal to an open stage reopens it (clears won/lost and probability). Requires the manage:contacts permission. Returns the updated deal.",
     {
       dealId: z.string().describe("The UUID of the deal to move"),
       stageId: z
         .string()
-        .describe("The destination stage id within the pipeline (e.g. 'qualified')"),
+        .describe("The destination stage id within the pipeline (e.g. 'qualified', 'closed_won')"),
+      reason: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Why the deal was lost; only used when stageId is 'closed_lost'"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const found = await db.query.deal.findFirst({
-          where: and(
-            eq(deal.id, params.dealId),
-            eq(deal.organizationId, ctx.organizationId),
-            notDeleted(deal.deletedAt)
-          ),
-        });
-        if (!found) throw new Error("Deal not found");
-
-        const [updated] = await db
-          .update(deal)
-          .set({ stageId: params.stageId, updatedAt: new Date() })
-          .where(
-            and(
-              eq(deal.id, params.dealId),
-              eq(deal.organizationId, ctx.organizationId),
-              notDeleted(deal.deletedAt)
-            )
-          )
-          .returning();
+        requireRole(ctx, CRM_PERMISSION);
+        const { before, deal: updated } = await moveDealToStage(ctx, params.dealId, params.stageId, { reason: params.reason });
 
         await logAudit({
           ctx,
           action: "change_stage",
           entityType: "deal",
           entityId: params.dealId,
-          changes: { previousStatus: found.stageId },
+          changes: { previousStatus: before.stageId, stageId: params.stageId },
         });
 
         return { deal: updated };
@@ -426,37 +444,14 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "mark_deal_won",
-    "Mark a deal as won. Sets its stage to 'closed_won', records the won timestamp and bumps probability to 100. Returns the updated deal.",
+    "Mark a deal as won. Sets its stage to 'closed_won', records the won timestamp, clears any lost state and sets probability to 100. Requires the manage:contacts permission. Returns the updated deal.",
     {
       dealId: z.string().describe("The UUID of the deal to mark as won"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const found = await db.query.deal.findFirst({
-          where: and(
-            eq(deal.id, params.dealId),
-            eq(deal.organizationId, ctx.organizationId),
-            notDeleted(deal.deletedAt)
-          ),
-        });
-        if (!found) throw new Error("Deal not found");
-
-        const [updated] = await db
-          .update(deal)
-          .set({
-            stageId: "closed_won",
-            wonAt: new Date(),
-            probability: 100,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(deal.id, params.dealId),
-              eq(deal.organizationId, ctx.organizationId),
-              notDeleted(deal.deletedAt)
-            )
-          )
-          .returning();
+        requireRole(ctx, CRM_PERMISSION);
+        const { before: found, deal: updated } = await moveDealToStage(ctx, params.dealId, WON_STAGE);
 
         await logAudit({
           ctx,
@@ -472,7 +467,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "mark_deal_lost",
-    "Mark a deal as lost. Sets its stage to 'closed_lost', records the lost timestamp and an optional lost reason, and drops probability to 0. Returns the updated deal.",
+    "Mark a deal as lost. Sets its stage to 'closed_lost', records the lost timestamp and an optional lost reason (shown in CRM analytics), clears any won state and sets probability to 0. Requires the manage:contacts permission. Returns the updated deal.",
     {
       dealId: z.string().describe("The UUID of the deal to mark as lost"),
       reason: z
@@ -483,32 +478,8 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const found = await db.query.deal.findFirst({
-          where: and(
-            eq(deal.id, params.dealId),
-            eq(deal.organizationId, ctx.organizationId),
-            notDeleted(deal.deletedAt)
-          ),
-        });
-        if (!found) throw new Error("Deal not found");
-
-        const [updated] = await db
-          .update(deal)
-          .set({
-            stageId: "closed_lost",
-            lostAt: new Date(),
-            lostReason: params.reason || null,
-            probability: 0,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(deal.id, params.dealId),
-              eq(deal.organizationId, ctx.organizationId),
-              notDeleted(deal.deletedAt)
-            )
-          )
-          .returning();
+        requireRole(ctx, CRM_PERMISSION);
+        const { before: found, deal: updated } = await moveDealToStage(ctx, params.dealId, LOST_STAGE, { reason: params.reason });
 
         await logAudit({
           ctx,
@@ -615,7 +586,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "add_deal_activity",
-    "Log an activity (note, email, call, meeting or task) against a deal. The activity is attributed to the current user. Provide scheduledAt (ISO date-time) for upcoming tasks/meetings. Returns the created activity.",
+    "Log an activity (note, email, call, meeting or task) against a deal. The activity is attributed to the current user. Provide scheduledAt (ISO date-time) to plan it: it then shows as 'Coming up' or 'Overdue' until marked done with complete_deal_activity. Requires the manage:contacts permission. Returns the created activity.",
     {
       dealId: z.string().describe("The UUID of the deal to add the activity to"),
       type: z
@@ -634,13 +605,11 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        const d = await db.query.deal.findFirst({
-          where: and(
-            eq(deal.id, params.dealId),
-            eq(deal.organizationId, ctx.organizationId)
-          ),
-        });
-        if (!d) throw new Error("Deal not found");
+        requireRole(ctx, CRM_PERMISSION);
+        await findDeal(ctx, params.dealId);
+        if (params.scheduledAt && Number.isNaN(new Date(params.scheduledAt).getTime())) {
+          throw new CrmError("scheduledAt must be an ISO date-time", 400);
+        }
 
         const [activity] = await db
           .insert(dealActivity)
@@ -717,19 +686,20 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
       .innerJoin(deal, eq(deal.id, dealActivity.dealId))
       .where(and(eq(dealActivity.id, activityId), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)))
       .limit(1);
-    if (!row) throw new Error("Activity not found");
+    if (!row) throw new CrmError("Activity not found", 404);
     return row.activity;
   }
 
   server.tool(
     "complete_deal_activity",
-    "Mark a deal activity (usually a task, call or meeting that was planned) as done, or set it back to not done. Returns the updated activity with its completedAt time (null when not done).",
+    "Mark a deal activity (usually a task, call or meeting that was planned) as done, or set it back to not done. Requires the manage:contacts permission. Returns the updated activity with its completedAt time (null when not done).",
     {
       activityId: z.string().uuid().describe("The UUID of the deal activity"),
       completed: z.boolean().optional().default(true).describe("true to mark done (default), false to mark not done yet"),
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, CRM_PERMISSION);
         await findOrgActivity(params.activityId);
         const [activity] = await db
           .update(dealActivity)
@@ -743,12 +713,13 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "delete_deal_activity",
-    "Permanently delete one activity from a deal's history. Returns { success: true }.",
+    "Permanently delete one activity from a deal's history. Requires the manage:contacts permission. Returns { success: true }.",
     {
       activityId: z.string().uuid().describe("The UUID of the deal activity to delete"),
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, CRM_PERMISSION);
         const existing = await findOrgActivity(params.activityId);
         await db.delete(dealActivity).where(eq(dealActivity.id, params.activityId));
         logAudit({ ctx, action: "delete", entityType: "deal_activity", entityId: params.activityId, changes: existing as Record<string, unknown> });
@@ -758,21 +729,29 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "delete_deal",
-    "Delete a deal (soft delete: it disappears from the pipeline, lists and analytics). Returns { success: true }.",
+    "Delete a deal. It moves to Trash with its activities and disappears from the pipeline, lists and analytics; it can be restored from Trash (restore_trash_item) within 30 days. Requires the manage:contacts permission. Returns { success: true }.",
     {
       dealId: z.string().uuid().describe("The UUID of the deal to delete"),
     },
     (params) =>
       wrapTool(ctx, async () => {
+        requireRole(ctx, CRM_PERMISSION);
         const [deleted] = await db
           .update(deal)
           .set(softDelete())
           .where(and(eq(deal.id, params.dealId), eq(deal.organizationId, ctx.organizationId), notDeleted(deal.deletedAt)))
           .returning();
-        if (!deleted) throw new Error("Deal not found");
+        if (!deleted) throw new CrmError("Deal not found", 404);
         logAudit({ ctx, action: "delete", entityType: "deal", entityId: params.dealId, changes: deleted as Record<string, unknown> });
         return { success: true };
       })
+  );
+
+  server.tool(
+    "get_crm_analytics",
+    "Get CRM pipeline analytics for the organization (what the CRM Analytics page shows): totalDeals, openDeals, wonDeals, lostDeals, totalPipelineValue (open deals) and wonValue in integer cents, conversionRate (won / (won + lost), percent), avgDealValue (average won deal, cents), stageDistribution keyed by stage id with { name, count, value }, and lostReasons [{ reason, count, value }] most common first. Takes no input.",
+    {},
+    () => wrapTool(ctx, async () => computeCrmAnalytics(ctx))
   );
 
   // --- Pipeline management ---
@@ -785,7 +764,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "create_pipeline",
-    "Create a sales pipeline with its ordered stages. Deals move through the stages left to right; include 'closed_won' and 'closed_lost' stages so won/lost deals have a home. Set isDefault to make it the pipeline new deals and the board use first. Requires the manage:contacts permission. Returns the created pipeline.",
+    "Create a sales pipeline with its ordered stages. Deals move through the open stages left to right. The 'closed_won' (Won) and 'closed_lost' (Lost) stages are always kept at the end; they are added if missing. The first pipeline becomes the default; set isDefault to make another one the default (only one pipeline is ever the default). Requires the manage:contacts permission. Returns the created pipeline.",
     {
       name: z.string().min(1).describe("Pipeline name, e.g. 'New business'"),
       stages: z.array(stageSchema).min(1).describe("Ordered list of stages"),
@@ -793,11 +772,24 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:contacts");
-        const [created] = await db
-          .insert(pipeline)
-          .values({ organizationId: ctx.organizationId, name: params.name, stages: params.stages, isDefault: params.isDefault ?? false })
-          .returning();
+        requireRole(ctx, CRM_PERMISSION);
+        const created = await db.transaction(async (tx) => {
+          const existing = await tx.query.pipeline.findFirst({
+            where: and(eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)),
+            columns: { id: true },
+          });
+          const [row] = await tx
+            .insert(pipeline)
+            .values({
+              organizationId: ctx.organizationId,
+              name: params.name,
+              stages: normalizePipelineStages(params.stages),
+              isDefault: params.isDefault ?? !existing,
+            })
+            .returning();
+          if (row.isDefault) await clearOtherDefaults(tx, ctx.organizationId, row.id);
+          return row;
+        });
         logAudit({ ctx, action: "create", entityType: "pipeline", entityId: created.id });
         return { pipeline: created };
       })
@@ -805,7 +797,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
   server.tool(
     "update_pipeline",
-    "Rename a pipeline, replace its ordered stages (to add, remove, rename, recolour or reorder them), or make it the default. Only provided fields change. Deals keep their stage id, so keep ids stable when renaming a stage. Requires the manage:contacts permission. Returns the updated pipeline.",
+    "Rename a pipeline, replace its ordered stages (to add, remove, rename, recolour or reorder them), or make it the default (the previous default is cleared). Only provided fields change. Deals keep their stage id, so keep ids stable when renaming a stage. The Won and Lost stages can't be removed (they are re-added at the end), and deals in a removed stage move to the first open stage. Requires the manage:contacts permission. Returns the updated pipeline and how many deals moved.",
     {
       pipelineId: z.string().uuid().describe("The UUID of the pipeline"),
       name: z.string().min(1).optional().describe("New pipeline name"),
@@ -814,39 +806,47 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:contacts");
+        requireRole(ctx, CRM_PERMISSION);
+        const existing = await findPipeline(ctx, params.pipelineId);
+        if (params.isDefault === false && existing.isDefault) {
+          throw new CrmError("Set another pipeline as the default instead", 400);
+        }
         const updates: Partial<typeof pipeline.$inferInsert> = {};
-        if (params.name !== undefined) updates.name = params.name;
-        if (params.stages !== undefined) updates.stages = params.stages;
-        if (params.isDefault !== undefined) updates.isDefault = params.isDefault;
-        const [updated] = await db
-          .update(pipeline)
-          .set(updates)
-          .where(and(eq(pipeline.id, params.pipelineId), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)))
-          .returning();
-        if (!updated) throw new Error("Pipeline not found");
+        let movedDeals = 0;
+        const updated = await db.transaction(async (tx) => {
+          if (params.name !== undefined) updates.name = params.name;
+          if (params.isDefault !== undefined) updates.isDefault = params.isDefault;
+          if (params.stages !== undefined) {
+            const applied = await applyPipelineStages(tx, ctx.organizationId, params.pipelineId, params.stages);
+            updates.stages = applied.stages;
+            movedDeals = applied.movedDeals;
+          }
+          const [row] = await tx
+            .update(pipeline)
+            .set(updates)
+            .where(and(eq(pipeline.id, params.pipelineId), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)))
+            .returning();
+          if (row?.isDefault) await clearOtherDefaults(tx, ctx.organizationId, row.id);
+          return row;
+        });
+        if (!updated) throw new CrmError("Pipeline not found", 404);
         logAudit({ ctx, action: "update", entityType: "pipeline", entityId: params.pipelineId, changes: updates as Record<string, unknown> });
-        return { pipeline: updated };
+        return { pipeline: updated, movedDeals };
       })
   );
 
   server.tool(
     "delete_pipeline",
-    "Delete a sales pipeline (soft delete). Its deals are not deleted. Requires the manage:contacts permission. Returns { success: true }.",
+    "Delete a sales pipeline. Its deals are not deleted: they move to the default pipeline (or the oldest other one), open deals into a stage that exists there, and that pipeline becomes the default if this one was. Refused when it is the only pipeline and still has deals. Requires the manage:contacts permission. Returns { success, movedDeals, movedTo }.",
     {
       pipelineId: z.string().uuid().describe("The UUID of the pipeline to delete"),
     },
     (params) =>
       wrapTool(ctx, async () => {
-        requireRole(ctx, "manage:contacts");
-        const [deleted] = await db
-          .update(pipeline)
-          .set(softDelete())
-          .where(and(eq(pipeline.id, params.pipelineId), eq(pipeline.organizationId, ctx.organizationId), notDeleted(pipeline.deletedAt)))
-          .returning();
-        if (!deleted) throw new Error("Pipeline not found");
-        logAudit({ ctx, action: "delete", entityType: "pipeline", entityId: params.pipelineId, changes: deleted as Record<string, unknown> });
-        return { success: true };
+        requireRole(ctx, CRM_PERMISSION);
+        const { pipeline: deleted, movedDeals, movedTo } = await deletePipelineMovingDeals(ctx, params.pipelineId);
+        logAudit({ ctx, action: "delete", entityType: "pipeline", entityId: params.pipelineId, changes: { ...(deleted as Record<string, unknown>), movedDeals } });
+        return { success: true, movedDeals, movedTo };
       })
   );
 }

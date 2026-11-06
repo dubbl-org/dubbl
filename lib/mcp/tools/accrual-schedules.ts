@@ -10,6 +10,7 @@ import {
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/api/require-role";
 import { getNextEntryNumber } from "@/lib/api/journal-automation";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { wrapTool } from "@/lib/mcp/errors";
 import type { AuthContext } from "@/lib/api/auth-context";
 
@@ -173,7 +174,7 @@ export function registerAccrualScheduleTools(server: McpServer, ctx: AuthContext
 
   server.tool(
     "post_accrual_entry",
-    "Post the next unposted period of an accrual schedule as a reversing journal entry: DR reverseAccountId / CR accountId for that period's amount (in integer cents). Marks the period entry as posted and links its journal entry. When the last unposted period is posted, the schedule's status flips to 'completed'. The schedule must be 'active'. Returns the posted period entry.",
+    "Post the next unposted period of an accrual schedule as a reversing journal entry: DR reverseAccountId / CR accountId for that period's amount (in integer cents). Marks the period entry as posted and links its journal entry. When the last unposted period is posted, the schedule's status flips to 'completed'. The schedule must be 'active', and the period date must not be in a locked period or closed financial year. Returns the posted period entry.",
     {
       scheduleId: z.string().describe("The UUID of the accrual schedule to post the next period for"),
     },
@@ -196,6 +197,8 @@ export function registerAccrualScheduleTools(server: McpServer, ctx: AuthContext
         // Find first unposted entry.
         const nextEntry = schedule.entries.find((e) => !e.posted);
         if (!nextEntry) throw new Error("All entries have already been posted");
+        // The period posts on its date; refuse a locked period.
+        await assertNotLocked(ctx.organizationId, nextEntry.periodDate, ctx);
 
         const updatedEntry = await db.transaction(async (tx) => {
           // Pass the surrounding tx so concurrent posts don't collide on

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const bills = await db.query.bill.findMany({
       where: and(...conditions),
-      with: { contact: true, lines: true },
+      with: { contact: true, lines: { with: { account: { columns: { code: true } } } } },
     });
 
     const rows: Record<string, unknown>[] = [];
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
             lineQty: centsToDecimal(line.quantity),
             lineUnitPrice: centsToDecimal(line.unitPrice),
             lineAmount: centsToDecimal(line.amount),
-            lineAccountCode: line.accountId || "",
+            lineAccountCode: line.account?.code || "",
           });
         }
       } else {

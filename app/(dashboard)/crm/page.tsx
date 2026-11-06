@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,7 +20,7 @@ import { ArrowRight, BarChart3, Handshake, List, Loader2, Plus, Search, ThumbsDo
 import { toast } from "sonner";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
-import { useRecords } from "@/components/dashboard/explorer/use-records";
+import { useApi, useApiCache, useApiRecords } from "@/lib/query/use-api";
 import { daysUntil, formatDay } from "@/components/dashboard/explorer/cells";
 import { postJson } from "@/components/dashboard/explorer/action-button";
 import { DEFAULT_STAGES, openStages, usePipelines, type Pipeline, type PipelineStage } from "@/components/dashboard/crm/pipelines";
@@ -57,14 +57,14 @@ function initials(name: string) {
 }
 
 export default function CRMPipelinePage() {
-  const { pipelines, loading: pipelinesLoading, reload: reloadPipelines } = usePipelines();
+  const { pipelines, loading: pipelinesLoading } = usePipelines();
   const [chosen, setChosen] = useState<string | null>(() => (typeof window === "undefined" ? null : localStorage.getItem(PIPELINE_KEY)));
   useDocumentTitle("CRM · Pipeline");
 
   const pipeline = pipelines.find((p) => p.id === chosen) ?? pipelines.find((p) => p.isDefault) ?? pipelines[0] ?? null;
 
   if (pipelinesLoading) return <BrandLoader />;
-  if (!pipeline) return <PipelineSetup onCreated={reloadPipelines} />;
+  if (!pipeline) return <PipelineSetup />;
 
   return (
     <Board
@@ -86,50 +86,34 @@ export default function CRMPipelinePage() {
 function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines: Pipeline[]; onPick: (id: string) => void }) {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const params = useMemo(() => ({ pipelineId: pipeline.id, status: "active", sortBy: "value", sortOrder: "desc" }), [pipeline.id]);
-  const { rows, loading, error, refresh } = useRecords<Deal>("/api/v1/crm/deals", params, undefined, refreshKey);
+  const cache = useApiCache();
+  const dealsUrl = `/api/v1/crm/deals?pipelineId=${pipeline.id}&status=active&sortBy=value&sortOrder=desc`;
+  const { rows, data, loading, error, refetch } = useApiRecords<Deal>(dealsUrl);
 
-  // Optimistic moves while the server catches up
-  const [moved, setMoved] = useState<Record<string, string>>({});
-  const [closed, setClosed] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [losing, setLosing] = useState<Deal | null>(null);
   const [search, setSearch] = useState("");
-  const [outcomes, setOutcomes] = useState<{ won: number; wonValue: number; lost: number } | null>(null);
-
-  useEffect(() => {
-    const bump = () => setRefreshKey((k) => k + 1);
-    window.addEventListener("deals-changed", bump);
-    return () => window.removeEventListener("deals-changed", bump);
-  }, []);
 
   // Won and lost totals for the outcome columns
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    const headers = { "x-organization-id": orgId };
-    Promise.all([
-      fetch(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=won&limit=1`, { headers }).then((r) => r.json()),
-      fetch(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=lost&limit=1`, { headers }).then((r) => r.json()),
-    ])
-      .then(([won, lost]) => {
-        if (cancelled) return;
-        setOutcomes({ won: won.summary?.wonCount ?? 0, wonValue: won.summary?.wonValue ?? 0, lost: lost.pagination?.total ?? 0 });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pipeline.id, refreshKey, closed]);
+  const { data: wonData } = useApi<{ summary?: { wonCount?: number; wonValue?: number } }>(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=won&limit=1`);
+  const { data: lostData } = useApi<{ pagination?: { total?: number } }>(`/api/v1/crm/deals?pipelineId=${pipeline.id}&status=lost&limit=1`);
+  const outcomes = wonData && lostData ? { won: wonData.summary?.wonCount ?? 0, wonValue: wonData.summary?.wonValue ?? 0, lost: lostData.pagination?.total ?? 0 } : null;
+
+  // Optimistic moves: change the cached board first; the request refreshes it when it lands.
+  // Before a request, drop any refresh in flight so it can't put the old board back.
+  const editDeals = useCallback(
+    (fn: (rows: Deal[]) => Deal[], before = true) => {
+      if (before) void cache.cancel(dealsUrl);
+      cache.updateRows<Deal>(dealsUrl, fn);
+    },
+    [dealsUrl, cache]
+  );
+  const rollback = useCallback(() => void cache.invalidate(dealsUrl), [dealsUrl, cache]);
+  const close = useCallback((id: string, before = true) => editDeals((list) => list.filter((d) => d.id !== id), before), [editDeals]);
 
   const stages = openStages(pipeline);
   const q = search.trim().toLowerCase();
-  const deals = rows
-    .filter((d) => !closed.has(d.id))
-    .map((d) => (moved[d.id] ? { ...d, stageId: moved[d.id] } : d))
-    .filter((d) => !q || [d.title, d.contact?.name, d.assignedUser?.name].some((v) => v?.toLowerCase().includes(q)));
+  const deals = rows.filter((d) => !q || [d.title, d.contact?.name, d.assignedUser?.name].some((v) => v?.toLowerCase().includes(q)));
   // Deals whose stage was removed from the pipeline still need a home: show them in the first column
   const known = new Set(stages.map((s) => s.id));
   const byStage = new Map<string, Deal[]>(stages.map((s) => [s.id, []]));
@@ -146,25 +130,21 @@ function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines:
 
   const markWon = useCallback(
     async (deal: Deal) => {
-      setClosed((prev) => new Set(prev).add(deal.id));
+      close(deal.id);
       try {
         await postJson(`/api/v1/crm/deals/${deal.id}/won`);
         toast.success(`${deal.title} marked as won`);
       } catch (err) {
-        setClosed((prev) => {
-          const next = new Set(prev);
-          next.delete(deal.id);
-          return next;
-        });
+        rollback();
         toast.error(err instanceof Error ? err.message : "Couldn't mark the deal as won");
       }
     },
-    []
+    [close, rollback]
   );
 
   async function moveTo(deal: Deal, stageId: string) {
     if (deal.stageId === stageId) return;
-    setMoved((prev) => ({ ...prev, [deal.id]: stageId }));
+    editDeals((list) => list.map((d) => (d.id === deal.id ? { ...d, stageId } : d)));
     const orgId = localStorage.getItem("activeOrgId");
     try {
       const res = await fetch(`/api/v1/crm/deals/${deal.id}/stage`, {
@@ -172,13 +152,12 @@ function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines:
         headers: { "content-type": "application/json", ...(orgId ? { "x-organization-id": orgId } : {}) },
         body: JSON.stringify({ stageId }),
       });
-      if (!res.ok) throw new Error("Couldn't move the deal");
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Couldn't move the deal");
+      }
     } catch (err) {
-      setMoved((prev) => {
-        const next = { ...prev };
-        delete next[deal.id];
-        return next;
-      });
+      rollback();
       toast.error(err instanceof Error ? err.message : "Couldn't move the deal");
     }
   }
@@ -197,7 +176,7 @@ function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines:
     else void moveTo(deal, target);
   }
 
-  if (error) return <ErrorState message={error} onRetry={refresh} />;
+  if (error && !data) return <ErrorState message="We couldn't load this list. Check your connection and try again." onRetry={() => void refetch()} />;
 
   return (
     <div className="@container space-y-4">
@@ -314,7 +293,8 @@ function Board({ pipeline, pipelines, onPick }: { pipeline: Pipeline; pipelines:
         deal={losing}
         onClose={() => setLosing(null)}
         onLost={(deal) => {
-          setClosed((prev) => new Set(prev).add(deal.id));
+          // Already saved (and refreshing), so just hide it now
+          close(deal.id, false);
           setLosing(null);
         }}
       />
@@ -479,7 +459,7 @@ function LostDialog({ deal, onClose, onLost }: { deal: Deal | null; onClose: () 
 /*  First run                                                          */
 /* ------------------------------------------------------------------ */
 
-function PipelineSetup({ onCreated }: { onCreated: () => void }) {
+function PipelineSetup() {
   const [busy, setBusy] = useState(false);
 
   async function create() {
@@ -487,7 +467,6 @@ function PipelineSetup({ onCreated }: { onCreated: () => void }) {
     try {
       await postJson("/api/v1/crm/pipelines", { name: "Sales pipeline", stages: DEFAULT_STAGES, isDefault: true });
       toast.success("Pipeline created");
-      onCreated();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't set up the pipeline");
     } finally {

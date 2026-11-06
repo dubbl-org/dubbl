@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
-import { RootProvider } from "fumadocs-ui/provider/next";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
-import "fumadocs-ui/style.css";
+import { DesktopBridge } from "@/components/shared/desktop-bridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -114,10 +113,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} font-sans antialiased`}
       >
         <ThemeProvider>
-          <RootProvider>
-            <SessionProvider>{children}</SessionProvider>
-          </RootProvider>
+          <SessionProvider>{children}</SessionProvider>
           <Toaster richColors position="bottom-right" />
+          <DesktopBridge />
         </ThemeProvider>
       </body>
     </html>

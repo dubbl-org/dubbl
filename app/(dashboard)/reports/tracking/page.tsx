@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layers } from "lucide-react";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { ContentReveal } from "@/components/ui/content-reveal";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/table";
 import { formatMoney } from "@/lib/money";
 import { BackToReports, ReportHelp, BasisToggle } from "../_components";
+import { useApi } from "@/lib/query/use-api";
+import { DownloadLink } from "@/components/dashboard/download-link";
 
 interface ColumnDesc {
   key: string;
@@ -51,40 +53,17 @@ type Dimension = "costCenterId" | "projectId";
 
 export default function TrackingReportPage() {
   const now = new Date();
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
   const [basis, setBasis] = useState<"accrual" | "cash">("accrual");
   const [dimension, setDimension] = useState<Dimension>("costCenterId");
-  const [data, setData] = useState<TrackingResponse | null>(null);
+  const { data: report, loading } = useApi<TrackingResponse>(
+    `/api/v1/reports/tracking-category?${new URLSearchParams({ startDate, endDate, basis, dimension, mode: "pnl" })}`,
+    { keepPrevious: true }
+  );
+  const data = report?.columns ? report : null;
 
-  useEffect(() => {
-    const orgId = localStorage.getItem("activeOrgId");
-    if (!orgId) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate, basis, dimension, mode: "pnl" });
-    fetch(`/api/v1/reports/tracking-category?${params}`, {
-      headers: { "x-organization-id": orgId },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        if (d.columns) setData(d);
-        else setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialLoad(false);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [startDate, endDate, basis, dimension]);
-
-  if (initialLoad) return <BrandLoader />;
+  if (loading) return <BrandLoader />;
 
   const columns = data?.columns ?? [];
   const dimQueryKey = dimension === "projectId" ? "projectId" : "costCenterId";
@@ -104,12 +83,13 @@ export default function TrackingReportPage() {
         title="Profit by team or project"
         description="Money in vs money out, split into a column for each team or project."
       >
-        <a
+        <DownloadLink
           href={`/api/v1/reports/tracking-category?${new URLSearchParams({ startDate, endDate, basis, dimension, mode: "pnl", format: "xlsx" })}`}
+          filename="profit-by-tracking.xlsx"
           className="inline-flex h-8 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
         >
           Export spreadsheet
-        </a>
+        </DownloadLink>
       </PageHeader>
 
       <ReportHelp>
@@ -149,9 +129,7 @@ export default function TrackingReportPage() {
         </div>
       </div>
 
-      {loading ? (
-        <BrandLoader className="h-48" />
-      ) : !data || columns.length === 0 ? (
+      {!data || columns.length === 0 ? (
         <ContentReveal>
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
             <div className="flex size-12 items-center justify-center rounded-lg bg-muted">

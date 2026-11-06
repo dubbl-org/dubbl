@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { portalAccessToken, invoice, documentTemplate, organization } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, notInArray } from "drizzle-orm";
+import { PORTAL_HIDDEN_INVOICE_STATUSES } from "@/lib/api/portal-access";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { notFound, error, handleError } from "@/lib/api/response";
 import { generateInvoiceHtml } from "@/lib/documents/pdf-generator";
@@ -33,7 +34,9 @@ export async function GET(
       where: and(
         eq(invoice.id, id),
         eq(invoice.organizationId, access.organizationId),
-        eq(invoice.contactId, access.contactId)
+        eq(invoice.contactId, access.contactId),
+        notInArray(invoice.status, [...PORTAL_HIDDEN_INVOICE_STATUSES]),
+        notDeleted(invoice.deletedAt)
       ),
       with: { lines: true, contact: true },
     });

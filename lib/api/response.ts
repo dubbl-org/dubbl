@@ -4,6 +4,9 @@ import { AuthError } from "./auth-context";
 import { PeriodLockedError } from "./period-lock";
 import { LimitExceededError } from "./check-limit";
 import { MissingExchangeRateError } from "@/lib/currency/converter";
+import { ApprovalError } from "@/lib/approvals/errors";
+import { LineReferenceError } from "./line-stock-refs";
+import { BackupRestoreError } from "./backup-errors";
 import { safeStringify } from "./redact";
 
 function json(data: unknown, status = 200) {
@@ -48,6 +51,12 @@ export function handleError(err: unknown) {
   }
   if (err instanceof MissingExchangeRateError) {
     return NextResponse.json({ error: err.message }, { status: 422 });
+  }
+  if (err instanceof ApprovalError || err instanceof LineReferenceError) {
+    return NextResponse.json({ error: err.message }, { status: err.status });
+  }
+  if (err instanceof BackupRestoreError) {
+    return NextResponse.json({ error: err.message }, { status: err.status });
   }
   if (err instanceof z.ZodError) {
     const message = err.issues.map((i) => i.message).join(", ");

@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { isValidCurrencyCode } from "@/lib/currency/iso4217";
 import { auth } from "@/lib/auth";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
+import { getRequestUserId } from "@/lib/api/app-auth";
 import { requireRole } from "@/lib/api/require-role";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -17,6 +18,7 @@ import { createElement } from "react";
 import { OrgCreatedEmail } from "@/lib/email/templates/org-created";
 import { sendPlatformEmail } from "@/lib/email/resend-client";
 import { setUpOrganization } from "@/lib/api/org-setup";
+import { deleteOrganization } from "@/lib/api/delete-organization";
 import { getChartTemplate } from "@/lib/db/chart-templates";
 import { getCountrySetup } from "@/lib/country-setup";
 import { toAppUrl } from "@/lib/public-url";
@@ -44,6 +46,14 @@ const updateSchema = z
     defaultPaymentTerms: z.string().nullable().optional(),
     industrySector: z.string().nullable().optional(),
     referralSource: z.string().nullable().optional(),
+    peppolId: z.string().nullable().optional(),
+    peppolScheme: z.string().nullable().optional(),
+    // Late-payment interest for Charge interest on overdue invoices: annual
+    // rate in basis points (850 = 8.5%, null = not set), simple or daily
+    // compound, and days after the due date before interest starts.
+    interestRate: z.number().int().min(0).max(100000).nullable().optional(),
+    interestMethod: z.enum(["simple", "compound"]).nullable().optional(),
+    interestGraceDays: z.number().int().min(0).max(3650).optional(),
     // Set-up choices (first country save): which default chart to use — omit
     // for the country's default — and whether the business is registered for
     // VAT/GST/sales tax (false = rates seeded, but defaulting to "No VAT").
@@ -72,9 +82,11 @@ const createSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    // If x-organization-id header present, return single org
+    // Return the single org when one is picked: by x-organization-id, or by an
+    // API key (a key already belongs to exactly one organization)
     const orgId = request.headers.get("x-organization-id");
-    if (orgId) {
+    const isApiKey = request.headers.get("authorization")?.startsWith("Bearer dk_");
+    if (orgId || isApiKey) {
       const ctx = await getAuthContext(request);
       const org = await db.query.organization.findFirst({
         where: eq(organization.id, ctx.organizationId),
@@ -82,14 +94,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ organization: org });
     }
 
-    // Otherwise list all orgs for the session user
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Otherwise list all orgs for the signed-in user (browser session or native app)
+    const userId = await getRequestUserId(request);
+    if (!userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const memberships = await db.query.member.findMany({
-      where: eq(member.userId, session.user.id),
+      where: eq(member.userId, userId),
       with: { organization: true },
     });
 
@@ -184,10 +196,10 @@ export async function POST(request: Request) {
         userId: session.user!.id!,
         role: "owner",
       });
-      const selfHosted = isSelfHostedUnlimited();
+      const selfHosted = await isSelfHostedUnlimited();
       await tx.insert(subscription).values({
         organizationId: orgId,
-        plan: selfHosted ? "pro" : "free",
+        plan: selfHosted ? "ultimate" : "free",
         status: "active",
         ...(selfHosted ? { managedBy: "manual" } : {}),
       });
@@ -235,10 +247,10 @@ export async function PATCH(request: Request) {
 
     // The getting-started checklist can be dismissed by any member, so a
     // non-owner isn't dead-ended on it. Only when the PATCH touches another
-    // org-settings field do we require the owner-level manage:billing role.
+    // org-settings field do we require manage:organization (admins and the owner).
     const onlyTogglesOnboarding =
       Object.keys(parsed).length === 1 && parsed.onboardingCompleted !== undefined;
-    requireRole(ctx, onlyTogglesOnboarding ? "view:data" : "manage:billing");
+    requireRole(ctx, onlyTogglesOnboarding ? "view:data" : "manage:organization");
 
     const existing = await db.query.organization.findFirst({
       where: eq(organization.id, ctx.organizationId),
@@ -316,6 +328,47 @@ export async function PATCH(request: Request) {
     }
     const message = err instanceof Error ? err.message : "Internal error";
     console.error("PATCH /organization error:", message, err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+const deleteSchema = z.object({
+  // The organization's name, typed by the owner to confirm.
+  confirmName: z.string(),
+});
+
+// Permanently delete the organization and all its data (owner only).
+export async function DELETE(request: Request) {
+  try {
+    const ctx = await getAuthContext(request);
+    requireRole(ctx, "delete:organization");
+
+    const parsed = deleteSchema.parse(await request.json().catch(() => ({})));
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+    });
+    if (!org) {
+      return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    }
+    if (parsed.confirmName.trim() !== org.name.trim()) {
+      return NextResponse.json(
+        { error: "Type the organization's name exactly to confirm" },
+        { status: 400 }
+      );
+    }
+
+    await deleteOrganization(ctx.organizationId);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
+    }
+    const message = err instanceof Error ? err.message : "Internal error";
+    console.error("DELETE /organization error:", message, err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

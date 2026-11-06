@@ -12,9 +12,9 @@ import { z } from "zod";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   sku: z.string().nullable().optional(),
-  purchasePrice: z.number().int().optional(),
-  salePrice: z.number().int().optional(),
-  quantityOnHand: z.number().int().optional(),
+  purchasePrice: z.number().int().min(0).optional(),
+  salePrice: z.number().int().min(0).optional(),
+  quantityOnHand: z.number().int().min(0).optional(),
   options: z.record(z.string(), z.string()).optional(),
   isActive: z.boolean().optional(),
 });
