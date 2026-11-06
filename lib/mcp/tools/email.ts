@@ -217,7 +217,10 @@ export function registerEmailTools(server: McpServer, ctx: AuthContext) {
             const { invoice } = await import("@/lib/db/schema");
             const { renderInvoicePdf } = await import("@/lib/documents/pdf-renderer");
             const inv = await db.query.invoice.findFirst({
-              where: eq(invoice.id, logEntry.documentId),
+              where: and(
+                eq(invoice.id, logEntry.documentId),
+                eq(invoice.organizationId, ctx.organizationId)
+              ),
               with: { lines: true, contact: true },
             });
             if (inv) {
