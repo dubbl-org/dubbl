@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <title>Connect to dubbl</title>
+  <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+  <div class="drag"></div>
+  <main>
+    <svg class="logo" viewBox="0 0 40 32" fill="currentColor" aria-label="dubbl"><path d="M18 4v.19a11.5 11.5 0 0 1 5.5 9.81v4a11.5 11.5 0 0 1-5.5 9.81V28h8a10 10 0 0 0 10-10v-4A10 10 0 0 0 26 4h-8z"/><path d="M4 4h8a10 10 0 0 1 10 10v4a10 10 0 0 1-10 10H4V4z"/></svg>
+    <h1>Welcome to dubbl</h1>
+    <p class="lede">Choose where your books live.</p>
+
+    <form id="form" class="options" novalidate>
+      <button type="button" class="option" data-choice="cloud" aria-pressed="true">
+        <span class="dot"></span>
+        <span><span class="title">dubbl Cloud</span><br /><span class="sub" id="cloud-host">dubbl.dev</span></span>
+      </button>
+      <button type="button" class="option" data-choice="self" aria-pressed="false">
+        <span class="dot"></span>
+        <span><span class="title">Self-hosted</span><br /><span class="sub">Your own dubbl server</span></span>
+      </button>
+      <div class="self-hosted" id="self-hosted">
+        <input id="url" type="text" placeholder="books.example.com" spellcheck="false" autocomplete="url" />
+      </div>
+      <button type="submit" class="primary" id="submit">Continue</button>
+    </form>
+    <div class="error" id="error" role="alert"></div>
+  </main>
+  <script src="connect.js"></script>
+</body>
+</html>

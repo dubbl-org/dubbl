@@ -1,0 +1,38 @@
+appId: dev.dubbl.desktop
+productName: dubbl
+copyright: Copyright © dubbl
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - static/**/*
+  - package.json
+mac:
+  category: public.app-category.finance
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Set CSC_LINK / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID in CI to sign and notarize.
+  notarize: true
+dmg:
+  title: dubbl
+win:
+  target: [nsis]
+nsis:
+  oneClick: true
+  perMachine: false
+linux:
+  target: [AppImage, deb]
+  category: Office
+  maintainer: dubbl
+publish:
+  provider: github
+  owner: dubbl-org
+  repo: dubbl
+  releaseType: release

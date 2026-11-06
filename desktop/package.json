@@ -1,0 +1,37 @@
+{
+  "name": "dubbl-desktop",
+  "productName": "dubbl",
+  "version": "0.1.0",
+  "description": "dubbl for macOS, Windows and Linux",
+  "private": true,
+  "license": "Apache-2.0",
+  "author": "dubbl",
+  "homepage": "https://dubbl.dev",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "dev": "tsc -p . && DUBBL_URL=${DUBBL_URL:-http://localhost:3000} electron .",
+    "start": "tsc -p . && electron .",
+    "dist": "tsc -p . && electron-builder",
+    "dist:mac": "tsc -p . && electron-builder --mac",
+    "dist:win": "tsc -p . && electron-builder --win",
+    "dist:linux": "tsc -p . && electron-builder --linux"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+/* The connect and offline screens. Monochrome like the web app; the window's
+   native material shows through on macOS and Windows. */
+:root {
+  color-scheme: light dark;
+  --ink: #0a0a0a;
+  --muted: #737373;
+  --hairline: rgba(0, 0, 0, 0.08);
+  --field: rgba(255, 255, 255, 0.72);
+  --field-focus: #ffffff;
+  --tint: rgba(0, 0, 0, 0.045);
+  --tint-strong: rgba(0, 0, 0, 0.075);
+  --button: #171717;
+  --button-ink: #ffffff;
+  --danger: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #fafafa;
+    --muted: #a3a3a3;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --field: rgba(255, 255, 255, 0.06);
+    --field-focus: rgba(255, 255, 255, 0.1);
+    --tint: rgba(255, 255, 255, 0.06);
+    --tint-strong: rgba(255, 255, 255, 0.1);
+    --button: #fafafa;
+    --button-ink: #0a0a0a;
+    --danger: #f87171;
+  }
+}
+html[data-desktop="linux"] body { background: #f5f5f3; }
+@media (prefers-color-scheme: dark) {
+  html[data-desktop="linux"] body { background: #050505; }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drag { position: fixed; inset: 0 0 auto 0; height: 44px; -webkit-app-region: drag; }
+
+main { width: 360px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.logo { width: 40px; height: 32px; color: var(--ink); }
+h1 { margin: 22px 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+p.lede { margin: 0 0 26px; color: var(--muted); }
+
+.options { width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.option {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border: 0; border-radius: 10px; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: default;
+}
+.option:hover { background: var(--tint); }
+.option[aria-pressed="true"] { background: var(--tint-strong); }
+.option .title { font-weight: 500; }
+.option .sub { color: var(--muted); font-size: 12px; }
+.option .dot {
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 0 0 1.5px var(--hairline), inset 0 0 0 1.5px var(--muted);
+}
+.option[aria-pressed="true"] .dot { box-shadow: inset 0 0 0 5px var(--ink); }
+
+input {
+  width: 100%; height: 38px; margin-top: 8px; padding: 0 12px;
+  border: 1px solid var(--hairline); border-radius: 9px;
+  background: var(--field); color: var(--ink); font: inherit; outline: none;
+  user-select: text;
+}
+input:focus { background: var(--field-focus); border-color: var(--muted); }
+.self-hosted { width: 100%; overflow: hidden; max-height: 0; transition: max-height 0.2s ease; }
+.self-hosted.open { max-height: 60px; }
+
+button.primary {
+  width: 100%; height: 38px; margin-top: 18px; border: 0; border-radius: 9px;
+  background: var(--button); color: var(--button-ink); font: inherit; font-weight: 500;
+}
+button.primary:disabled { opacity: 0.4; }
+button.link {
+  margin-top: 12px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px;
+}
+button.link:hover { color: var(--ink); }
+.error { min-height: 18px; margin-top: 10px; color: var(--danger); font-size: 12.5px; }
