@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AuthError } from "@/lib/api/auth-context";
 import type { AuthContext } from "@/lib/api/auth-context";
 import { LimitExceededError } from "@/lib/api/check-limit";
+import { PeriodLockedError } from "@/lib/api/period-lock";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -37,6 +38,19 @@ export function wrapTool<T>(
                 error: "Validation error",
                 details: err.issues.map((i) => i.message),
               }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (err instanceof PeriodLockedError) {
+        // Same as handleError (REST): 422 with the lock message, so the agent
+        // learns the period is locked instead of seeing "Internal error".
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ error: err.message, status: 422 }),
             },
           ],
           isError: true,
