@@ -7,6 +7,8 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
+import { assertNotLocked } from "@/lib/api/period-lock";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
 
 export async function GET(
   request: Request,
@@ -57,11 +59,32 @@ export async function DELETE(
     if (!run) return notFound("Payroll run");
 
     if (run.status === "completed") {
-      // Void instead of delete
-      await db
-        .update(payrollRun)
-        .set({ status: "void" })
-        .where(eq(payrollRun.id, id));
+      // Void instead of delete. Processing posted the run to the GL (dated
+      // payPeriodEnd), so post a reversing entry on that same date — blocked
+      // if the period is locked — rather than leaving wages/liabilities live.
+      if (run.journalEntryId) {
+        await assertNotLocked(ctx.organizationId, run.payPeriodEnd, ctx);
+      }
+      await db.transaction(async (tx) => {
+        if (run.journalEntryId) {
+          await reverseJournalEntry(
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            {
+              entryId: run.journalEntryId,
+              date: run.payPeriodEnd,
+              description: `Void payroll ${run.payPeriodStart} to ${run.payPeriodEnd}`,
+              reference: `PR-${run.id.slice(0, 8)}`,
+              sourceType: "payroll_void",
+              sourceId: run.id,
+            },
+            tx
+          );
+        }
+        await tx
+          .update(payrollRun)
+          .set({ status: "void" })
+          .where(eq(payrollRun.id, id));
+      });
 
       logAudit({
         ctx,
