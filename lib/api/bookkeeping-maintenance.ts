@@ -385,7 +385,10 @@ export async function processBookkeepingMaintenance(): Promise<{
 }> {
   const depreciation = await processDepreciation();
   const loanPayments = await processLoanPayments();
-  const revenueRecognition = await processRevenueRecognition();
+  // Paused: invoice posting already credits revenue in full and schedule
+  // creation posts no deferral, so each recognition double-counts revenue.
+  // Re-enable (call processRevenueRecognition) once the deferral entry exists.
+  const revenueRecognition = { processed: 0, skipped: 0 };
 
   // Auto-reconcile for all orgs with unreconciled transactions
   let totalChecked = 0;
