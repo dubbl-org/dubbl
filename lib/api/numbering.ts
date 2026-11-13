@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { numberSequence } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /**
  * Get next sequential number for an entity type.
@@ -52,14 +52,29 @@ export async function getNextNumber(
 
     const next = maxNum + 1;
 
-    await tx.insert(numberSequence).values({
-      organizationId,
-      entityType,
-      prefix,
-      lastNumber: next,
-    });
+    // ON CONFLICT: two concurrent first callers both miss the row above; the
+    // loser must not hit number_sequence_org_entity_idx (500). It waits for
+    // the winner's insert to commit, then locks and increments that row.
+    const [inserted] = await tx
+      .insert(numberSequence)
+      .values({
+        organizationId,
+        entityType,
+        prefix,
+        lastNumber: next,
+      })
+      .onConflictDoNothing({ target: [numberSequence.organizationId, numberSequence.entityType] })
+      .returning({ id: numberSequence.id });
+    if (inserted) return `${prefix}-${next.toString().padStart(5, "0")}`;
 
-    return `${prefix}-${next.toString().padStart(5, "0")}`;
+    const [row] = await tx
+      .select({ id: numberSequence.id, lastNumber: numberSequence.lastNumber })
+      .from(numberSequence)
+      .where(and(eq(numberSequence.organizationId, organizationId), eq(numberSequence.entityType, entityType)))
+      .for("update");
+    const bumped = row.lastNumber + 1;
+    await tx.update(numberSequence).set({ lastNumber: bumped }).where(eq(numberSequence.id, row.id));
+    return `${prefix}-${bumped.toString().padStart(5, "0")}`;
   });
 }
 
