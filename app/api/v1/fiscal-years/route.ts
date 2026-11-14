@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { fiscalYear } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:accounts");
     const body = await request.json();
     const parsed = createSchema.parse(body);
 

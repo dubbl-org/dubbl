@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTopbarAction } from "@/components/dashboard/topbar";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/shared/currency-input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -37,12 +37,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { formatMoney } from "@/lib/money";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
 
@@ -266,7 +267,7 @@ export default function CompensationPage() {
     )
   );
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   const hasData = bands.length > 0 || reviews.length > 0;
   const activeReviews = reviews.filter((r) => r.status === "in_progress" || r.status === "draft");

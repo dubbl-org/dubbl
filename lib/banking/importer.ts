@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
+import { organization,
   bankAccount,
   bankStatementImport,
   bankTransaction,
@@ -80,6 +80,11 @@ export interface CommitImportResult extends ImportPreviewResult {
   imported: number;
   duplicateCount: number;
   importId: string;
+  /**
+   * Currencies whose rates still have to be fetched, so the caller can queue
+   * that work after responding. Empty when every row is in the base currency.
+   */
+  ratesNeeded?: string[];
 }
 
 export async function previewBankStatementImport(
@@ -244,11 +249,26 @@ export async function commitBankStatementImport(
     })
     .where(eq(bankStatementImport.id, importRow.id));
 
+  // A transaction in a currency the org has no rate for cannot post, so the
+  // caller pulls the dated rate afterwards rather than making the import wait.
+  const base = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { defaultCurrency: true },
+  });
+  const ratesNeeded = [
+    ...new Set(
+      insertedRows
+        .map((r) => r.currencyCode ?? account?.currencyCode ?? base?.defaultCurrency)
+        .filter((c): c is string => Boolean(c) && c !== base?.defaultCurrency)
+    ),
+  ];
+
   return {
     ...preview,
     imported: insertedRows.length,
     duplicateCount: preview.duplicates.length,
     importId: importRow.id,
+    ratesNeeded,
   };
 }
 

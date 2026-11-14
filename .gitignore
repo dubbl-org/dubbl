@@ -50,3 +50,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Internal notes, handoffs and local credentials never belong in git.
+planning/
+/credentials/
+/cli/credentials/
+/cli/__pycache__/

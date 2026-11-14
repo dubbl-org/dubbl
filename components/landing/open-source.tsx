@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Github, Eye, Unlock, Users } from "lucide-react";
+import { Eye, Unlock, Users } from "lucide-react";
+import { GithubIcon } from "@/components/brand-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/shared/container";
@@ -164,7 +165,7 @@ export function OpenSource() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Github className="size-4" />
+                    <GithubIcon className="size-4" />
                     View Repository
                   </a>
                 </Button>

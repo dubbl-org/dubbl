@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bankTransaction, bankAccount, payment, paymentAllocation, invoice, bill, journalEntry, auditLog } from "@/lib/db/schema";
+import { bankTransaction, bankAccount, payment, paymentAllocation, invoice, bill, expenseClaim, journalEntry, auditLog } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -120,6 +120,27 @@ export async function POST(
           }
         }
 
+        // Founder-funding match (expense claim consumed by this line): void the
+        // journal (below, same as a categorization) AND release the claim back
+        // to draft, so it can be edited, resubmitted or re-matched. Without
+        // this the claim would be stuck in 'founder_funded' forever.
+        let restoredExpenseClaimId: string | null = null;
+        if (transaction.expenseClaimId) {
+          const claim = await tx.query.expenseClaim.findFirst({
+            where: and(
+              eq(expenseClaim.id, transaction.expenseClaimId),
+              eq(expenseClaim.organizationId, ctx.organizationId)
+            ),
+          });
+          if (claim && claim.status === "founder_funded") {
+            await tx
+              .update(expenseClaim)
+              .set({ status: "draft", journalEntryId: null, updatedAt: new Date() })
+              .where(eq(expenseClaim.id, claim.id));
+            restoredExpenseClaimId = claim.id;
+          }
+        }
+
         if (linkedPayment) {
           linkedPaymentId = linkedPayment.id;
 
@@ -231,6 +252,7 @@ export async function POST(
             status: "unreconciled",
             reconciliationId: null,
             journalEntryId: null,
+            expenseClaimId: null,
             transferTransactionId: null,
             transferGroupId: null,
           })
@@ -251,6 +273,7 @@ export async function POST(
             voidedJournalEntryId,
             unwoundTransferLegId,
             deletedTransferMirror,
+            restoredExpenseClaimId,
           },
         });
 

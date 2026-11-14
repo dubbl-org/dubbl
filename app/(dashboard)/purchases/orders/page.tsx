@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import {
   Select,
   SelectContent,
@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/select";
 import { formatMoney } from "@/lib/money";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { motion, MotionConfig } from "motion/react";
 
 interface PO {
@@ -266,7 +267,7 @@ export default function PurchaseOrdersPage() {
   const activeValue = (countsData?.counts.sent?.amount || 0) + (countsData?.counts.partial?.amount || 0);
   const activeCount = (statusCounts.sent || 0) + (statusCounts.partial || 0);
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   if ((countsData?.total || 0) === 0 && statusFilter === "all" && !debouncedSearch && !hasFilters) {
     return (

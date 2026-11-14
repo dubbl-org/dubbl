@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { webhook, webhookDelivery } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { retryWebhookDeliveryTask } from "@/trigger/webhooks";
+import { assertPublicHttpsUrl, UnsafeUrlError } from "@/lib/api/url-guard";
+
+// Response bodies are attacker-influenced (the receiver chooses them) and are
+// echoed back to the caller, so keep only a bounded prefix.
+const MAX_STORED_RESPONSE_BYTES = 4000;
 
 // Retry backoff schedule in minutes
 const RETRY_BACKOFF = [1, 5, 30, 120, 720]; // 1m, 5m, 30m, 2h, 12h
@@ -39,6 +44,10 @@ export async function deliverWebhook(
 
   // 4. POST to URL with headers
   try {
+    // Re-validate at send time: a row may predate the guard, and the DNS answer
+    // may have changed since it was created.
+    await assertPublicHttpsUrl(wh.url);
+
     const res = await fetch(wh.url, {
       method: "POST",
       headers: {
@@ -49,9 +58,12 @@ export async function deliverWebhook(
       },
       body,
       signal: AbortSignal.timeout(10_000),
+      // A redirect would let a public URL reach an internal address that the
+      // pre-flight check just cleared.
+      redirect: "manual",
     });
 
-    const responseBody = await res.text().catch(() => "");
+    const responseBody = (await res.text().catch(() => "")).slice(0, MAX_STORED_RESPONSE_BYTES);
 
     if (res.ok) {
       const [updated] = await db
@@ -70,7 +82,15 @@ export async function deliverWebhook(
       await scheduleRetry(delivery.id, 1, res.status, responseBody);
     }
   } catch (err) {
-    await scheduleRetry(delivery.id, 1, null, String(err));
+    // A blocked URL is not retryable — retrying just repeats the refusal.
+    const blocked = err instanceof UnsafeUrlError;
+    await scheduleRetry(
+      delivery.id,
+      1,
+      null,
+      blocked ? `Blocked: ${err.message}` : String(err),
+      blocked
+    );
   }
 
   return db.query.webhookDelivery.findFirst({
@@ -83,12 +103,13 @@ async function scheduleRetry(
   attempt: number,
   responseStatus: number | null,
   responseBody: string,
+  terminal = false,
 ) {
   const backoffIndex = Math.min(attempt - 1, RETRY_BACKOFF.length - 1);
   const nextRetryMinutes = RETRY_BACKOFF[backoffIndex];
   const nextRetryAt = new Date(Date.now() + nextRetryMinutes * 60 * 1000);
   const maxAttempts = 5;
-  const status = attempt >= maxAttempts ? "failed" : "retrying";
+  const status = terminal || attempt >= maxAttempts ? "failed" : "retrying";
 
   await db
     .update(webhookDelivery)
@@ -159,6 +180,7 @@ export async function retryWebhookDeliveryById(deliveryId: string) {
   const nextAttempt = delivery.attempts + 1;
 
   try {
+    await assertPublicHttpsUrl(wh.url);
     const res = await fetch(wh.url, {
       method: "POST",
       headers: {
@@ -169,9 +191,10 @@ export async function retryWebhookDeliveryById(deliveryId: string) {
       },
       body,
       signal: AbortSignal.timeout(10_000),
+      redirect: "manual",
     });
 
-    const responseBody = await res.text().catch(() => "");
+    const responseBody = (await res.text().catch(() => "")).slice(0, MAX_STORED_RESPONSE_BYTES);
 
     if (res.ok) {
       await db

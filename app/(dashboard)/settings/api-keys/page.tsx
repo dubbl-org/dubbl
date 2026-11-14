@@ -16,7 +16,7 @@ import {
   SheetFooter,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 
 interface ApiKeyItem {
   id: string;

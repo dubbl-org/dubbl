@@ -13,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import { BulkImportWizard } from "@/components/bulk-import-wizard";
 import { getMapping, aliasesToRecord } from "@/lib/import-export/mappings";
 import type { SourceSystem, ImportEntity } from "@/lib/import-export/types";

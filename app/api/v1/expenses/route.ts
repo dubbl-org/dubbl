@@ -8,6 +8,7 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { decimalToMinorUnits } from "@/lib/money";
+import { isOrgOwnedKey } from "@/lib/s3";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
@@ -126,7 +127,11 @@ export async function POST(request: Request) {
         isMileage: item.isMileage ?? false,
         distanceMiles: item.isMileage ? (item.distanceMiles ?? null) : null,
         mileageRate: item.isMileage ? (item.mileageRate ?? null) : null,
-        receiptFileKey: item.receiptFileKey || null,
+        // Client-supplied: it must point inside this org's own object prefix.
+        receiptFileKey:
+          item.receiptFileKey && isOrgOwnedKey(item.receiptFileKey, ctx.organizationId)
+            ? item.receiptFileKey
+            : null,
         receiptFileName: item.receiptFileName || null,
         sortOrder: i,
       };

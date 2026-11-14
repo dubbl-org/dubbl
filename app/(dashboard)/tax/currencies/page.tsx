@@ -32,7 +32,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 
 interface Currency {
   id: string;

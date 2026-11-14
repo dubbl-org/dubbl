@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   bankTransaction,
   bankAccount,
+  expenseClaim,
   bill,
   invoice,
   payment,
@@ -30,7 +31,7 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 interface ExistingCandidate {
-  type: "existing_payment" | "existing_journal" | "transfer";
+  type: "existing_payment" | "existing_journal" | "transfer" | "existing_expense";
   id: string; // payment.id / journalEntry.id / opposite bankTransaction.id
   journalEntryId: string | null; // the JE to link (already posted)
   date: string;
@@ -341,7 +342,52 @@ export async function GET(
       }
     }
 
-    // --- (c) Opposite-sign bank transactions in OTHER accounts (transfers) ---
+    // --- (c) Draft expense claims this founder payment covers ---------------
+    // Money-out transactions on founder/loan accounts can consume an existing
+    // receipt-backed draft claim (see POST /match-expense). Same absolute
+    // amount, same currency, not already matched.
+    if (isOutgoing) {
+      const txAbs = Math.abs(transaction.amount);
+      const txCur = transaction.currencyCode || account.currencyCode;
+      const founderCandidates =
+        account.accountType === "loan" && account.chartAccountId
+          ? await db.query.expenseClaim.findMany({
+              where: and(
+                eq(expenseClaim.organizationId, ctx.organizationId),
+                eq(expenseClaim.status, "draft"),
+                eq(expenseClaim.currencyCode, txCur),
+                eq(expenseClaim.totalAmount, txAbs),
+                notDeleted(expenseClaim.deletedAt),
+                gte(expenseClaim.createdAt, new Date(Date.now() - 1000 * 60 * 60 * 24 * 365)),
+              ),
+              with: { items: true },
+              limit: 20,
+            })
+          : [];
+      for (const c of founderCandidates) {
+        const alreadyMatched = await db.query.bankTransaction.findFirst({
+          where: eq(bankTransaction.expenseClaimId, c.id),
+        });
+        if (alreadyMatched) continue;
+        existingCandidates.push({
+          type: "existing_expense",
+          id: c.id,
+          journalEntryId: null,
+          date: c.items[0]?.date || c.createdAt.toISOString().slice(0, 10),
+          description: c.title,
+          amount: -Math.abs(c.totalAmount),
+          meta: {
+            expenseClaimId: c.id,
+            title: c.title,
+            currencyCode: c.currencyCode,
+            totalAmount: c.totalAmount,
+            itemCount: c.items.length,
+          },
+        });
+      }
+    }
+
+    // --- (d) Opposite-sign bank transactions in OTHER accounts (transfers) ---
     // A money-out leg here pairs with a money-in leg elsewhere. We only surface
     // unreconciled, un-paired lines in other bank accounts of this org.
     const transferRows = await db

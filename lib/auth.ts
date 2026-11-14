@@ -6,6 +6,11 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "@/lib/api/rate-limit";
+
+// Constant-work target for the unknown-email path in credentials authorize
+// (timing-based email enumeration). Bcrypt hash of random data.
+const DUMMY_BCRYPT_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEeO7Ff7UiLzQSKiF4TnCBmCY0YCAa5YQ9S";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
@@ -35,13 +40,15 @@ export class TwoFactorRequiredError extends CredentialsSignin {
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   // Generate Apple client secret from .p8 key if configured,
   // otherwise use the default Apple provider (reads AUTH_APPLE_SECRET)
+  // allowDangerousEmailAccountLinking stays false (the default): combined with
+  // no email verification at registration, auto-linking lets anyone who
+  // registers a victim's email attach their own OAuth identity to that account.
   const appleProvider = process.env.AUTH_APPLE_KEY_BASE64
     ? Apple({
         clientId: process.env.AUTH_APPLE_ID,
         clientSecret: await getAppleClientSecret(),
-        allowDangerousEmailAccountLinking: true,
       })
-    : Apple({ allowDangerousEmailAccountLinking: true });
+    : Apple({ clientId: process.env.AUTH_APPLE_ID });
 
   return {
   ...authConfig,
@@ -53,7 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   }),
   providers: [
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
-      ? [Google({ allowDangerousEmailAccountLinking: true })]
+      ? [Google({})]
       : []),
     ...(process.env.AUTH_APPLE_ID && (process.env.AUTH_APPLE_KEY_BASE64 || process.env.AUTH_APPLE_SECRET)
       ? [appleProvider]
@@ -69,11 +76,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
+        // Per-account throttle: 10 attempts / 15 min.
+        if (!rateLimit(`login:${parsed.data.email.toLowerCase()}`, 10)) return null;
+
         const user = await db.query.users.findFirst({
           where: eq(users.email, parsed.data.email),
         });
 
-        if (!user?.passwordHash) return null;
+        // Equalize timing so sign-in cannot enumerate registered emails.
+        if (!user?.passwordHash) {
+          await bcrypt.compare(parsed.data.password, DUMMY_BCRYPT_HASH);
+          return null;
+        }
 
         const valid = await bcrypt.compare(
           parsed.data.password,
@@ -114,7 +128,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       const existingUser = await db.query.users.findFirst({
         where: eq(users.email, email),
       });
-      if (existingUser) return true;
+      if (existingUser) {
+        // 2FA is a promise to the user. Google/Apple sign-in cannot ask for a
+        // code, so for an account that has it enabled we refuse the OAuth path
+        // and send them to password + code instead of silently skipping it.
+        if (await isTwoFactorEnabled(existingUser.id)) {
+          return "/sign-in?error=2fa_required";
+        }
+        return true;
+      }
 
       // New OAuth user = registration
       const [{ count: userCount }] = await db

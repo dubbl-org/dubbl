@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { contractorPayment } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { getAuthContext } from "@/lib/api/auth-context";
+import { eq } from "drizzle-orm";import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, ok, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -19,12 +18,25 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
   try {
-    const { paymentId } = await params;
+    const { id, paymentId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:contractors");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    const payment = await db.query.contractorPayment.findFirst({
+      where: eq(contractorPayment.id, paymentId),
+      with: { contractor: true },
+    });
+    // contractor_payment rows carry no organizationId — scope via the contractor.
+    if (
+      !payment ||
+      payment.contractorId !== id ||
+      payment.contractor?.organizationId !== ctx.organizationId
+    ) {
+      return notFound("Payment");
+    }
 
     const [updated] = await db
       .update(contractorPayment)

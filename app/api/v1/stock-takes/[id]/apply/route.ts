@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -164,9 +165,12 @@ export async function POST(
         // an item with no recorded cost — quantity still trued up above).
         let entryId: string | null = null;
         if (glValue !== 0) {
+          await assertNotLocked(ctx.organizationId, today, ctx);
+
           const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
           const description = `Stock take ${st.name}${shortage ? " shortage" : " overage"}`;
           const [entry] = await tx
+
             .insert(journalEntry)
             .values({
               organizationId: ctx.organizationId,

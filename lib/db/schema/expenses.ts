@@ -18,6 +18,7 @@ export const expenseStatusEnum = pgEnum("expense_status", [
   "approved",
   "rejected",
   "paid",
+  "founder_funded",
 ]);
 
 // Expense Claim

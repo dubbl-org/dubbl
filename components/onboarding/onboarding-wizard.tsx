@@ -1,5 +1,6 @@
 "use client";
 
+import { setActiveOrgId } from "@/lib/active-org";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
@@ -171,7 +172,7 @@ export function OnboardingWizard() {
 
         const createData = await createRes.json();
         currentOrgId = createData.organization.id;
-        localStorage.setItem("activeOrgId", currentOrgId);
+        setActiveOrgId(currentOrgId);
       }
 
       const selectedCountry = COUNTRIES.find((c) => c.code === countryCode);
@@ -226,7 +227,7 @@ export function OnboardingWizard() {
       {hasOtherOrgs && (
         <button
           onClick={() => {
-            localStorage.setItem("activeOrgId", otherOrgId);
+            setActiveOrgId(otherOrgId);
             window.location.href = "/dashboard";
           }}
           className="mb-4 flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

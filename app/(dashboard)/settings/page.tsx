@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Lock } from "lucide-react";
+import { Check, ChevronsUpDown, Lock, Loader2, RefreshCcw } from "lucide-react";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { cn } from "@/lib/utils";
 import { COUNTRIES as ALL_COUNTRIES } from "@/lib/countries";
 import { PAYMENT_TERMS } from "@/lib/payment-terms";
@@ -66,6 +66,14 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+/** "Aug 2026, 2026" style label for the month currently being fetched. */
+function chunksLabel(from: string, to: string, done: number): string {
+  const start = new Date(`${from}T00:00:00Z`);
+  start.setUTCMonth(start.getUTCMonth() + done);
+  const label = start.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" });
+  return done === 0 ? `rates from ${label}` : `${label}`;
+}
+
 export default function SettingsPage() {
   const [, setOrg] = useState<OrgSettings | null>(null);
   const [form, setForm] = useState({
@@ -92,6 +100,91 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const [lockDate, setLockDate] = useState("");
+  const [ratesFrom, setRatesFrom] = useState(new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10));
+  const [ratesTo, setRatesTo] = useState(new Date().toISOString().slice(0, 10));
+  const [ratesPulling, setRatesPulling] = useState(false);
+  const [ratesResult, setRatesResult] = useState<{ stored: number; dates: number; skipped: string[] } | null>(null);
+  const [ratesProgress, setRatesProgress] = useState<{ done: number; total: number; stored: number } | null>(null);
+  const [ratesSuggested, setRatesSuggested] = useState<{
+    from: string;
+    to: string;
+    currencies: string[];
+    baseCurrency: string;
+    derived: boolean;
+  } | null>(null);
+  const [ratesTouched, setRatesTouched] = useState(false);
+
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/exchange-rates/backfill", { headers: { "x-organization-id": orgId } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setRatesSuggested(data);
+        setRatesFrom((prev) => (ratesTouched ? prev : data.from));
+        setRatesTo((prev) => (ratesTouched ? prev : data.to));
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function pullRates() {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+
+    // One request per month: the range stays inside any single request's
+    // timeout, and each finished month is a visible step rather than an
+    // unbroken wait with a spinning icon.
+    const chunks: Array<{ from: string; to: string; label: string }> = [];
+    const start = new Date(`${ratesFrom}T00:00:00Z`);
+    const end = new Date(`${ratesTo}T00:00:00Z`);
+    for (let d = new Date(start); d <= end; ) {
+      const monthStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+      const monthEnd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+      chunks.push({
+        from: (monthStart < start ? start : monthStart).toISOString().slice(0, 10),
+        to: (monthEnd > end ? end : monthEnd).toISOString().slice(0, 10),
+        label: monthStart.toLocaleString("en", { month: "short", year: "numeric", timeZone: "UTC" }),
+      });
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    }
+
+    setRatesPulling(true);
+    setRatesResult(null);
+    setRatesProgress({ done: 0, total: chunks.length, stored: 0 });
+
+    let stored = 0;
+    let dates = 0;
+    const skipped: string[] = [];
+    try {
+      for (const [index, chunk] of chunks.entries()) {
+        const res = await fetch("/api/v1/exchange-rates/backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-organization-id": orgId },
+          body: JSON.stringify({ from: chunk.from, to: chunk.to }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || `Could not fetch ${chunk.label}`);
+          break;
+        }
+        stored += data.stored ?? 0;
+        dates += data.dates ?? 0;
+        skipped.push(...(data.skipped ?? []));
+        setRatesProgress({ done: index + 1, total: chunks.length, stored });
+      }
+      if (stored > 0) {
+        setRatesResult({ stored, dates, skipped });
+        toast.success(`Stored ${stored} rates`);
+      }
+    } catch {
+      toast.error("Could not fetch rates");
+    } finally {
+      setRatesPulling(false);
+      setRatesProgress(null);
+    }
+  }
   const [lockSaving, setLockSaving] = useState(false);
   const [peppolId, setPeppolId] = useState("");
   const [peppolScheme, setPeppolScheme] = useState("");
@@ -563,6 +656,101 @@ export default function SettingsPage() {
       </Section>
 
       <div className="h-px bg-border" />
+
+      {/* Exchange rates */}
+      <Section
+        title="Exchange rates"
+        description="Foreign-currency postings need a rate for their date. Fetch the published rates for a range here; they are kept per day, imported statements pull their own, and a rate you enter by hand always wins."
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">From</Label>
+            <Input
+              type="date"
+              value={ratesFrom}
+              onChange={(e) => {
+                setRatesFrom(e.target.value);
+                setRatesTouched(true);
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">To</Label>
+            <Input
+              type="date"
+              value={ratesTo}
+              onChange={(e) => {
+                setRatesTo(e.target.value);
+                setRatesTouched(true);
+              }}
+            />
+          </div>
+          <Button size="sm" className="ml-auto gap-1.5" disabled={ratesPulling} onClick={pullRates}>
+            {ratesPulling ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCcw className="size-3.5" />}
+            {ratesPulling ? "Fetching" : "Fetch rates"}
+          </Button>
+        </div>
+        {ratesSuggested && ratesSuggested.currencies.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Pairs to sync:</span>
+            {ratesSuggested.currencies.map((code) => (
+              <span
+                key={code}
+                className="rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums"
+              >
+                {code} → {ratesSuggested.baseCurrency}
+              </span>
+            ))}
+          </div>
+        )}
+        {ratesSuggested && (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {ratesTouched ? (
+              <>Using the range you picked.</>
+            ) : ratesSuggested.derived ? (
+              <>
+                Range worked out from your books: the oldest transaction still waiting to post is{" "}
+                {ratesSuggested.from}, in {ratesSuggested.currencies.join(", ") || "a foreign currency"}.
+              </>
+            ) : (
+              <>Nothing is waiting on a rate right now, so this defaults to the last 90 days.</>
+            )}
+          </p>
+        )}
+        {ratesProgress ? (
+          <div className="mt-3 max-w-md space-y-1.5">
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="font-medium">
+                {ratesProgress.done < ratesProgress.total
+                  ? `Fetching ${chunksLabel(ratesFrom, ratesTo, ratesProgress.done)}`
+                  : "Finishing up"}
+              </span>
+              <span className="tabular-nums text-muted-foreground">
+                {ratesProgress.done}/{ratesProgress.total} months · {ratesProgress.stored} rates
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+                style={{ width: `${Math.round((ratesProgress.done / Math.max(ratesProgress.total, 1)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Covers every currency sitting unreconciled in your books, fetched one month at a time so
+            you can watch it progress. Weekends use the last published rate, and a rate you enter by
+            hand always wins.
+          </p>
+        )}
+        {ratesResult && (
+          <p className="mt-2 text-xs">
+            Stored {ratesResult.stored} rates across {ratesResult.dates} days
+            {ratesResult.skipped.length > 0 && `, ${ratesResult.skipped.length} days skipped`}
+            {ratesResult.skipped.length > 0 && ` (first: ${ratesResult.skipped[0]})`}.
+          </p>
+        )}
+      </Section>
 
       {/* Period Lock */}
       <Section title="Lock past dates" description="Lock past dates so they can't be changed. Once set, nothing dated on or before this day can be added or edited — useful after you've filed taxes or closed your books for a period.">

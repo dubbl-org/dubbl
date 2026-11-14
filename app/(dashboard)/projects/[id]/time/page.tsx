@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -656,8 +656,8 @@ export default function TimePage() {
                     background: "hsl(var(--card))",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
                   }}
-                  formatter={(value: number | undefined, name: string | undefined) => [
-                    `${value ?? 0}h`,
+                  formatter={(value, name) => [
+                    `${Number(value ?? 0)}h`,
                     name === "billable" ? "Billable" : "Total",
                   ]}
                   cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}

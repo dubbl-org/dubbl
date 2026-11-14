@@ -35,6 +35,7 @@ import { wrapTool } from "@/lib/mcp/errors";
 import { getNextNumber } from "@/lib/api/numbering";
 import { findMatches, type MatchCandidate } from "@/lib/banking/reconciliation-matcher";
 import { suggestAccounts } from "@/lib/banking/account-suggestions";
+import { matchExistingExpense, unmatchExpense, MatchExpenseConflict } from "@/lib/api/match-expense-op";
 import {
   createCategorizationJournalEntry,
   createPaymentJournalEntry,
@@ -2124,6 +2125,50 @@ export function registerBankTransactionTools(server: McpServer, ctx: AuthContext
         });
 
         return { journalEntryId: entry.id };
+      })
+  );
+
+  server.tool(
+    "match_expense_claim_to_bank_transaction",
+    "Match a bank transaction to an EXISTING receipt-backed expense claim instead of creating a new expense. Intended for founder current-account funding: the founder paid a vendor personally, so the company books the cost and records that it still owes the founder on the founder current account (a liability). Requirements: the bank account must be a loan-type account with a linked GL account; the claim must be a single-item DRAFT claim already categorized to an expense/prepaid account; the claim currency must equal the transaction currency; the claim total must equal the absolute transaction amount (both in integer cents: EUR 13.23 = 1323; the transaction amount is negative for money out, the claim total positive). Posts exactly one journal entry dated on the accounting date (defaults to the transaction date) as DR expense account / CR founder account, converted to the company base currency. A missing exchange rate fails with 422 before anything is written; pass rateOverride (integer on a 1,000,000 scale, e.g. 1.234567 = 1234567) to supply a historical rate, which is audited. Marks the transaction reconciled and the claim 'founder_funded' (it can no longer be submitted, approved, paid or matched again). Retries with the same ids return the existing match without posting again. Returns transactionId, expenseClaimId, journalEntryId, appliedRate, baseCurrency.",
+    {
+      transactionId: z.string().describe("UUID of the (unreconciled) bank transaction to match"),
+      expenseClaimId: z.string().describe("UUID of the existing draft expense claim to consume"),
+      date: z.string().optional().describe("Optional accounting date (YYYY-MM-DD) for the journal; defaults to the transaction date"),
+      rateOverride: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Optional historical exchange rate as an integer on a 1,000,000 scale (1.234567 = 1234567), claim currency to base currency; audited"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const result = await matchExistingExpense(ctx, {
+          transactionId: params.transactionId,
+          expenseClaimId: params.expenseClaimId,
+          date: params.date,
+          rateOverride: params.rateOverride,
+        });
+        return result;
+      })
+  );
+
+  server.tool(
+    "unmatch_expense_claim_from_bank_transaction",
+    "Undo a founder-funding match made by match_expense_claim_to_bank_transaction. Posts a reversing journal entry on the original entry's date (period locks apply), restores the expense claim to draft and the bank transaction to unreconciled, and releases the one-to-one link. Receipts, documents and the claim's items are untouched. Requires the exact transactionId and expenseClaimId of the existing match.",
+    {
+      transactionId: z.string().describe("UUID of the matched bank transaction"),
+      expenseClaimId: z.string().describe("UUID of the founder-funded expense claim"),
+      reason: z.string().optional().describe("Optional reason recorded in the audit log and the reversal"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        return await unmatchExpense(ctx, {
+          transactionId: params.transactionId,
+          expenseClaimId: params.expenseClaimId,
+          reason: params.reason,
+        });
       })
   );
 }
