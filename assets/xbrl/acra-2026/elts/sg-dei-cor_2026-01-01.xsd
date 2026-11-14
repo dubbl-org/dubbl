@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+       *************** Element declaration : 2026-01-01*************
+                      
+       *************** Document and entity information *************
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+	   -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-dei" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-dei="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-dei" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:sg-parts="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:sg-types="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../labels/sg-dei_2026-01-01_lab.xml" xlink:title="Label Linkbase" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../references/sg-dei_2026-01-01_ref.xml" xlink:title="Reference Linkbase" xlink:role="http://www.xbrl.org/2003/role/referenceLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/non-numeric" schemaLocation="http://www.xbrl.org/dtr/type/nonNumeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/numeric" schemaLocation="http://www.xbrl.org/dtr/type/numeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" schemaLocation="sg-types_2026-01-01.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" schemaLocation="sg-parts_2026-01-01.xsd"/>
+  <xsd:element name="DisclosureOfFilingInformationAbstract" id="sg-dei_DisclosureOfFilingInformationAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NameOfCompany" id="sg-dei_NameOfCompany" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="UniqueEntityNumber" id="sg-dei_UniqueEntityNumber" type="sg-types:UENItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherCompanyIsPreparingFinancialStatementsForFirstTimeSinceIncorporation" id="sg-dei_WhetherCompanyIsPreparingFinancialStatementsForFirstTimeSinceIncorporation" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherCompanyIsListedAsAtCurrentPeriodEndDate" id="sg-dei_WhetherCompanyIsListedAsAtCurrentPeriodEndDate" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfExchangeOnWhichCompanyIsListed" id="sg-dei_TypeOfExchangeOnWhichCompanyIsListed" type="sg-types:ListingItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="CurrentPeriodStartDate" id="sg-dei_CurrentPeriodStartDate" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="CurrentPeriodEndDate" id="sg-dei_CurrentPeriodEndDate" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="PriorPeriodStartDate" id="sg-dei_PriorPeriodStartDate" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="PriorPeriodEndDate" id="sg-dei_PriorPeriodEndDate" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="TypeOfAccountingStandardUsedToPrepareFinancialStatements" id="sg-dei_TypeOfAccountingStandardUsedToPrepareFinancialStatements" type="sg-types:AccountingStandardsItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherFinancialStatementsAreAudited" id="sg-dei_WhetherFinancialStatementsAreAudited" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NatureOfFinancialStatementsCompanyLevelOrConsolidated" id="sg-dei_NatureOfFinancialStatementsCompanyLevelOrConsolidated" type="sg-types:NatureOfFinancialStatementsItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DescriptionOfPresentationCurrency" id="sg-dei_DescriptionOfPresentationCurrency" type="sg-types:CurrencyCodeItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="LevelOfRoundingUsedInFinancialStatements" id="sg-dei_LevelOfRoundingUsedInFinancialStatements" type="sg-types:LevelOfRoundingItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfStatementOfFinancialPosition" id="sg-dei_TypeOfStatementOfFinancialPosition" type="sg-types:StatementOfFinancialPositionItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherStatementOfIncomeAndRetainedEarningsUsed" id="sg-dei_WhetherStatementOfIncomeAndRetainedEarningsUsed" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfIncomeStatement" id="sg-dei_TypeOfIncomeStatement" type="sg-types:IncomeStatementItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfOtherComprehensiveIncome" id="sg-dei_TypeOfOtherComprehensiveIncome" type="sg-types:ComprehensiveIncomeItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfStatementOfCashFlows" id="sg-dei_TypeOfStatementOfCashFlows" type="sg-types:CashFlowStatementItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" id="sg-dei_WhetherThereAreChangesToComparativeAmountsDueToRestatementsReclassificationOrOtherReasons" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreRestatementsToComparativeAmounts" id="sg-dei_WhetherThereAreRestatementsToComparativeAmounts" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreReclassificationsToComparativeAmounts" id="sg-dei_WhetherThereAreReclassificationsToComparativeAmounts" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreChangesToComparativeAmountsDueToOtherReasons" id="sg-dei_WhetherThereAreChangesToComparativeAmountsDueToOtherReasons" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherCompanyOrGroupIfConsolidatedAccountsArePreparedHasMoreThan50Employees" id="sg-dei_WhetherCompanyOrGroupIfConsolidatedAccountsArePreparedHasMoreThan50Employees" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DetailsOfInstanceDocumentAbstract" id="sg-dei_DetailsOfInstanceDocumentAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NameAndVersionOfSoftwareUsedToGenerateInstanceDocument" id="sg-dei_NameAndVersionOfSoftwareUsedToGenerateInstanceDocument" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NameOfSoftwareUsedToGenerateInstanceDocument" id="sg-dei_NameOfSoftwareUsedToGenerateInstanceDocument" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="VersionOfSoftwareUsedToGenerateInstanceDocument" id="sg-dei_VersionOfSoftwareUsedToGenerateInstanceDocument" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfCompanyDuringCurrentPeriod" id="sg-dei_TypeOfCompanyDuringCurrentPeriod" type="sg-types:CompanyItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherCompanyIsDormantForCurrentPeriod" id="sg-dei_WhetherCompanyIsDormantForCurrentPeriod" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TaxonomyVersion" id="sg-dei_TaxonomyVersion" type="sg-types:TaxonomyVersionItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DesignationOfPreparer" id="sg-dei_DesignationOfPreparer" type="sg-types:DesignationOfPreparerItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="HowWasXBRLInstanceDocumentPrepared" id="sg-dei_HowWasXBRLInstanceDocumentPrepared" type="sg-types:PreparationOfXBRLFileItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="ReasonForNotPreparingStatementOfCashFlows" id="sg-dei_ReasonForNotPreparingStatementOfCashFlows" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfXBRLInstanceDocumentPrepared" id="sg-dei_TypeOfXBRLInstanceDocumentPrepared" type="sg-types:ScopeOfFilingItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="MethodOfPresentingAllItemsOfIncomeAndExpenses" id="sg-dei_MethodOfPresentingAllItemsOfIncomeAndExpenses" type="sg-types:MethodOfPresentingAllItemsOfIncomeAndExpensesItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="TypeOfXBRLFiling" id="sg-dei_TypeOfXBRLFiling" type="sg-types:XBRLFilingItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherFinancialStatementsArePreparedOnGoingConcernBasis" id="sg-dei_WhetherFinancialStatementsArePreparedOnGoingConcernBasis" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+</xsd:schema>

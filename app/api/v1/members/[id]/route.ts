@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { apiKey } from "@/lib/db/schema/billing";
+import { mcpAccessToken } from "@/lib/db/schema/mcp";
 import { member } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
@@ -88,7 +90,28 @@ export async function DELETE(
       );
     }
 
-    await db.delete(member).where(eq(member.id, id));
+    // Removing a member must also revoke every credential they hold in this
+    // org: their API keys and MCP tokens otherwise keep working (the token
+    // checks now fail closed too, but leaving the rows behind is a trap).
+    await db.transaction(async (tx) => {
+      await tx.delete(member).where(eq(member.id, id));
+      await tx
+        .delete(apiKey)
+        .where(
+          and(
+            eq(apiKey.organizationId, ctx.organizationId),
+            eq(apiKey.createdBy, target.userId)
+          )
+        );
+      await tx
+        .delete(mcpAccessToken)
+        .where(
+          and(
+            eq(mcpAccessToken.organizationId, ctx.organizationId),
+            eq(mcpAccessToken.userId, target.userId)
+          )
+        );
+    });
 
     logAudit({ ctx, action: "delete", entityType: "member", entityId: id, request });
 

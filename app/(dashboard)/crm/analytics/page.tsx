@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { BarChart3, Target, TrendingUp, DollarSign } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { CardsSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
@@ -35,7 +35,7 @@ export default function CRMAnalyticsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <CardsSkeleton count={6} />;
   if (!data) return null;
 
   return (

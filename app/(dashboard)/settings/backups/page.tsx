@@ -12,8 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { FormSkeleton } from "@/components/dashboard/skeletons";
 import { toast } from "sonner";
 
 interface Backup {
@@ -227,7 +227,7 @@ export default function BackupsPage() {
     }
   }
 
-  if (loading && backups.length === 0) return <BrandLoader />;
+  if (loading && backups.length === 0) return <FormSkeleton />;
 
   return (
     <ContentReveal className="space-y-5">

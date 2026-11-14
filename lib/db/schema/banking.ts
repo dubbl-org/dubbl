@@ -8,9 +8,11 @@ import {
   date,
   pgEnum,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organization } from "./auth";
+import { expenseClaim } from "./expenses";
 import { chartAccount, journalEntry, taxRate } from "./bookkeeping";
 import { contact } from "./contacts";
 
@@ -80,7 +82,12 @@ export const bankAccount = pgTable("bank_account", {
   accountType: bankAccountTypeEnum("account_type").notNull().default("checking"),
   color: text("color").notNull().default("#0f766e"),
   chartAccountId: uuid("chart_account_id").references(() => chartAccount.id),
+  // `balance` is the anchor, not the live balance: the money the account held at
+  // `balanceAsOfDate` (the bank's closing balance on the last imported
+  // statement). A null date means "before every transaction", so the opening
+  // balance still counts. The live balance is this plus the movements after it.
   balance: integer("balance").notNull().default(0),
+  balanceAsOfDate: date("balance_as_of_date"),
   lowBalanceThreshold: integer("low_balance_threshold"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -150,6 +157,9 @@ export const bankTransaction = pgTable("bank_transaction", {
   status: bankTransactionStatusEnum("status").notNull().default("unreconciled"),
   reconciliationId: uuid("reconciliation_id").references(() => bankReconciliation.id),
   journalEntryId: uuid("journal_entry_id").references(() => journalEntry.id),
+  // Matched expense claim (founder-funding reconciliation). Unique: one claim
+  // is matched to at most one bank transaction, enforced by the database.
+  expenseClaimId: uuid("expense_claim_id").references(() => expenseClaim.id),
   importId: uuid("import_id").references(() => bankStatementImport.id),
   sourceType: text("source_type").notNull().default("statement_import"),
   externalTransactionId: text("external_transaction_id"),
@@ -173,7 +183,10 @@ export const bankTransaction = pgTable("bank_transaction", {
   costCenterId: uuid("cost_center_id"),
   projectId: uuid("project_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
+}, (table) => [
+  // One expense claim can be matched to at most one bank transaction.
+  uniqueIndex("bank_transaction_expense_claim_id_key").on(table.expenseClaimId),
+]);
 
 // Bank Reconciliation
 export const bankReconciliation = pgTable("bank_reconciliation", {
@@ -269,6 +282,10 @@ export const bankTransactionRelations = relations(bankTransaction, ({ one }) => 
   taxRate: one(taxRate, {
     fields: [bankTransaction.taxRateId],
     references: [taxRate.id],
+  }),
+  expenseClaim: one(expenseClaim, {
+    fields: [bankTransaction.expenseClaimId],
+    references: [expenseClaim.id],
   }),
 }));
 

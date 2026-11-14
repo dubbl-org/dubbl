@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { webhook } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertPublicHttpsUrl } from "@/lib/api/url-guard";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
@@ -34,7 +35,9 @@ export async function GET(
     });
 
     if (!found) return notFound("Webhook");
-    return NextResponse.json({ webhook: found });
+    // Never echo the signing secret (see webhooks/route.ts).
+    const { secret: _secret, ...safe } = found;
+    return NextResponse.json({ webhook: safe });
   } catch (err) {
     return handleError(err);
   }
@@ -61,6 +64,8 @@ export async function PATCH(
     });
 
     if (!existing) return notFound("Webhook");
+
+    if (parsed.url) await assertPublicHttpsUrl(parsed.url);
 
     const [updated] = await db
       .update(webhook)

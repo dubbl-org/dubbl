@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { decimalToCents } from "@/lib/money";
 import { useContactContext, getOrgId } from "../layout";
 import type { Account, TaxRate, ContactDetail } from "../layout";

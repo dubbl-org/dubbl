@@ -21,8 +21,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
 import { formatMoney, parseMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
@@ -177,7 +177,7 @@ export default function PaymentBatchesPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   return (
     <ContentReveal className="space-y-6">

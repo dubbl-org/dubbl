@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { webhook } from "@/lib/db/schema";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertPublicHttpsUrl } from "@/lib/api/url-guard";
+import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
 import { z } from "zod";
 
@@ -14,9 +16,11 @@ const subscribeSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:webhooks");
 
     const body = await request.json();
     const parsed = subscribeSchema.parse(body);
+    await assertPublicHttpsUrl(parsed.hookUrl);
 
     const secret = crypto.randomBytes(32).toString("hex");
 

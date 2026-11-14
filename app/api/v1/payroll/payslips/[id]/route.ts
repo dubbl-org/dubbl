@@ -19,7 +19,8 @@ export async function GET(
       with: { payrollRun: true, employee: true, payrollItem: true },
     });
 
-    if (!ps) return notFound("Payslip");
+    // Payslip rows carry no organizationId — scope through the parent run.
+    if (!ps || ps.payrollRun?.organizationId !== ctx.organizationId) return notFound("Payslip");
 
     // Mark as viewed
     if (ps.status === "generated" || ps.status === "sent") {

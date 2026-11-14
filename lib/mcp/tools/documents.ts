@@ -7,7 +7,7 @@ import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
 import { wrapTool } from "@/lib/mcp/errors";
 import { checkStorageLimit } from "@/lib/api/check-limit";
-import { getUploadUrl } from "@/lib/s3";
+import { getUploadUrl, validateUpload } from "@/lib/s3";
 import type { AuthContext } from "@/lib/api/auth-context";
 
 export function registerDocumentTools(server: McpServer, ctx: AuthContext) {
@@ -121,7 +121,9 @@ export function registerDocumentTools(server: McpServer, ctx: AuthContext) {
         await checkStorageLimit(ctx.organizationId, params.fileSize);
 
         const fileKey = `documents/${ctx.organizationId}/${Date.now()}-${params.fileName}`;
-        const uploadUrl = await getUploadUrl(fileKey, params.mimeType);
+        const uploadError = validateUpload(params.mimeType, params.fileSize);
+        if (uploadError) throw new Error(uploadError);
+        const uploadUrl = await getUploadUrl(fileKey, params.mimeType, params.fileSize);
 
         const [doc] = await db
           .insert(document)
@@ -248,7 +250,9 @@ export function registerDocumentTools(server: McpServer, ctx: AuthContext) {
         await checkStorageLimit(ctx.organizationId, params.fileSize);
 
         const fileKey = `documents/${ctx.organizationId}/${Date.now()}-${params.fileName}`;
-        const uploadUrl = await getUploadUrl(fileKey, params.mimeType);
+        const uploadError = validateUpload(params.mimeType, params.fileSize);
+        if (uploadError) throw new Error(uploadError);
+        const uploadUrl = await getUploadUrl(fileKey, params.mimeType, params.fileSize);
 
         const [doc] = await db
           .insert(document)

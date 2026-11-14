@@ -175,10 +175,17 @@ export function useProject() {
   return ctx;
 }
 
-export function ProjectProvider({ children }: { children: React.ReactNode }) {
+export function ProjectProvider({
+  children,
+  initialProject = null,
+}: {
+  children: React.ReactNode;
+  initialProject?: ProjectDetail | null;
+}) {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<ProjectDetail | null>(initialProject);
+  // The layout loads this on the server; only re-fetch after a mutation.
+  const [loading, setLoading] = useState(!initialProject);
   const [orgId] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null
   );
@@ -196,8 +203,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, [id, orgId]);
 
   useEffect(() => {
+    if (initialProject) return;   // already rendered by the server
     refresh();
-  }, [refresh]);
+  }, [refresh, initialProject]);
 
   return (
     <ProjectContext.Provider value={{ project, loading, orgId, projectId: id, refresh }}>

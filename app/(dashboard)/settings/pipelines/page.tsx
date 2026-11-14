@@ -39,8 +39,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { FormSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
@@ -478,7 +478,7 @@ export default function PipelinesSettingsPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <FormSkeleton />;
 
   return (
     <ContentReveal className="space-y-6">

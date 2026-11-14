@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Package2, FileSpreadsheet, Check } from "lucide-react";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { Button } from "@/components/ui/button";

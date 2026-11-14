@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import {
   Select,
   SelectContent,

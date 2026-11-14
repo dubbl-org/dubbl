@@ -21,7 +21,8 @@ import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 
 interface RecurringJournal {
   id: string;
@@ -250,7 +251,7 @@ export default function RecurringJournalsPage() {
     [templates]
   );
 
-  if (initialLoad) return <BrandLoader />;
+  if (initialLoad) return <ListSkeleton />;
 
   if (!initialLoad && !refetching && templates.length === 0 && statusFilter === "all" && !hasFilters) {
     // Generate a sample month grid

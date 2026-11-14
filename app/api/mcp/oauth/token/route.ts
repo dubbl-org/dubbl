@@ -140,7 +140,11 @@ async function handleAuthorizationCode(params: Record<string, string>) {
     ),
   });
 
-  const role: MemberRole = (mem?.role as MemberRole) ?? "member";
+  // A removed member must not be able to rotate their way to fresh tokens.
+  if (!mem) {
+    return corsJson({ error: "invalid_grant", error_description: "Member no longer in organization" }, { status: 400 });
+  }
+  const role: MemberRole = mem.role as MemberRole;
 
   // Delete the used code
   await db.delete(mcpOAuthCode).where(eq(mcpOAuthCode.id, authCode.id));

@@ -92,6 +92,7 @@ export async function syncSystemAccounts(
           name: a.name,
           type: a.type,
           subType: a.subType,
+          taxDisallowedPercent: a.taxDisallowedPercent ?? 0,
           currencyCode: currencyCode as string,
           isSystem: true,
         })),

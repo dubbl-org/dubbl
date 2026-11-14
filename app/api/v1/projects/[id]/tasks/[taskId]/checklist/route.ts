@@ -36,6 +36,11 @@ export async function GET(
     });
     if (!proj) return notFound("Project");
 
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+    });
+    if (!task) return notFound("Task");
+
     const items = await db.query.taskChecklist.findMany({
       where: eq(taskChecklist.taskId, taskId),
       orderBy: asc(taskChecklist.sortOrder),
@@ -81,7 +86,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id, taskId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:projects");
 
@@ -93,13 +98,23 @@ export async function PATCH(
     });
     if (!proj) return notFound("Project");
 
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+    });
+    if (!task) return notFound("Task");
+
     for (const item of parsed.items) {
       const updates: Record<string, unknown> = {};
       if (item.title !== undefined) updates.title = item.title;
       if (item.isCompleted !== undefined) updates.isCompleted = item.isCompleted;
       if (item.sortOrder !== undefined) updates.sortOrder = item.sortOrder;
       if (Object.keys(updates).length > 0) {
-        await db.update(taskChecklist).set(updates).where(eq(taskChecklist.id, item.id));
+        // item.id comes from the request body: bind it to this task, or a
+        // caller can rewrite any tenant's checklist row by id.
+        await db
+          .update(taskChecklist)
+          .set(updates)
+          .where(and(eq(taskChecklist.id, item.id), eq(taskChecklist.taskId, taskId)));
       }
     }
 
@@ -112,7 +127,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id, taskId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:projects");
 
@@ -121,11 +136,18 @@ export async function DELETE(
     });
     if (!proj) return notFound("Project");
 
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+    });
+    if (!task) return notFound("Task");
+
     const url = new URL(request.url);
     const itemId = url.searchParams.get("itemId");
     if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
 
-    await db.delete(taskChecklist).where(eq(taskChecklist.id, itemId));
+    await db
+      .delete(taskChecklist)
+      .where(and(eq(taskChecklist.id, itemId), eq(taskChecklist.taskId, taskId)));
     return NextResponse.json({ success: true });
   } catch (err) { return handleError(err); }
 }

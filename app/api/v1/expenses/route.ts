@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { expenseClaim, expenseItem } from "@/lib/db/schema";
+import { expenseClaim, expenseItem, organization } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -8,11 +8,13 @@ import { handleError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { decimalToMinorUnits } from "@/lib/money";
+import { isOrgOwnedKey } from "@/lib/s3";
 import { assertNotLocked } from "@/lib/api/period-lock";
 import { logAudit } from "@/lib/api/audit";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { resolveDocumentCurrency } from "@/lib/currency/resolve-currency";
+import { ensureRatesForDate } from "@/lib/currency/rate-backfill";
 
 const itemSchema = z
   .object({
@@ -126,7 +128,11 @@ export async function POST(request: Request) {
         isMileage: item.isMileage ?? false,
         distanceMiles: item.isMileage ? (item.distanceMiles ?? null) : null,
         mileageRate: item.isMileage ? (item.mileageRate ?? null) : null,
-        receiptFileKey: item.receiptFileKey || null,
+        // Client-supplied: it must point inside this org's own object prefix.
+        receiptFileKey:
+          item.receiptFileKey && isOrgOwnedKey(item.receiptFileKey, ctx.organizationId)
+            ? item.receiptFileKey
+            : null,
         receiptFileName: item.receiptFileName || null,
         sortOrder: i,
       };
@@ -150,6 +156,21 @@ export async function POST(request: Request) {
         ...item,
       }))
     );
+
+    // A currency the books have never held needs its rate fetched here, the
+    // same way a statement import does, or the claim has nothing to convert at.
+    const org = await db.query.organization.findFirst({
+      where: eq(organization.id, ctx.organizationId),
+      columns: { defaultCurrency: true },
+    });
+    if (org && org.defaultCurrency !== currencyCode) {
+      await ensureRatesForDate(
+        ctx.organizationId,
+        org.defaultCurrency,
+        currencyCode,
+        new Date().toISOString().slice(0, 10)
+      ).catch(() => {});
+    }
 
     logAudit({ ctx, action: "create", entityType: "expense", entityId: created.id, request });
 

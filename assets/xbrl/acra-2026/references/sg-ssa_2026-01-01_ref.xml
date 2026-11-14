@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+       *************** References : 2026-01-01*************
+                      
+       *************** Singapore Standards on Auditing *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2003/instance http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd http://www.w3.org/1999/xlink http://www.xbrl.org/2003/xl-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_DisclosuresInIndependentAuditorsReportTextBlock" xlink:label="loc_sg-ssa_DisclosuresInIndependentAuditorsReportTextBlock"/>
+    <link:reference xlink:type="resource" xlink:label="reference_1" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_DisclosuresInIndependentAuditorsReportTextBlock" xlink:to="reference_1"/>
+    <link:reference xlink:type="resource" xlink:label="reference_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>207</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_DisclosuresInIndependentAuditorsReportTextBlock" xlink:to="reference_2"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_WhetherThereIsModifiedOpinionInIndependentAuditorsReport" xlink:label="loc_sg-ssa_WhetherThereIsModifiedOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>16</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsModifiedOpinionInIndependentAuditorsReport" xlink:to="reference_3"/>
+    <link:reference xlink:type="resource" xlink:label="reference_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Companies Act</ref:Name>
+      <ref:Chapter>50</ref:Chapter>
+      <ref:Section>207</ref:Section>
+      <ref:Paragraph>2</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsModifiedOpinionInIndependentAuditorsReport" xlink:to="reference_4"/>
+    <link:reference xlink:type="resource" xlink:label="reference_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>17</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsModifiedOpinionInIndependentAuditorsReport" xlink:to="reference_5"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_TypeOfModificationToIndependentAuditorsReport" xlink:label="loc_sg-ssa_TypeOfModificationToIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_6" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>7</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_TypeOfModificationToIndependentAuditorsReport" xlink:to="reference_6"/>
+    <link:reference xlink:type="resource" xlink:label="reference_10" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>8</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_TypeOfModificationToIndependentAuditorsReport" xlink:to="reference_10"/>
+    <link:reference xlink:type="resource" xlink:label="reference_11" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>9</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_TypeOfModificationToIndependentAuditorsReport" xlink:to="reference_11"/>
+    <link:reference xlink:type="resource" xlink:label="reference_12" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_TypeOfModificationToIndependentAuditorsReport" xlink:to="reference_12"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_WhetherThereIsEmphasisOfMatterInIndependentAuditorsReport" xlink:label="loc_sg-ssa_WhetherThereIsEmphasisOfMatterInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_7" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>706</ref:Number>
+      <ref:Paragraph>8</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsEmphasisOfMatterInIndependentAuditorsReport" xlink:to="reference_7"/>
+    <link:reference xlink:type="resource" xlink:label="reference_8" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>706</ref:Number>
+      <ref:Paragraph>9</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsEmphasisOfMatterInIndependentAuditorsReport" xlink:to="reference_8"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_DateOfIndependentAuditorsReport" xlink:label="loc_sg-ssa_DateOfIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_9" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>50</ref:Paragraph>
+      <ref:Subparagraph>o</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_DateOfIndependentAuditorsReport" xlink:to="reference_9"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_WhetherAuditIsConductedInAccordanceWithSingaporeStandardsOnAuditing" xlink:label="loc_sg-ssa_WhetherAuditIsConductedInAccordanceWithSingaporeStandardsOnAuditing"/>
+    <link:reference xlink:type="resource" xlink:label="reference_13" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>28</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherAuditIsConductedInAccordanceWithSingaporeStandardsOnAuditing" xlink:to="reference_13"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_DidAuditorConcludeThatThereIsMaterialMisstatementOfOtherInformation" xlink:label="loc_sg-ssa_DidAuditorConcludeThatThereIsMaterialMisstatementOfOtherInformation"/>
+    <link:reference xlink:type="resource" xlink:label="reference_14" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>720</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_DidAuditorConcludeThatThereIsMaterialMisstatementOfOtherInformation" xlink:to="reference_14"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_WhetherThereIsAnyOtherMatterReported" xlink:label="loc_sg-ssa_WhetherThereIsAnyOtherMatterReported"/>
+    <link:reference xlink:type="resource" xlink:label="reference_15" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>706</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsAnyOtherMatterReported" xlink:to="reference_15"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_WhetherThereIsAnyMaterialUncertaintyRelatingToGoingConcern" xlink:label="loc_sg-ssa_WhetherThereIsAnyMaterialUncertaintyRelatingToGoingConcern"/>
+    <link:reference xlink:type="resource" xlink:label="reference_16" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>570</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsAnyMaterialUncertaintyRelatingToGoingConcern" xlink:to="reference_16"/>
+    <link:reference xlink:type="resource" xlink:label="reference_17" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>570</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_WhetherThereIsAnyMaterialUncertaintyRelatingToGoingConcern" xlink:to="reference_17"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersAcquisitionBusinessCombinationReverseTakeoverMergers" xlink:label="loc_sg-ssa_KeyAuditMattersAcquisitionBusinessCombinationReverseTakeoverMergers"/>
+    <link:reference xlink:type="resource" xlink:label="reference_18" xlink:role="http://www.xbrl.org/2003/role/disclosureRef">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersAcquisitionBusinessCombinationReverseTakeoverMergers" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersBiologicalAssets" xlink:label="loc_sg-ssa_KeyAuditMattersBiologicalAssets"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersBiologicalAssets" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersBriberyOrCorruption" xlink:label="loc_sg-ssa_KeyAuditMattersBriberyOrCorruption"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersBriberyOrCorruption" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersDisposalAssetsHeldForSale" xlink:label="loc_sg-ssa_KeyAuditMattersDisposalAssetsHeldForSale"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersDisposalAssetsHeldForSale" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersFinancialInstruments" xlink:label="loc_sg-ssa_KeyAuditMattersFinancialInstruments"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersFinancialInstruments" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersIntangibleAssetGoodwill" xlink:label="loc_sg-ssa_KeyAuditMattersIntangibleAssetGoodwill"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersIntangibleAssetGoodwill" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersIntangibleAssetsNonGoodwill" xlink:label="loc_sg-ssa_KeyAuditMattersIntangibleAssetsNonGoodwill"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersIntangibleAssetsNonGoodwill" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersInternalControlsITRelatedControls" xlink:label="loc_sg-ssa_KeyAuditMattersInternalControlsITRelatedControls"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersInternalControlsITRelatedControls" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersInventories" xlink:label="loc_sg-ssa_KeyAuditMattersInventories"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersInventories" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersInvestmentProperty" xlink:label="loc_sg-ssa_KeyAuditMattersInvestmentProperty"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersInvestmentProperty" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersInvestmentsSubsidiariesAssociatesJointVenturesJointedControlledOperations" xlink:label="loc_sg-ssa_KeyAuditMattersInvestmentsSubsidiariesAssociatesJointVenturesJointedControlledOperations"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersInvestmentsSubsidiariesAssociatesJointVenturesJointedControlledOperations" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersLegalProvisionsLawsuits" xlink:label="loc_sg-ssa_KeyAuditMattersLegalProvisionsLawsuits"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersLegalProvisionsLawsuits" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersLiabilitiesOfInsuranceBusinessInsuranceContracts" xlink:label="loc_sg-ssa_KeyAuditMattersLiabilitiesOfInsuranceBusinessInsuranceContracts"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersLiabilitiesOfInsuranceBusinessInsuranceContracts" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersLongTermContractsConstructionContractsProvisionForForeseeableLosses" xlink:label="loc_sg-ssa_KeyAuditMattersLongTermContractsConstructionContractsProvisionForForeseeableLosses"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersLongTermContractsConstructionContractsProvisionForForeseeableLosses" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersManagementOverrideOfControl" xlink:label="loc_sg-ssa_KeyAuditMattersManagementOverrideOfControl"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersManagementOverrideOfControl" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersMiningReserves" xlink:label="loc_sg-ssa_KeyAuditMattersMiningReserves"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersMiningReserves" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_NumberOfKeyAuditMattersReported" xlink:label="loc_sg-ssa_NumberOfKeyAuditMattersReported"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_NumberOfKeyAuditMattersReported" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersOthers" xlink:label="loc_sg-ssa_KeyAuditMattersOthers"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersOthers" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersPensions" xlink:label="loc_sg-ssa_KeyAuditMattersPensions"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersPensions" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersPropertyPlantAndEquipment" xlink:label="loc_sg-ssa_KeyAuditMattersPropertyPlantAndEquipment"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersPropertyPlantAndEquipment" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersProvisionsAccrualsContingentLiabilities" xlink:label="loc_sg-ssa_KeyAuditMattersProvisionsAccrualsContingentLiabilities"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersProvisionsAccrualsContingentLiabilities" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersRelatedPartyTransactions" xlink:label="loc_sg-ssa_KeyAuditMattersRelatedPartyTransactions"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersRelatedPartyTransactions" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersResearchAndDevelopmentCosts" xlink:label="loc_sg-ssa_KeyAuditMattersResearchAndDevelopmentCosts"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersResearchAndDevelopmentCosts" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersRestructuring" xlink:label="loc_sg-ssa_KeyAuditMattersRestructuring"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersRestructuring" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersRevenue" xlink:label="loc_sg-ssa_KeyAuditMattersRevenue"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersRevenue" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersShareBasedPayments" xlink:label="loc_sg-ssa_KeyAuditMattersShareBasedPayments"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersShareBasedPayments" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersSupplierIncentivesRebatesAndDiscounts" xlink:label="loc_sg-ssa_KeyAuditMattersSupplierIncentivesRebatesAndDiscounts"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersSupplierIncentivesRebatesAndDiscounts" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersTax" xlink:label="loc_sg-ssa_KeyAuditMattersTax"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersTax" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersTradeAndOtherReceivables" xlink:label="loc_sg-ssa_KeyAuditMattersTradeAndOtherReceivables"/>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="loc_sg-ssa_KeyAuditMattersTradeAndOtherReceivables" xlink:to="reference_18"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_TypeOfAuditOpinionInIndependentAuditorsReport" xlink:label="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:title="TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport">
+      <ref:Name>Companies Act 1967</ref:Name>
+      <ref:Paragraph>207</ref:Paragraph>
+      <ref:Subparagraph>2</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>16</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_2" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>17</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_3" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>7</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_4" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_5" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_5">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>8</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_5" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_6" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_6">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>9</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_6" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:reference xlink:type="resource" xlink:label="reference_TypeOfAuditOpinionInIndependentAuditorsReport_7" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_TypeOfAuditOpinionInIndependentAuditorsReport" id="reference_TypeOfAuditOpinionInIndependentAuditorsReport_7">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>10</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="TypeOfAuditOpinionInIndependentAuditorsReport" xlink:to="reference_TypeOfAuditOpinionInIndependentAuditorsReport_7" xlink:title="reference: TypeOfAuditOpinionInIndependentAuditorsReport to reference_TypeOfAuditOpinionInIndependentAuditorsReport"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_AuditingStandardsUsedToConductAudit" xlink:label="AuditingStandardsUsedToConductAudit" xlink:title="AuditingStandardsUsedToConductAudit"/>
+    <link:reference xlink:type="resource" xlink:label="reference_AuditingStandardsUsedToConductAudit" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_AuditingStandardsUsedToConductAudit" id="reference_AuditingStandardsUsedToConductAudit">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>700</ref:Number>
+      <ref:Paragraph>28</ref:Paragraph>
+      <ref:Subparagraph>a</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="AuditingStandardsUsedToConductAudit" xlink:to="reference_AuditingStandardsUsedToConductAudit" xlink:title="reference: AuditingStandardsUsedToConductAudit to reference_AuditingStandardsUsedToConductAudit"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModificationAuditOpinion" xlink:label="ReasonForModificationAuditOpinion" xlink:title="ReasonForModificationAuditOpinion"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModificationAuditOpinion" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModificationAuditOpinion" id="reference_ReasonForModificationAuditOpinion">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModificationAuditOpinion" xlink:to="reference_ReasonForModificationAuditOpinion" xlink:title="reference: ReasonForModificationAuditOpinion to reference_ReasonForModificationAuditOpinion"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModificationAuditOpinion_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModificationAuditOpinion" id="reference_ReasonForModificationAuditOpinion_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModificationAuditOpinion" xlink:to="reference_ReasonForModificationAuditOpinion_2" xlink:title="reference: ReasonForModificationAuditOpinion to reference_ReasonForModificationAuditOpinion"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModificationAuditOpinion_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModificationAuditOpinion" id="reference_ReasonForModificationAuditOpinion_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModificationAuditOpinion" xlink:to="reference_ReasonForModificationAuditOpinion_3" xlink:title="reference: ReasonForModificationAuditOpinion to reference_ReasonForModificationAuditOpinion"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModificationAuditOpinion_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModificationAuditOpinion" id="reference_ReasonForModificationAuditOpinion_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModificationAuditOpinion" xlink:to="reference_ReasonForModificationAuditOpinion_4" xlink:title="reference: ReasonForModificationAuditOpinion to reference_ReasonForModificationAuditOpinion"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersValuationOfPropertyPlantAndEquipment" xlink:label="KeyAuditMattersValuationOfPropertyPlantAndEquipment" xlink:title="KeyAuditMattersValuationOfPropertyPlantAndEquipment"/>
+    <link:reference xlink:type="resource" xlink:label="reference_KeyAuditMattersValuationOfPropertyPlantAndEquipment" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_KeyAuditMattersValuationOfPropertyPlantAndEquipment" id="reference_KeyAuditMattersValuationOfPropertyPlantAndEquipment">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="KeyAuditMattersValuationOfPropertyPlantAndEquipment" xlink:to="reference_KeyAuditMattersValuationOfPropertyPlantAndEquipment" xlink:title="reference: KeyAuditMattersValuationOfPropertyPlantAndEquipment to reference_KeyAuditMattersValuationOfPropertyPlantAndEquipment"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" xlink:label="KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" xlink:title="KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments"/>
+    <link:reference xlink:type="resource" xlink:label="reference_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" id="reference_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" xlink:to="reference_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments" xlink:title="reference: KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments to reference_KeyAuditMattersValuationOfReceivablesAndOtherFinancialInstruments"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" xlink:label="KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" xlink:title="KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets"/>
+    <link:reference xlink:type="resource" xlink:label="reference_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" id="reference_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" xlink:to="reference_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets" xlink:title="reference: KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets to reference_KeyAuditMattersImpairmentOfGoodwillAndOtherIntangibleAssets"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersValuationOfInvestmentProperty" xlink:label="KeyAuditMattersValuationOfInvestmentProperty" xlink:title="KeyAuditMattersValuationOfInvestmentProperty"/>
+    <link:reference xlink:type="resource" xlink:label="reference_KeyAuditMattersValuationOfInvestmentProperty" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_KeyAuditMattersValuationOfInvestmentProperty" id="reference_KeyAuditMattersValuationOfInvestmentProperty">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="KeyAuditMattersValuationOfInvestmentProperty" xlink:to="reference_KeyAuditMattersValuationOfInvestmentProperty" xlink:title="reference: KeyAuditMattersValuationOfInvestmentProperty to reference_KeyAuditMattersValuationOfInvestmentProperty"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_KeyAuditMattersRevenueRecognition" xlink:label="KeyAuditMattersRevenueRecognition" xlink:title="KeyAuditMattersRevenueRecognition"/>
+    <link:reference xlink:type="resource" xlink:label="reference_KeyAuditMattersRevenueRecognition" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_KeyAuditMattersRevenueRecognition" id="reference_KeyAuditMattersRevenueRecognition">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>701</ref:Number>
+      <ref:Paragraph>11</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="KeyAuditMattersRevenueRecognition" xlink:to="reference_KeyAuditMattersRevenueRecognition" xlink:title="reference: KeyAuditMattersRevenueRecognition to reference_KeyAuditMattersRevenueRecognition"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:label="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:title="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" id="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets to reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" id="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets to reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" id="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets to reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" id="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets to reference_ReasonForModifiedAuditOpinionRelatedToImpairmentOfAssets"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:label="ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:title="ReasonForModifiedAuditOpinionRelatedToGoingConcern"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" id="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToGoingConcern to reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" id="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToGoingConcern to reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" id="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToGoingConcern to reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern" id="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToGoingConcern" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToGoingConcern to reference_ReasonForModifiedAuditOpinionRelatedToGoingConcern"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:label="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:title="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" id="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance to reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" id="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance to reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" id="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance to reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" id="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance to reference_ReasonForModifiedAuditOpinionRelatedToAuditOfOpeningBalance"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:label="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:title="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" id="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting to reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" id="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting to reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" id="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting to reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" id="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting to reference_ReasonForModifiedAuditOpinionRelatedToConsolidatedOrEquityAccounting"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:label="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:title="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" id="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases to reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" id="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases to reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" id="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases to reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" id="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases to reference_ReasonForModifiedAuditOpinionRelatedToOngoingInvestigationOrLegalCases"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionRelatedToOthers" xlink:label="ReasonForModifiedAuditOpinionRelatedToOthers" xlink:title="ReasonForModifiedAuditOpinionRelatedToOthers"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOthers" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOthers" id="reference_ReasonForModifiedAuditOpinionRelatedToOthers">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOthers" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOthers" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOthers to reference_ReasonForModifiedAuditOpinionRelatedToOthers"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOthers_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOthers" id="reference_ReasonForModifiedAuditOpinionRelatedToOthers_2">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>21</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOthers" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOthers_2" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOthers to reference_ReasonForModifiedAuditOpinionRelatedToOthers"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOthers_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOthers" id="reference_ReasonForModifiedAuditOpinionRelatedToOthers_3">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>22</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOthers" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOthers_3" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOthers to reference_ReasonForModifiedAuditOpinionRelatedToOthers"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionRelatedToOthers_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionRelatedToOthers" id="reference_ReasonForModifiedAuditOpinionRelatedToOthers_4">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+      <ref:Number>705</ref:Number>
+      <ref:Paragraph>23</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionRelatedToOthers" xlink:to="reference_ReasonForModifiedAuditOpinionRelatedToOthers_4" xlink:title="reference: ReasonForModifiedAuditOpinionRelatedToOthers to reference_ReasonForModifiedAuditOpinionRelatedToOthers"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-ssa-cor_2026-01-01.xsd#sg-ssa_ReasonForModifiedAuditOpinionAbstract" xlink:label="ReasonForModifiedAuditOpinionAbstract" xlink:title="ReasonForModifiedAuditOpinionAbstract"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionAbstract" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionAbstract" id="reference_ReasonForModifiedAuditOpinionAbstract">
+      <ref:Name>Singapore Standard on Auditing</ref:Name>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionAbstract" xlink:to="reference_ReasonForModifiedAuditOpinionAbstract" xlink:title="reference: ReasonForModifiedAuditOpinionAbstract to reference_ReasonForModifiedAuditOpinionAbstract"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionAbstract_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionAbstract" id="reference_ReasonForModifiedAuditOpinionAbstract_2">
+      <ref:Number>705</ref:Number>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionAbstract" xlink:to="reference_ReasonForModifiedAuditOpinionAbstract_2" xlink:title="reference: ReasonForModifiedAuditOpinionAbstract to reference_ReasonForModifiedAuditOpinionAbstract"/>
+    <link:reference xlink:type="resource" xlink:label="reference_ReasonForModifiedAuditOpinionAbstract_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReasonForModifiedAuditOpinionAbstract" id="reference_ReasonForModifiedAuditOpinionAbstract_3">
+      <ref:Paragraph>20</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReasonForModifiedAuditOpinionAbstract" xlink:to="reference_ReasonForModifiedAuditOpinionAbstract_3" xlink:title="reference: ReasonForModifiedAuditOpinionAbstract to reference_ReasonForModifiedAuditOpinionAbstract"/>
+  </link:referenceLink>
+</link:linkbase>

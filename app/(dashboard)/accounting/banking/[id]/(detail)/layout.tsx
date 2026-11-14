@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import {
   ArrowLeft,
@@ -17,8 +18,8 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,9 @@ interface BankAccountContextValue {
   handleOpenMatchUnified: (tx: Transaction) => void;
   handleOpenTransfer: (tx: Transaction) => void;
   handleOpenSplit: (tx: Transaction) => void;
+  /** Settle a line locally so the counts above follow the row, without a refetch. */
+  markSettled: (txId: string) => void;
+  markUnsettled: (txId: string) => void;
   bankAccounts: BankAccountSummary[];
   // Import
   openImport: () => void;
@@ -224,6 +228,20 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     return { unreconciled, reconciled, excluded, credits, debits, total: transactions.length };
   }, [transactions]);
+
+  const markSettled = useCallback((txId: string) => {
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === txId ? { ...t, status: "reconciled" as const } : t))
+    );
+  }, []);
+
+  const markUnsettled = useCallback((txId: string) => {
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === txId ? { ...t, status: "unreconciled" as const, expenseClaimId: null } : t
+      )
+    );
+  }, []);
 
   // Transaction actions
   async function handleReconcile(txId: string) {
@@ -397,7 +415,18 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Request failed");
-      toast.success(`Imported ${data.import.imported} transactions`);
+      const imported = data.import.imported as number;
+      const currencies: string[] = data.import.ratesNeeded ?? [];
+      toast.success(`Imported ${imported} transactions`);
+      if (currencies.length > 0) {
+        // Rates arrive in the background, so say so: the rows are in, but they
+        // cannot be posted to the books until their dated rate exists.
+        toast.info(
+          `Fetching ${currencies.join(", ")} exchange rates for these dates. ` +
+            `You can categorise the rows now; postings use the rates once they land.`,
+          { duration: 8000 }
+        );
+      }
       setImportOpen(false);
       setSelectedFile(null);
       setManualContent("");
@@ -411,13 +440,15 @@ export default function BankAccountDetailLayout({ children }: { children: React.
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   if (!account) {
     return (
       <div className="space-y-4 pt-12 text-center">
         <p className="text-sm text-muted-foreground">Account not found</p>
-        <Button variant="outline" size="sm" onClick={() => router.push("/accounting/banking")}>Back to Banking</Button>
+        <Button variant="outline" size="sm" asChild>
+              <Link href="/accounting/banking">Back to Banking</Link>
+            </Button>
       </div>
     );
   }
@@ -443,19 +474,21 @@ export default function BankAccountDetailLayout({ children }: { children: React.
       handleOpenMatchUnified,
       handleOpenTransfer,
       handleOpenSplit,
+      markSettled,
+      markUnsettled,
       bankAccounts,
       openImport: () => setImportOpen(true),
       summary,
     }}>
       <ContentReveal>
         {/* Back link */}
-        <button
-          onClick={() => router.push("/accounting/banking")}
+        <Link
+          href="/accounting/banking"
           className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="size-3.5" />
           Back to banking
-        </button>
+        </Link>
 
         {/* Header */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between mb-5">
@@ -480,9 +513,16 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/accounting/banking/${id}/reconcile`)} title="Tick off transactions against your bank statement">
-              <RefreshCcw className="mr-2 size-3.5" />
-              Match statement to your books
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              title="Tick off transactions against your bank statement"
+            >
+              <Link href={`/accounting/banking/${id}/reconcile`}>
+                <RefreshCcw className="mr-2 size-3.5" />
+                Match statement to your books
+              </Link>
             </Button>
             <Button size="sm" onClick={() => setImportOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
               <Upload className="mr-2 size-3.5" />
@@ -523,9 +563,9 @@ export default function BankAccountDetailLayout({ children }: { children: React.
             const tabHref = t.href(id);
             const active = activeTab === t.value;
             return (
-              <button
+              <Link
                 key={t.value}
-                onClick={() => router.push(tabHref)}
+                href={tabHref}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
                   active
@@ -541,7 +581,7 @@ export default function BankAccountDetailLayout({ children }: { children: React.
                 {t.value === "imports" && imports.length > 0 && (
                   <span className="ml-1 text-[11px] tabular-nums text-muted-foreground">{imports.length}</span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </nav>

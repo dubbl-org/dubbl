@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -87,8 +88,10 @@ export async function POST(
     // Create journal entry
     const entryNumber = await getNextEntryNumber(ctx.organizationId);
     const today = new Date().toISOString().slice(0, 10);
+    await assertNotLocked(ctx.organizationId, nextEntry.date || today, ctx);
 
     const [je] = await db
+
       .insert(journalEntry)
       .values({
         organizationId: ctx.organizationId,

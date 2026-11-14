@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+       *************** Element declaration : 2026-01-01*************
+                      
+       *************** Companies Act *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+ -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ca" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-ca="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ca" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:xbrldt="http://xbrl.org/2005/xbrldt" xmlns:sg-parts="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:sg-types="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../labels/sg-ca_2026-01-01_lab.xml" xlink:title="Label Linkbase" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../references/sg-ca_2026-01-01_ref.xml" xlink:title="Reference Linkbase" xlink:role="http://www.xbrl.org/2003/role/referenceLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/non-numeric" schemaLocation="http://www.xbrl.org/dtr/type/nonNumeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/numeric" schemaLocation="http://www.xbrl.org/dtr/type/numeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" schemaLocation="sg-types_2026-01-01.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ty-dim" schemaLocation="sg-ty-dim_2026-01-01.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-lab-rol" schemaLocation="sg-lab-rol_2026-01-01.xsd"/>
+  <xsd:import namespace="http://xbrl.org/2005/xbrldt" schemaLocation="http://www.xbrl.org/2005/xbrldt-2005.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" schemaLocation="sg-parts_2026-01-01.xsd"/>
+  <xsd:element name="DisclosuresInDirectorsReportTextBlock" id="sg-ca_DisclosuresInDirectorsReportTextBlock" type="nonnum:textBlockItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" id="sg-ca_WhetherThereAreAnyArrangementsToEnableDirectorsToAcquireBenefitsByAcquisitionOfSharesOrDebentures" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" id="sg-ca_WhetherThereAreAnyDirectorsInterestedOrDeemedToHaveInterestInSharesOrDebenturesOfCompanyAndRelatedCorporations" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosureOfShareOptionsAbstract" id="sg-ca_DisclosureOfShareOptionsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DetailsOfShareOptionsTable" id="sg-ca_DetailsOfShareOptionsTable" type="xbrli:stringItemType" substitutionGroup="xbrldt:hypercubeItem" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DateOfGrantOfOptionAxis" id="sg-ca_DateOfGrantOfOptionAxis" type="xbrli:stringItemType" xbrldt:typedDomainRef="sg-ty-dim_2026-01-01.xsd#sg-ty-dim_DateOfGrantDomain" substitutionGroup="xbrldt:dimensionItem" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DetailsOfShareOptionsLineItems" id="sg-ca_DetailsOfShareOptionsLineItems" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NumberOfOptionsOutstanding" id="sg-ca_NumberOfOptionsOutstanding" type="xbrli:decimalItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="NumberOfOptionsGrantedDuringPeriod" id="sg-ca_NumberOfOptionsGrantedDuringPeriod" type="xbrli:decimalItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NumberOfOptionsExercisedDuringPeriod" id="sg-ca_NumberOfOptionsExercisedDuringPeriod" type="xbrli:decimalItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NumberOfOptionsCancelledOrLapsedDuringPeriod" id="sg-ca_NumberOfOptionsCancelledOrLapsedDuringPeriod" type="xbrli:decimalItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="ExercisePricePerOption" id="sg-ca_ExercisePricePerOption" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DateOfDirectorsReport" id="sg-ca_DateOfDirectorsReport" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="DisclosuresInStatementByDirectorsTextBlock" id="sg-ca_DisclosuresInStatementByDirectorsTextBlock" type="nonnum:textBlockItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NumberOfDirectorsSigningStatementByDirectors" id="sg-ca_NumberOfDirectorsSigningStatementByDirectors" type="xbrli:positiveIntegerItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" id="sg-ca_WhetherInDirectorsOpinionFinancialStatementsAreDrawnUpSoAsToExhibitATrueAndFairView" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" id="sg-ca_WhetherThereAreReasonableGroundsToBelieveThatCompanyWillBeAbleToPayItsDebtsAsAndWhenTheyFallDueAtDateOfStatement" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DateOfStatementByDirectors" id="sg-ca_DateOfStatementByDirectors" type="xbrli:dateItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" id="sg-ca_WhetherInAuditorsOpinionAccountingAndOtherRecordsRequiredAreProperlyKeptInAccordanceWithCompaniesAct" type="sg-types:YesNoNotApplicableItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="WhetherThereIsAnyTrueAndFairOverrideInFinancialStatements" id="sg-ca_WhetherThereIsAnyTrueAndFairOverrideInFinancialStatements" type="sg-types:YesNoItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="StartDateOfExerciseOfOptionAxis" id="sg-ca_StartDateOfExerciseOfOptionAxis" type="xbrli:stringItemType" xbrldt:typedDomainRef="sg-ty-dim_2026-01-01.xsd#sg-ty-dim_StartDateOfExerciseDomain" substitutionGroup="xbrldt:dimensionItem" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="EndDateOfExerciseOfOptionsAxis" id="sg-ca_EndDateOfExerciseOfOptionsAxis" type="xbrli:stringItemType" xbrldt:typedDomainRef="sg-ty-dim_2026-01-01.xsd#sg-ty-dim_EndDateOfExerciseDomain" substitutionGroup="xbrldt:dimensionItem" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosuresInDirectorsReportAbstract" id="sg-ca_DisclosuresInDirectorsReportAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="DisclosureInStatementByDirectorsAbstract" id="sg-ca_DisclosureInStatementByDirectorsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+</xsd:schema>

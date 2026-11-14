@@ -5,8 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, FileText, ChevronDown, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
 import { formatMoney } from "@/lib/money";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { cn } from "@/lib/utils";
@@ -147,7 +147,7 @@ export default function RunPayslipsPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   const generated = rows.filter((r) => r.payslip).length;
 

@@ -11,9 +11,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; bonusId: string }> }
 ) {
   try {
-    const { bonusId } = await params;
+    const { id, bonusId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
+
+    const existing = await db.query.payrollBonus.findFirst({
+      where: eq(payrollBonus.id, bonusId),
+      with: { payrollRun: true },
+    });
+    // payroll_bonus rows carry no organizationId — scope via the payroll run.
+    if (
+      !existing ||
+      existing.payrollRunId !== id ||
+      existing.payrollRun?.organizationId !== ctx.organizationId
+    ) {
+      return notFound("Bonus");
+    }
 
     const [deleted] = await db
       .delete(payrollBonus)

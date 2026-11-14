@@ -5,10 +5,10 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { useParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import {
   Select,
   SelectContent,
@@ -29,68 +29,25 @@ interface LedgerEntry {
   balance: string;
 }
 
-const ledgerColumns: Column<LedgerEntry>[] = [
-  {
-    key: "number",
-    header: "#",
-    className: "w-16",
-    render: (r) => (
-      <a
-        href={`/accounting/${r.entryId}`}
-        className="font-mono text-xs text-emerald-600 hover:underline"
-      >
-        {r.entryNumber}
-      </a>
-    ),
-  },
-  {
-    key: "date",
-    header: "Date",
-    className: "w-28",
-    render: (r) => <span className="text-sm">{r.date}</span>,
-  },
-  {
-    key: "description",
-    header: "Description",
-    render: (r) => <span className="text-sm">{r.description}</span>,
-  },
-  {
-    key: "debit",
-    header: "Debit",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">
-        {parseFloat(r.debitAmount) > 0 ? parseFloat(r.debitAmount).toFixed(2) : ""}
-      </span>
-    ),
-  },
-  {
-    key: "credit",
-    header: "Credit",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm tabular-nums">
-        {parseFloat(r.creditAmount) > 0 ? parseFloat(r.creditAmount).toFixed(2) : ""}
-      </span>
-    ),
-  },
-  {
-    key: "balance",
-    header: "Balance",
-    className: "w-28 text-right",
-    render: (r) => (
-      <span className="font-mono text-sm font-medium tabular-nums">
-        {parseFloat(r.balance).toFixed(2)}
-      </span>
-    ),
-  },
-];
+/** One amount column: half of a debit/credit pair is always blank. */
+function Amount({ debit, credit, currency }: { debit: string; credit: string; currency: string }) {
+  const d = parseFloat(debit) || 0;
+  const c = parseFloat(credit) || 0;
+  const value = d > 0 ? d : c;
+  const money = new Intl.NumberFormat("en", { style: "currency", currency }).format(value);
+  return (
+    <span className={d > 0 ? "text-sm tabular-nums" : "text-sm tabular-nums text-muted-foreground"}>
+      {money}
+    </span>
+  );
+}
 
 export default function AccountLedgerPage() {
   const { id } = useParams<{ id: string }>();
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [currency, setCurrency] = useState("USD");
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
@@ -141,6 +98,7 @@ export default function AccountLedgerPage() {
       .then((data) => {
         if (cancelled) return;
         if (data.data) setLedger(data.data);
+        if (data.account?.currencyCode) setCurrency(data.account.currencyCode);
         if (data.pagination) {
           setTotal(data.pagination.total);
           setHasMore(data.pagination.page < data.pagination.totalPages);
@@ -298,11 +256,55 @@ export default function AccountLedgerPage() {
             style={{ willChange: "opacity, transform, filter" }}
             className="overflow-x-auto"
           >
-            <DataTable
-              columns={ledgerColumns}
-              data={ledger}
-              emptyMessage={hasFilters ? "No entries match your filters." : "No transactions in this account yet."}
-            />
+            <div className="overflow-hidden rounded-xl border">
+              <div className="hidden grid-cols-[5rem_minmax(0,1fr)_7.5rem_7.5rem] items-center gap-4 border-b bg-muted/40 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:grid">
+                <span>Date</span>
+                <span>Entry</span>
+                <span className="text-right">Amount</span>
+                <span className="text-right">Balance</span>
+              </div>
+              {ledger.length === 0 ? (
+                <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  {hasFilters
+                    ? "No entries match your filters."
+                    : "No transactions in this account yet."}
+                </p>
+              ) : (
+                ledger.map((row) => {
+                  const debit = parseFloat(row.debitAmount) || 0;
+                  return (
+                    <a
+                      key={`${row.entryId}-${row.entryNumber}`}
+                      href={`/accounting/${row.entryId}`}
+                      className="group/row grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b px-4 py-2.5 transition-colors last:border-b-0 hover:bg-accent/40 sm:grid-cols-[5rem_minmax(0,1fr)_7.5rem_7.5rem] sm:items-center"
+                    >
+                      <span className="text-[11px] tabular-nums text-muted-foreground sm:text-xs">
+                        {row.date}
+                      </span>
+                      <div className="min-w-0 sm:order-none">
+                        <p className="truncate text-sm group-hover/row:underline">{row.description}</p>
+                        <p className="font-mono text-[10px] text-muted-foreground">
+                          #{row.entryNumber}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-right sm:order-none">
+                        <Amount debit={row.debitAmount} credit={row.creditAmount} currency={currency} />
+                      </span>
+                      <span
+                        className={cn(
+                          "col-span-2 text-right text-sm font-medium tabular-nums sm:col-span-1",
+                          debit > 0 ? "" : "text-muted-foreground"
+                        )}
+                      >
+                        {new Intl.NumberFormat("en", { style: "currency", currency }).format(
+                          parseFloat(row.balance) || 0
+                        )}
+                      </span>
+                    </a>
+                  );
+                })
+              )}
+            </div>
           </motion.div>
         </MotionConfig>
       )}

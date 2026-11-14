@@ -15,7 +15,7 @@ import {
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { cn } from "@/lib/utils";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { BlurReveal } from "@/components/shared/blur-reveal";
 import { Button } from "@/components/ui/button";
 
 interface NavItem {

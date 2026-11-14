@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+            *************** Extended links : 2026-01-01*************
+
+            *************** Financial Statements Highlights - Insurance companies *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 	
+
+  -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins-rol" 
+            elementFormDefault="qualified" 
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+            xmlns:sg-fsh-ins-rol="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins-rol" 
+            xmlns:link="http://www.xbrl.org/2003/linkbase" 
+            xmlns:xl="http://www.xbrl.org/2003/XLink" 
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+            xmlns:xbrli="http://www.xbrl.org/2003/instance" 
+            xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/FilingInformation" id="FilingInformation">
+        <link:definition>[10000000] Filing information</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+       
+	   	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/StatementByDirectors" id="StatementByDirectors">
+        <link:definition>[12000000] Statement by directors</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/IndependentAuditorsReport" id="IndependentAuditorsReport">
+        <link:definition>[13000000] Independent auditors' report</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+    <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/FSHofSFP" id="FSHofSFP">
+        <link:definition>[21000000] Financial statements highlights - Statement of financial position</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	        	  	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/FSHofIS" id="FSHofIS">
+        <link:definition>[22000000] Financial statements highlights - Income statement</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/FSHofSCF" id="FSHofSCF">
+        <link:definition>[23000000] Financial statements highlights - Statement of cash flows</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	   
+	  
+     <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/AxisDefaults" id="AxisDefaults">
+        <link:definition>[99999999] Axis - Defaults</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/AxisConsolidatedAndSeparateFinancialStatements" id="AxisConsolidatedAndSeparateFinancialStatements">
+        <link:definition>[90050000] Axis - Consolidated and separate financial statements</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+     
+	 
+	 
+	<link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins/role/AdditionalInformation" id="AdditionalInformation">
+      <link:definition>[14000000] Additional information</link:definition>
+      <link:usedOn>link:presentationLink</link:usedOn>
+      <link:usedOn>link:calculationLink</link:usedOn>
+      <link:usedOn>link:definitionLink</link:usedOn>
+     </link:roleType>
+
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+</xsd:schema>
