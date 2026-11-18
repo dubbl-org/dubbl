@@ -8,10 +8,10 @@ import {
   ArrowRight,
   Mail,
   FileBox,
-  Github,
   Sparkles,
   Zap,
 } from "lucide-react";
+import { GithubIcon } from "@/components/brand-icons";
 import { GrainGradient } from "@paper-design/shaders-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -484,7 +484,7 @@ export default function PricingPage() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <Github className="size-5 text-emerald-600 dark:text-emerald-400" />
+                  <GithubIcon className="size-5 text-emerald-600 dark:text-emerald-400" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                     Open Source
                   </span>
@@ -507,7 +507,7 @@ export default function PricingPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Github className="mr-2 size-4" />
+                  <GithubIcon className="mr-2 size-4" />
                   View on GitHub
                 </a>
               </Button>

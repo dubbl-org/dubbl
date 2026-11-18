@@ -1,0 +1,164 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--                     
+            *************** Extended links : 2026-01-01*************
+
+            *************** Entities following SFRS *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+  -->
+<xsd:schema xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:sg-sfrs-rol="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs-rol" elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs-rol">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/FilingInformation" id="FilingInformation">
+        <link:definition>[10000000] Filing information</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/FullSetOfFinancialStatements" id="FullSetOfFinancialStatements">
+        <link:definition>[11000000] Full set of financial statements</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/StatementByDirectors" id="StatementByDirectors">
+        <link:definition>[12000000] Statement by directors</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/IndependentAuditorsReport" id="IndependentAuditorsReport">
+        <link:definition>[13000000] Independent auditors' report</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/SFPCurrentNonCurrent" id="SFPCurrentNonCurrent">
+        <link:definition>[21100000] Statement of financial position, current and non-current</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/SFPOrderOfLiquidity" id="SFPOrderOfLiquidity">
+        <link:definition>[21200000] Statement of financial position, order of liquidity</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/ISNature" id="ISNature">
+        <link:definition>[22000000] Income statement, by nature of expense</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/SCF" id="SCFDirect">
+        <link:definition>[23000000] Statement of cash flows</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteTradeAndOtherReceivables" id="NoteTradeAndOtherReceivables">
+        <link:definition>[31000000] Note - Trade and other receivables</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NotePropertyPlantAndEquipment" id="NotePropertyPlantAndEquipment">
+        <link:definition>[32000000] Note - Property, plant and equipment</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteIntangibleAssets" id="NoteIntangibleAssets">
+        <link:definition>[33000000] Note - Intangible assets (excluding goodwill)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteRightOfUseAssets" id="NoteRightOfUseAssets">
+        <link:definition>[34000000] Note - Right-of-use assets</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteTradeAndOtherPayables" id="NoteTradeAndOtherPayables">
+        <link:definition>[35000000] Note - Trade and other payables</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteLoansAndBorrowings" id="NoteLoansAndBorrowings">
+        <link:definition>[36000000] Note - Loans and borrowings</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteRevenue" id="NoteRevenue">
+        <link:definition>[37000000] Note - Revenue</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+	  
+	            
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteSelectedIncomeExpense" id="NoteSelectedIncomeExpense">
+        <link:definition>[38000000] Note - Selected income (expense)</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/NoteRelatedParty" id="NoteRelatedParty">
+        <link:definition>[39000000] Note - Related party</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+	  
+	  
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/AxisDefaults" id="AxisDefaults">
+        <link:definition>[99999999] Axis - Defaults</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/AxisConsolidatedAndSeparateFinancialStatements" id="AxisConsolidatedAndSeparateFinancialStatements">
+        <link:definition>[90050000] Axis - Consolidated and separate financial statements</link:definition>
+        <link:usedOn>link:presentationLink</link:usedOn>
+        <link:usedOn>link:calculationLink</link:usedOn>
+        <link:usedOn>link:definitionLink</link:usedOn>
+      </link:roleType>
+      
+           
+      <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/AdditionalCalculations" id="AdditionalCalculations">
+        <link:definition>[22900000] Additional calculations</link:definition>
+        <link:usedOn>link:calculationLink</link:usedOn>
+      </link:roleType>
+      
+	  <link:roleType roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs/role/AdditionalInformation" id="AdditionalInformation">
+      <link:definition>[14000000] Additional information</link:definition>
+      <link:usedOn>link:presentationLink</link:usedOn>
+      <link:usedOn>link:calculationLink</link:usedOn>
+      <link:usedOn>link:definitionLink</link:usedOn>
+     </link:roleType>
+	  
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd" />
+</xsd:schema>

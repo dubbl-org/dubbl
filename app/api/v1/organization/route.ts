@@ -43,6 +43,25 @@ const updateSchema = z
     defaultPaymentTerms: z.string().nullable().optional(),
     industrySector: z.string().nullable().optional(),
     referralSource: z.string().nullable().optional(),
+    // Jurisdiction filing settings. IRAS assigns the GST period start month and
+    // frequency; ACRA picks the filing template from the year's figures, so the
+    // stored xbrlTemplate is the org's current expectation, not a rule.
+    gstRegisteredAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    gstDeregisteredAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    gstFilingFrequency: z.enum(["monthly", "quarterly"]).nullable().optional(),
+    gstPeriodStartMonth: z.number().int().min(1).max(12).nullable().optional(),
+    xbrlTemplate: z.enum(["simplified", "full"]).nullable().optional(),
+    accountingStandard: z.enum(["sfrs", "sfrs_se"]).nullable().optional(),
+    newStartupExemption: z.boolean().optional(),
+    isExemptPrivateCompany: z.boolean().optional(),
     // Getting-started checklist: client sends true to mark onboarding done
     // (stored as now()), or null to re-open it. Coerced to a Date below.
     onboardingCompleted: z.boolean().optional(),

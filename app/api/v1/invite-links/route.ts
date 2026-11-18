@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orgInviteLink } from "@/lib/db/schema";
+import { orgInviteLink, publicUserColumns } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     const links = await db.query.orgInviteLink.findMany({
       where: eq(orgInviteLink.organizationId, ctx.organizationId),
-      with: { createdBy: true },
+      with: { createdBy: { columns: publicUserColumns } },
       orderBy: (link, { desc }) => [desc(link.createdAt)],
     });
 

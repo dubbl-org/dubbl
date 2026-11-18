@@ -20,8 +20,8 @@ import {
   ExternalLink,
   ArrowLeftRight,
 } from "lucide-react";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,6 +54,8 @@ interface BankAccount {
   accountType: BankAccountType;
   color: string;
   balance: number;
+  inflow: number;
+  outflow: number;
   isActive: boolean;
 }
 
@@ -87,6 +89,42 @@ const ACCOUNT_TYPE_ICONS: Record<BankAccountType, React.ElementType> = {
   other: Wallet,
 };
 
+/** Amounts only add up inside one currency, so totals are kept per currency. */
+function sumByCurrency(rows: Array<{ currency: string; amount: number }>) {
+  const sums = new Map<string, number>();
+  for (const { currency, amount } of rows) {
+    sums.set(currency, (sums.get(currency) ?? 0) + amount);
+  }
+  return [...sums]
+    .map(([currency, amount]) => ({ currency, amount }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+function CurrencyAmounts({
+  amounts,
+  fallbackCurrency,
+}: {
+  amounts: Array<{ currency: string; amount: number }>;
+  fallbackCurrency: string;
+}) {
+  const list =
+    amounts.length > 0 ? amounts : [{ currency: fallbackCurrency, amount: 0 }];
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-2">
+      {list.map(({ currency, amount }) => (
+        <span key={currency} className="whitespace-nowrap">
+          {formatMoney(amount, currency)}
+          {list.length > 1 && (
+            <span className="ml-1 align-middle text-[10px] font-normal text-muted-foreground">
+              {currency}
+            </span>
+          )}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function BankingPage() {
   const router = useRouter();
   const { open: openDrawer } = useCreateDrawer();
@@ -116,12 +154,17 @@ export default function BankingPage() {
   }, []);
 
   const totals = useMemo(() => {
-    const active = accounts.filter((a) => a.isActive).length;
-    const balance = accounts.reduce((sum, a) => sum + a.balance, 0);
-    return { active, balance };
+    const pick = (field: "balance" | "inflow" | "outflow") =>
+      sumByCurrency(accounts.map((a) => ({ currency: a.currencyCode, amount: a[field] })));
+    return {
+      active: accounts.filter((a) => a.isActive).length,
+      balance: pick("balance"),
+      inflow: pick("inflow"),
+      outflow: pick("outflow"),
+    };
   }, [accounts]);
 
-  if (loading && accounts.length === 0) return <BrandLoader />;
+  if (loading && accounts.length === 0) return <ListSkeleton />;
 
   // Empty state
   if (!loading && accounts.length === 0) {
@@ -212,8 +255,8 @@ export default function BankingPage() {
     );
   }
 
-  const positiveBalance = accounts.filter((a) => a.balance > 0).reduce((s, a) => s + a.balance, 0);
-  const negativeBalance = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + Math.abs(a.balance), 0);
+  const fallbackCurrency = accounts[0]?.currencyCode ?? "USD";
+  const singleBalance = totals.balance.length === 1 ? totals.balance[0].amount : 0;
   const currencies = [...new Set(accounts.map((a) => a.currencyCode))];
   const maxBalance = Math.max(...accounts.map((a) => Math.abs(a.balance)), 1);
 
@@ -236,13 +279,17 @@ export default function BankingPage() {
           <p className="text-[11px] text-muted-foreground">Total Balance</p>
           <p className={cn(
             "mt-0.5 font-mono text-lg font-semibold tabular-nums",
-            totals.balance > 0
+            singleBalance > 0
               ? "text-emerald-600 dark:text-emerald-400"
-              : totals.balance < 0
+              : singleBalance < 0
                 ? "text-red-600 dark:text-red-400"
                 : ""
           )}>
-            {showBalances ? formatMoney(totals.balance) : "********"}
+            {showBalances ? (
+              <CurrencyAmounts amounts={totals.balance} fallbackCurrency={fallbackCurrency} />
+            ) : (
+              "********"
+            )}
           </p>
         </div>
         <div>
@@ -251,7 +298,11 @@ export default function BankingPage() {
             Money In
           </p>
           <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {showBalances ? formatMoney(positiveBalance) : "********"}
+            {showBalances ? (
+              <CurrencyAmounts amounts={totals.inflow} fallbackCurrency={fallbackCurrency} />
+            ) : (
+              "********"
+            )}
           </p>
         </div>
         <div>
@@ -260,7 +311,11 @@ export default function BankingPage() {
             Money Out
           </p>
           <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
-            {showBalances ? formatMoney(negativeBalance) : "********"}
+            {showBalances ? (
+              <CurrencyAmounts amounts={totals.outflow} fallbackCurrency={fallbackCurrency} />
+            ) : (
+              "********"
+            )}
           </p>
         </div>
         <div>
@@ -323,7 +378,9 @@ export default function BankingPage() {
         {sortedGroups.map((type) => {
           const group = groupedAccounts[type];
           const Icon = ACCOUNT_TYPE_ICONS[type];
-          const groupBalance = group.reduce((s, a) => s + a.balance, 0);
+          const groupBalance = sumByCurrency(
+            group.map((a) => ({ currency: a.currencyCode, amount: a.balance }))
+          );
 
           return (
             <div key={type}>
@@ -337,7 +394,11 @@ export default function BankingPage() {
                     <span className="text-xs text-muted-foreground/50 tabular-nums">({group.length})</span>
                   </div>
                   <p className="text-xs font-mono tabular-nums text-muted-foreground">
-                    {showBalances ? formatMoney(groupBalance) : "****"}
+                    {showBalances ? (
+                      <CurrencyAmounts amounts={groupBalance} fallbackCurrency={fallbackCurrency} />
+                    ) : (
+                      "****"
+                    )}
                   </p>
                 </div>
               )}

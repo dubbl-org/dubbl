@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError } from "@/lib/api/response";
+import { centsToDecimal } from "@/lib/money";
 import type { Statement, StatementRow } from "@/lib/reports/statement-export";
+import { buildFsModel, type FsModel } from "@/lib/reports/fs-model";
+import { resolveTaxModuleForOrg } from "@/lib/tax/registry";
+import { SG_MODULE } from "@/lib/tax/modules/sg";
 import {
   aggregateByDateRange,
   type AccountAggregate,
@@ -67,6 +71,24 @@ function toPeriod(
   };
 }
 
+/**
+ * Profit and loss.
+ *
+ * Query params: `startDate`, `endDate`, `basis=accrual|cash`, `compareFrom` +
+ * `compareTo` (comparative period), `format=json|xlsx|pdf`, and
+ * `presentation=sfrs`.
+ *
+ * The default shape is unchanged: one row per revenue/expense account.
+ *
+ * `presentation=sfrs` groups the same figures by nature of expense, captioned by
+ * the org's tax module and ordered by its `captionOrder` ("Cost of sales",
+ * "Employee benefits expense", "Depreciation expense", "Other operating
+ * expenses"). It adds a `sfrs` object to the JSON (`income` and `expenses`
+ * sections, `netProfit`, and a `comparison` block when a comparative period is
+ * requested) and renders that grouping in `format=xlsx|pdf`. SFRS is
+ * Singapore's standard, so a module without a presentation falls back to
+ * Singapore's.
+ */
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
@@ -81,6 +103,7 @@ export async function GET(request: Request) {
     const endDate =
       url.searchParams.get("endDate") || new Date().toISOString().slice(0, 10);
     const basis = parseBasis(url.searchParams.get("basis"));
+    const sfrs = url.searchParams.get("presentation") === "sfrs";
 
     // Optional comparative period (both bounds required to activate).
     const compareFrom = url.searchParams.get("compareFrom");
@@ -95,14 +118,29 @@ export async function GET(request: Request) {
     const primary = toPeriod(startDate, endDate, primaryAccounts);
 
     let comparison: PLPeriod | undefined;
+    let comparisonAccounts: AccountAggregate[] | undefined;
     if (hasComparison) {
       const cmpAccounts = await aggregateByDateRange(
         ctx.organizationId,
         { startDate: compareFrom!, endDate: compareTo! },
         { basis, accountTypes: ["revenue", "expense"] }
       );
+      comparisonAccounts = cmpAccounts;
       comparison = toPeriod(compareFrom!, compareTo!, cmpAccounts);
     }
+
+    // SFRS grouping by nature of expense, over the same aggregates.
+    const presentation = sfrs
+      ? (await resolveTaxModuleForOrg(ctx.organizationId)).fsPresentation ??
+        SG_MODULE.fsPresentation!
+      : null;
+    const model = presentation
+      ? buildFsModel({ accounts: primaryAccounts, presentation })
+      : null;
+    const comparisonModel =
+      presentation && comparisonAccounts
+        ? buildFsModel({ accounts: comparisonAccounts, presentation })
+        : null;
 
     if (format === "pdf" || format === "xlsx") {
       const org = await db.query.organization.findFirst({
@@ -110,7 +148,20 @@ export async function GET(request: Request) {
         columns: { defaultCurrency: true },
       });
       const currency = org?.defaultCurrency || "USD";
-      const statement = buildStatement(primary, comparison, basis, currency);
+      const statement = model
+        ? sfrsStatement(
+            model,
+            comparisonModel,
+            comparison
+              ? [
+                  `${primary.startDate} to ${primary.endDate}`,
+                  `${comparison.startDate} to ${comparison.endDate}`,
+                ]
+              : null,
+            basis,
+            currency
+          )
+        : buildStatement(primary, comparison, basis, currency);
 
       const { toPdf, toXlsx } = await import("@/lib/reports/statement-export");
       if (format === "pdf") {
@@ -144,10 +195,114 @@ export async function GET(request: Request) {
       netIncome: primary.netIncome,
       // New: comparative period (present only when compareFrom/compareTo given).
       ...(comparison ? { comparison } : {}),
+      // New: SFRS presentation by nature of expense (only when requested).
+      ...(model
+        ? {
+            sfrs: {
+              presentation: "sfrs",
+              ...sfrsJson(model),
+              ...(comparisonModel ? { comparison: sfrsJson(comparisonModel) } : {}),
+            },
+          }
+        : {}),
     });
   } catch (err) {
     return handleError(err);
   }
+}
+
+/** Revenue / expenses grouped by caption, plus the bottom line (decimal). */
+function sfrsJson(model: FsModel) {
+  const section = (s: FsModel["income"]) => ({
+    caption: s.caption,
+    rows: s.rows.map((r) => ({
+      caption: r.caption,
+      amount: centsToDecimal(r.amount),
+      codes: r.codes,
+    })),
+    total: centsToDecimal(s.total),
+  });
+  return {
+    income: section(model.income),
+    expenses: section(model.expenses),
+    netProfit: centsToDecimal(model.netProfit),
+  };
+}
+
+/**
+ * SFRS statement of profit or loss: by nature of expense. `columns` is set only
+ * when a comparative period is supplied (current, then prior).
+ */
+function sfrsStatement(
+  model: FsModel,
+  comparisonModel: FsModel | null,
+  columns: string[] | null,
+  basis: ReportBasis,
+  currency: string
+): Statement {
+  const periodLabel = `By nature of expense (${basis} basis)`;
+
+  if (!comparisonModel || !columns) {
+    return {
+      title: "Profit and Loss",
+      periodLabel,
+      currency,
+      sections: [
+        {
+          label: "Revenue",
+          rows: model.income.rows.map((r) => ({
+            name: r.caption,
+            amount: r.amount,
+            depth: 1,
+          })),
+          subtotal: model.income.total,
+        },
+        {
+          label: "Expenses",
+          rows: model.expenses.rows.map((r) => ({
+            name: r.caption,
+            amount: r.amount,
+            depth: 1,
+          })),
+          subtotal: model.expenses.total,
+        },
+      ],
+      grandTotal: model.netProfit,
+    };
+  }
+
+  // Align captions across the two periods: current order first, then any caption
+  // that only exists in the comparative period.
+  const align = (
+    current: FsModel["income"],
+    prior: FsModel["income"]
+  ): { rows: StatementRow[]; subtotals: number[] } => {
+    const priorByCaption = new Map(prior.rows.map((r) => [r.caption, r.amount]));
+    const rows: StatementRow[] = current.rows.map((r) => {
+      const priorAmount = priorByCaption.get(r.caption) ?? 0;
+      priorByCaption.delete(r.caption);
+      return { name: r.caption, amounts: [r.amount, priorAmount], depth: 1 };
+    });
+    for (const [caption, amount] of priorByCaption) {
+      rows.push({ name: caption, amounts: [0, amount], depth: 1 });
+    }
+    return { rows, subtotals: [current.total, prior.total] };
+  };
+
+  const income = align(model.income, comparisonModel.income);
+  const expenses = align(model.expenses, comparisonModel.expenses);
+
+  return {
+    title: "Profit and Loss",
+    periodLabel,
+    currency,
+    columns,
+    sections: [
+      { label: "Revenue", rows: income.rows, subtotals: income.subtotals },
+      { label: "Expenses", rows: expenses.rows, subtotals: expenses.subtotals },
+    ],
+    grandTotals: [model.netProfit, comparisonModel.netProfit],
+  };
 }
 
 /**

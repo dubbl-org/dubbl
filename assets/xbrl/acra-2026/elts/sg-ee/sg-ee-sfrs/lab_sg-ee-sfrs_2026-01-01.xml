@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+            *************** Entry-point : 2026-01-01*************
+          
+            *************** Entities following SFRS *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+					     
+      
+-->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <link:labelLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="sg-ee-sfrs_2026-01-01.xsd#sg-ee-sfrs_NatureOfFinancialStatements" xlink:label="sg-ee-sfrs_NatureOfFinancialStatements" xlink:title="NatureOfFinancialStatements"/>
+    <link:label xlink:type="resource" xlink:label="label_sg-ee-sfrs_NatureOfFinancialStatements" xlink:role="http://www.xbrl.org/2003/role/label" xlink:title="label_sg-ee-sfrs_NatureOfFinancialStatements" xml:lang="en" id="label_sg-ee-sfrs_NatureOfFinancialStatements">Nature of financial statements</link:label>
+    <link:labelArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" xlink:from="sg-ee-sfrs_NatureOfFinancialStatements" xlink:to="label_sg-ee-sfrs_NatureOfFinancialStatements" xlink:title="label: NatureOfFinancialStatements to label_sg-ee-sfrs_NatureOfFinancialStatements"/>
+   
+  </link:labelLink>
+</link:linkbase>

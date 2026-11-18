@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 
 type Preset = "this-month" | "last-month" | "this-quarter" | "this-year" | "last-year" | "custom";
 

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+       *************** References : 2026-01-01*************
+                      
+       *************** Financial Statements Highlights - Bank and finance companies *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts ../elts/sg-parts_2026-01-01.xsd" xmlns:sg-fsh-bfc-ent="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc-ent" xmlns="http://www.xbrl.org/2003/linkbase" xmlns:sg-parts="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <roleRef roleURI="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:type="simple" xlink:href="http://www.xbrl.org/lrr/role/reference-2009-12-16.xsd#commonPracticeRef"/>
+  <referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_OtherRevenue" xlink:label="OtherRevenue" xlink:title="OtherRevenue"/>
+    <reference xlink:type="resource" xlink:label="reference_OtherRevenue_2" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_OtherRevenue" id="reference_OtherRevenue_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>112</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="OtherRevenue" xlink:to="reference_OtherRevenue_2" xlink:title="reference: OtherRevenue to reference_OtherRevenue"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_FinanceCosts" xlink:label="FinanceCosts" xlink:title="FinanceCosts"/>
+    <reference xlink:type="resource" xlink:label="reference_FinanceCosts" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_FinanceCosts" id="reference_FinanceCosts">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>82</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="FinanceCosts" xlink:to="reference_FinanceCosts" xlink:title="reference: FinanceCosts to reference_FinanceCosts"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" xlink:label="ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" xlink:title="ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue"/>
+    <reference xlink:type="resource" xlink:label="reference_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" id="reference_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>18</ref:Number>
+      <ref:Paragraph>35</ref:Paragraph>
+      <ref:Subparagraph>b</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" xlink:to="reference_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue" xlink:title="reference: ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue to reference_ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_InterestExpenditure" xlink:label="InterestExpenditure" xlink:title="InterestExpenditure"/>
+    <reference xlink:type="resource" xlink:label="reference_InterestExpenditure" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_InterestExpenditure" id="reference_InterestExpenditure">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>112</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="InterestExpenditure" xlink:to="reference_InterestExpenditure" xlink:title="reference: InterestExpenditure to reference_InterestExpenditure"/>
+    <reference xlink:type="resource" xlink:label="reference_InterestExpenditure_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_InterestExpenditure" id="reference_InterestExpenditure_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="InterestExpenditure" xlink:to="reference_InterestExpenditure_2" xlink:title="reference: InterestExpenditure to reference_InterestExpenditure"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_GeneralAllowanceForDebts" xlink:label="GeneralAllowanceForDebts" xlink:title="GeneralAllowanceForDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_GeneralAllowanceForDebts" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_GeneralAllowanceForDebts" id="reference_GeneralAllowanceForDebts">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>6.3</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="GeneralAllowanceForDebts" xlink:to="reference_GeneralAllowanceForDebts" xlink:title="reference: GeneralAllowanceForDebts to reference_GeneralAllowanceForDebts"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_SpecificAllowanceForDebts" xlink:label="SpecificAllowanceForDebts" xlink:title="SpecificAllowanceForDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_SpecificAllowanceForDebts" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_SpecificAllowanceForDebts" id="reference_SpecificAllowanceForDebts">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>6.3</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="SpecificAllowanceForDebts" xlink:to="reference_SpecificAllowanceForDebts" xlink:title="reference: SpecificAllowanceForDebts to reference_SpecificAllowanceForDebts"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CommitmentsAgainstDebts" xlink:label="CommitmentsAgainstDebts" xlink:title="CommitmentsAgainstDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_CommitmentsAgainstDebts_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CommitmentsAgainstDebts" id="reference_CommitmentsAgainstDebts_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>107</ref:Number>
+      <ref:Paragraph>31</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CommitmentsAgainstDebts" xlink:to="reference_CommitmentsAgainstDebts_2" xlink:title="reference: CommitmentsAgainstDebts to reference_CommitmentsAgainstDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_CommitmentsAgainstDebts_3" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CommitmentsAgainstDebts" id="reference_CommitmentsAgainstDebts_3">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>107</ref:Number>
+      <ref:Paragraph>32</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CommitmentsAgainstDebts" xlink:to="reference_CommitmentsAgainstDebts_3" xlink:title="reference: CommitmentsAgainstDebts to reference_CommitmentsAgainstDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_CommitmentsAgainstDebts_4" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CommitmentsAgainstDebts" id="reference_CommitmentsAgainstDebts_4">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>107</ref:Number>
+      <ref:Paragraph>32A</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CommitmentsAgainstDebts" xlink:to="reference_CommitmentsAgainstDebts_4" xlink:title="reference: CommitmentsAgainstDebts to reference_CommitmentsAgainstDebts"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_RevenueFromInterestNet" xlink:label="RevenueFromInterestNet" xlink:title="RevenueFromInterestNet"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromInterestNet" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_RevenueFromInterestNet" id="reference_RevenueFromInterestNet">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>112</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromInterestNet" xlink:to="reference_RevenueFromInterestNet" xlink:title="reference: RevenueFromInterestNet to reference_RevenueFromInterestNet"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromInterestNet_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_RevenueFromInterestNet" id="reference_RevenueFromInterestNet_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromInterestNet" xlink:to="reference_RevenueFromInterestNet_2" xlink:title="reference: RevenueFromInterestNet to reference_RevenueFromInterestNet"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CollateralsForDebts" xlink:label="CollateralsForDebts" xlink:title="CollateralsForDebts"/>
+    <reference xlink:type="resource" xlink:label="reference_CollateralsForDebts_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CollateralsForDebts" id="reference_CollateralsForDebts_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>107</ref:Number>
+      <ref:Paragraph>38</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CollateralsForDebts" xlink:to="reference_CollateralsForDebts_2" xlink:title="reference: CollateralsForDebts to reference_CollateralsForDebts"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsPass" xlink:label="CreditFacilitiesCategorisedAsPass" xlink:title="CreditFacilitiesCategorisedAsPass"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilitiesCategorisedAsPass" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilitiesCategorisedAsPass" id="reference_CreditFacilitiesCategorisedAsPass">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilitiesCategorisedAsPass" xlink:to="reference_CreditFacilitiesCategorisedAsPass" xlink:title="reference: CreditFacilitiesCategorisedAsPass to reference_CreditFacilitiesCategorisedAsPass"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsSpecialMention" xlink:label="CreditFacilitiesCategorisedAsSpecialMention" xlink:title="CreditFacilitiesCategorisedAsSpecialMention"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilitiesCategorisedAsSpecialMention" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilitiesCategorisedAsSpecialMention" id="reference_CreditFacilitiesCategorisedAsSpecialMention">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilitiesCategorisedAsSpecialMention" xlink:to="reference_CreditFacilitiesCategorisedAsSpecialMention" xlink:title="reference: CreditFacilitiesCategorisedAsSpecialMention to reference_CreditFacilitiesCategorisedAsSpecialMention"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsSubstandard" xlink:label="CreditFacilitiesCategorisedAsSubstandard" xlink:title="CreditFacilitiesCategorisedAsSubstandard"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilitiesCategorisedAsSubstandard" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilitiesCategorisedAsSubstandard" id="reference_CreditFacilitiesCategorisedAsSubstandard">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilitiesCategorisedAsSubstandard" xlink:to="reference_CreditFacilitiesCategorisedAsSubstandard" xlink:title="reference: CreditFacilitiesCategorisedAsSubstandard to reference_CreditFacilitiesCategorisedAsSubstandard"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsDoubtful" xlink:label="CreditFacilitiesCategorisedAsDoubtful" xlink:title="CreditFacilitiesCategorisedAsDoubtful"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilitiesCategorisedAsDoubtful" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilitiesCategorisedAsDoubtful" id="reference_CreditFacilitiesCategorisedAsDoubtful">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilitiesCategorisedAsDoubtful" xlink:to="reference_CreditFacilitiesCategorisedAsDoubtful" xlink:title="reference: CreditFacilitiesCategorisedAsDoubtful to reference_CreditFacilitiesCategorisedAsDoubtful"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsLoss" xlink:label="CreditFacilitiesCategorisedAsLoss" xlink:title="CreditFacilitiesCategorisedAsLoss"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilitiesCategorisedAsLoss" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilitiesCategorisedAsLoss" id="reference_CreditFacilitiesCategorisedAsLoss">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilitiesCategorisedAsLoss" xlink:to="reference_CreditFacilitiesCategorisedAsLoss" xlink:title="reference: CreditFacilitiesCategorisedAsLoss to reference_CreditFacilitiesCategorisedAsLoss"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilities" xlink:label="CreditFacilities" xlink:title="CreditFacilities"/>
+    <reference xlink:type="resource" xlink:label="reference_CreditFacilities" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_CreditFacilities" id="reference_CreditFacilities">
+      <ref:Name>BA</ref:Name>
+      <ref:Chapter>19</ref:Chapter>
+      <sg-parts:Notice>612</sg-parts:Notice>
+      <ref:Paragraph>4.2</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="CreditFacilities" xlink:to="reference_CreditFacilities" xlink:title="reference: CreditFacilities to reference_CreditFacilities"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromInterest" xlink:label="RevenueFromInterest" xlink:title="RevenueFromInterest"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromInterest" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_RevenueFromInterest" id="reference_RevenueFromInterest">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromInterest" xlink:to="reference_RevenueFromInterest" xlink:title="reference: RevenueFromInterest to reference_RevenueFromInterest"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_InvestmentIncome" xlink:label="InvestmentIncome" xlink:title="InvestmentIncome"/>
+    <reference xlink:type="resource" xlink:label="reference_InvestmentIncome" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_InvestmentIncome" id="reference_InvestmentIncome">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="InvestmentIncome" xlink:to="reference_InvestmentIncome" xlink:title="reference: InvestmentIncome to reference_InvestmentIncome"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromFeesAndCommission" xlink:label="RevenueFromFeesAndCommission" xlink:title="RevenueFromFeesAndCommission"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromFeesAndCommission" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_RevenueFromFeesAndCommission" id="reference_RevenueFromFeesAndCommission">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromFeesAndCommission" xlink:to="reference_RevenueFromFeesAndCommission" xlink:title="reference: RevenueFromFeesAndCommission to reference_RevenueFromFeesAndCommission"/>
+    <loc xlink:type="locator" xlink:href="../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromDividends" xlink:label="RevenueFromDividends" xlink:title="RevenueFromDividends"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromDividends" xlink:role="http://www.xbrl.org/2009/role/commonPracticeRef" xlink:title="reference_RevenueFromDividends" id="reference_RevenueFromDividends">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>112</ref:Paragraph>
+      <ref:Subparagraph>c</ref:Subparagraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromDividends" xlink:to="reference_RevenueFromDividends" xlink:title="reference: RevenueFromDividends to reference_RevenueFromDividends"/>
+    <reference xlink:type="resource" xlink:label="reference_RevenueFromDividends_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_RevenueFromDividends" id="reference_RevenueFromDividends_2">
+      <ref:Name>SFRS</ref:Name>
+      <ref:Number>1</ref:Number>
+      <ref:Paragraph>85</ref:Paragraph>
+    </reference>
+    <referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="RevenueFromDividends" xlink:to="reference_RevenueFromDividends_2" xlink:title="reference: RevenueFromDividends to reference_RevenueFromDividends"/>
+  </referenceLink>
+</linkbase>

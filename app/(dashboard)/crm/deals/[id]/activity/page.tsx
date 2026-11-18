@@ -25,8 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { SearchInput } from "@/components/ui/search-input";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { SearchInput } from "@/components/shared/search-input";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";

@@ -49,17 +49,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import { ContactPicker } from "@/components/dashboard/contact-picker";
 import { LineItemsEditor, type LineItem } from "@/components/dashboard/line-items-editor";
 import { EntryForm } from "@/components/dashboard/entry-form";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { FileUploader } from "@/components/dashboard/file-uploader";
-import { CurrencySelect } from "@/components/ui/currency-select";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { InventoryItemPicker } from "@/components/dashboard/inventory-item-picker";
 import { WarehousePicker } from "@/components/dashboard/warehouse-picker";
 import { CategoryPicker } from "@/components/dashboard/category-picker";
-import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/shared/currency-input";
 import { formatMoney, decimalToCents, decimalToMinorUnits } from "@/lib/money";
 
 type DrawerType = "contact" | "project" | "invoice" | "bill" | "entry" | "inventory" | "quote" | "salesReceipt" | "purchaseOrder" | "expense" | "fixedAsset" | "budget" | "employee" | "creditNote" | "recurring" | "account" | "bankAccount" | "warehouse" | "stockTake" | "category" | "transfer" | "bankTransfer" | "contractor" | "deal" | "debitNote" | "customerCredit" | "loan" | "openingBalance" | "accrualSchedule" | "revenueSchedule" | "recurringJournal";

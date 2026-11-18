@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+       *************** References : 2026-01-01*************
+                      
+       *************** Listing Manual *************
+	   
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:ref="http://www.xbrl.org/2006/ref" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_AuditFeesPaidToAuditorsOfCompany" xlink:label="AuditFeesPaidToAuditorsOfCompany" xlink:title="AuditFeesPaidToAuditorsOfCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_AuditFeesPaidToAuditorsOfCompany" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_AuditFeesPaidToAuditorsOfCompany" id="reference_AuditFeesPaidToAuditorsOfCompany">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>1207</ref:Paragraph>
+      <ref:Subparagraph>6</ref:Subparagraph>
+      <ref:Clause>a</ref:Clause>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="AuditFeesPaidToAuditorsOfCompany" xlink:to="reference_AuditFeesPaidToAuditorsOfCompany" xlink:title="reference: AuditFeesPaidToAuditorsOfCompany to reference_AuditFeesPaidToAuditorsOfCompany"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_AuditFeesPaidToOtherAuditors" xlink:label="AuditFeesPaidToOtherAuditors" xlink:title="AuditFeesPaidToOtherAuditors"/>
+    <link:reference xlink:type="resource" xlink:label="reference_AuditFeesPaidToOtherAuditors" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_AuditFeesPaidToOtherAuditors" id="reference_AuditFeesPaidToOtherAuditors">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>1207</ref:Paragraph>
+      <ref:Subparagraph>6</ref:Subparagraph>
+      <ref:Clause>a</ref:Clause>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="AuditFeesPaidToOtherAuditors" xlink:to="reference_AuditFeesPaidToOtherAuditors" xlink:title="reference: AuditFeesPaidToOtherAuditors to reference_AuditFeesPaidToOtherAuditors"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_NonAuditFeesPaidToAuditorsOfCompany" xlink:label="NonAuditFeesPaidToAuditorsOfCompany" xlink:title="NonAuditFeesPaidToAuditorsOfCompany"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NonAuditFeesPaidToAuditorsOfCompany" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NonAuditFeesPaidToAuditorsOfCompany" id="reference_NonAuditFeesPaidToAuditorsOfCompany">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>1207</ref:Paragraph>
+      <ref:Subparagraph>6</ref:Subparagraph>
+      <ref:Clause>a</ref:Clause>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NonAuditFeesPaidToAuditorsOfCompany" xlink:to="reference_NonAuditFeesPaidToAuditorsOfCompany" xlink:title="reference: NonAuditFeesPaidToAuditorsOfCompany to reference_NonAuditFeesPaidToAuditorsOfCompany"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_NonAuditFeesPaidToOtherAuditors" xlink:label="NonAuditFeesPaidToOtherAuditors" xlink:title="NonAuditFeesPaidToOtherAuditors"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NonAuditFeesPaidToOtherAuditors" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NonAuditFeesPaidToOtherAuditors" id="reference_NonAuditFeesPaidToOtherAuditors">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>1207</ref:Paragraph>
+      <ref:Subparagraph>6</ref:Subparagraph>
+      <ref:Clause>a</ref:Clause>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NonAuditFeesPaidToOtherAuditors" xlink:to="reference_NonAuditFeesPaidToOtherAuditors" xlink:title="reference: NonAuditFeesPaidToOtherAuditors to reference_NonAuditFeesPaidToOtherAuditors"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_PaymentToAuditors" xlink:label="PaymentToAuditors" xlink:title="PaymentToAuditors"/>
+    <link:reference xlink:type="resource" xlink:label="reference_PaymentToAuditors" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_PaymentToAuditors" id="reference_PaymentToAuditors">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>1207</ref:Paragraph>
+      <ref:Subparagraph>6</ref:Subparagraph>
+      <ref:Clause>a</ref:Clause>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="PaymentToAuditors" xlink:to="reference_PaymentToAuditors" xlink:title="reference: PaymentToAuditors to reference_PaymentToAuditors"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_NameOfAuditorOfSubsidiary" xlink:label="NameOfAuditorOfSubsidiary" xlink:title="NameOfAuditorOfSubsidiary"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfAuditorOfSubsidiary" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NameOfAuditorOfSubsidiary" id="reference_NameOfAuditorOfSubsidiary">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>717</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfAuditorOfSubsidiary" xlink:to="reference_NameOfAuditorOfSubsidiary" xlink:title="reference: NameOfAuditorOfSubsidiary to reference_NameOfAuditorOfSubsidiary"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfAuditorOfSubsidiary_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_NameOfAuditorOfSubsidiary" id="reference_NameOfAuditorOfSubsidiary_2">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>718</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfAuditorOfSubsidiary" xlink:to="reference_NameOfAuditorOfSubsidiary_2" xlink:title="reference: NameOfAuditorOfSubsidiary to reference_NameOfAuditorOfSubsidiary"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_YearOfAppointmentOfSigningAuditor" xlink:label="YearOfAppointmentOfSigningAuditor" xlink:title="YearOfAppointmentOfSigningAuditor"/>
+    <link:reference xlink:type="resource" xlink:label="reference_YearOfAppointmentOfSigningAuditor" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" xlink:title="reference_YearOfAppointmentOfSigningAuditor" id="reference_YearOfAppointmentOfSigningAuditor">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>713</ref:Paragraph>
+      <ref:Subparagraph>1</ref:Subparagraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="YearOfAppointmentOfSigningAuditor" xlink:to="reference_YearOfAppointmentOfSigningAuditor" xlink:title="reference: YearOfAppointmentOfSigningAuditor to reference_YearOfAppointmentOfSigningAuditor"/>
+    <link:loc xlink:type="locator" xlink:href="../elts/sg-lm-cor_2026-01-01.xsd#sg-lm_NameOfAuditorOfAssociate" xlink:label="NameOfAuditorOfAssociate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfAuditorOfAssociate" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" id="reference_NameOfAuditorOfAssociate">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>717</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfAuditorOfAssociate" xlink:to="reference_NameOfAuditorOfAssociate"/>
+    <link:reference xlink:type="resource" xlink:label="reference_NameOfAuditorOfAssociate_2" xlink:role="http://www.xbrl.org/2003/role/disclosureRef" id="reference_NameOfAuditorOfAssociate_2">
+      <ref:Name>Listing Manual</ref:Name>
+      <ref:Chapter>7</ref:Chapter>
+      <ref:Paragraph>718</ref:Paragraph>
+    </link:reference>
+    <link:referenceArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference" xlink:from="NameOfAuditorOfAssociate" xlink:to="reference_NameOfAuditorOfAssociate_2"/>
+  </link:referenceLink>
+</link:linkbase>

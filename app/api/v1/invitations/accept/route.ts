@@ -4,6 +4,7 @@ import { invitation, member, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { rateLimit, clientIp } from "@/lib/api/rate-limit";
 
 const acceptSchema = z.object({
   token: z.string().min(1),
@@ -13,6 +14,9 @@ const acceptSchema = z.object({
 export async function POST(request: Request) {
   try {
     const session = await auth();
+    if (!rateLimit(`invite-accept:${session?.user?.id ?? clientIp(request)}`, 20)) {
+      return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });
+    }
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }

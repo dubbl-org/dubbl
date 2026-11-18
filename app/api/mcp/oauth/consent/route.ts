@@ -74,7 +74,11 @@ export async function POST(request: Request) {
       redirectUri: parsed.redirect_uri,
       codeChallenge: parsed.code_challenge,
       codeChallengeMethod: parsed.code_challenge_method,
-      scopes: parsed.scope ?? "mcp",
+      // Scope strings from the client are recorded as "mcp" (full access):
+      // the tool surface is not scope-partitioned, so advertising a narrower
+      // scope at consent time would be misleading. shortcut: no granular MCP
+      // scopes yet — partition tools by scope when the tool registry grows one.
+      scopes: "mcp",
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
     });
 

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { document } from "@/lib/db/schema";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -5,7 +6,7 @@ import { getAuthContext } from "@/lib/api/auth-context";
 import { parsePagination, paginatedResponse } from "@/lib/api/pagination";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { ok, created, handleError } from "@/lib/api/response";
-import { getUploadUrl } from "@/lib/s3";
+import { getUploadUrl, validateUpload } from "@/lib/s3";
 import { checkStorageLimit } from "@/lib/api/check-limit";
 import { z } from "zod";
 
@@ -72,11 +73,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = uploadSchema.parse(body);
 
+    const uploadError = validateUpload(parsed.mimeType, parsed.fileSize);
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError }, { status: 400 });
+    }
+
     await checkStorageLimit(ctx.organizationId, parsed.fileSize);
 
     const fileKey = `documents/${ctx.organizationId}/${Date.now()}-${parsed.fileName}`;
 
-    const uploadUrl = await getUploadUrl(fileKey, parsed.mimeType);
+    const uploadUrl = await getUploadUrl(fileKey, parsed.mimeType, parsed.fileSize);
 
     const [doc] = await db
       .insert(document)

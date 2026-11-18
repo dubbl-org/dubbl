@@ -27,9 +27,11 @@ import {
   Sparkles,
   Package2,
   FileCheck2,
+  FileCode2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Section } from "@/components/dashboard/section";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
 const reportCategories = [
@@ -251,12 +253,64 @@ const reportCategories = [
   },
 ];
 
+interface FilingReturn {
+  kind: string;
+  title: string;
+  authority: string;
+}
+
 export default function ReportsPage() {
   useDocumentTitle("Reports · Overview");
+  // The tax cards come from the jurisdiction module: a Singapore org must not be
+  // offered a UK VAT100, and a new country needs no change here.
+  const [returns, setReturns] = useState<FilingReturn[]>([]);
+  const [hasXbrl, setHasXbrl] = useState(false);
+
+  useEffect(() => {
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    fetch("/api/v1/tax/returns", { headers: { "x-organization-id": orgId } })
+      .then((r) => r.json())
+      .then((d) => {
+        setReturns(Array.isArray(d.returns) ? d.returns : []);
+        // Only jurisdictions with an XBRL target (ACRA today) show the card.
+        setHasXbrl(Array.isArray(d.xbrl?.templates));
+      })
+      .catch(() => {});
+  }, []);
+
+  const categories = reportCategories.map((category) =>
+    category.title === "Tax time" && returns.length > 0
+      ? {
+          ...category,
+          reports: [
+            ...returns.map((r) => ({
+              title: r.title,
+              description: `${r.authority} — box by box, and what sits behind every number.`,
+              href: `/tax/returns/${r.kind}`,
+              icon: FileCheck2,
+            })),
+            ...(hasXbrl
+              ? [
+                  {
+                    title: "Annual return (XBRL)",
+                    description:
+                      "The financial statements ACRA wants, validated against the ACRA Taxonomy, ready for BizFinx.",
+                    href: "/reports/xbrl",
+                    icon: FileCode2,
+                  },
+                ]
+              : []),
+            ...category.reports.filter((r) => r.href !== "/reports/vat-return"),
+          ],
+        }
+      : category
+  );
+
   return (
     <ContentReveal>
       <div className="space-y-6 sm:space-y-10">
-        {reportCategories.map((category, i) => (
+        {categories.map((category, i) => (
           <div key={category.title}>
             {i > 0 && <div className="mb-6 sm:mb-10 h-px bg-border" />}
             <Section title={category.title} description={category.description}>

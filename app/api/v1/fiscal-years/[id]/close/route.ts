@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, error, notFound } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -152,9 +153,12 @@ export async function POST(
 
     // Only create closing entry if there are lines to close
     if (closingLines.length > 0) {
+      await assertNotLocked(ctx.organizationId, fy.endDate, ctx);
+
       const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
       const [closingEntry] = await db
+
         .insert(journalEntry)
         .values({
           organizationId: ctx.organizationId,

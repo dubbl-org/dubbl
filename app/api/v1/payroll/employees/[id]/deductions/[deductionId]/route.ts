@@ -22,12 +22,25 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; deductionId: string }> }
 ) {
   try {
-    const { deductionId } = await params;
+    const { id, deductionId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+
+    const existing = await db.query.employeeDeduction.findFirst({
+      where: eq(employeeDeduction.id, deductionId),
+      with: { employee: true },
+    });
+    // employee_deduction rows carry no organizationId — scope via the employee.
+    if (
+      !existing ||
+      existing.employeeId !== id ||
+      existing.employee?.organizationId !== ctx.organizationId
+    ) {
+      return notFound("Deduction");
+    }
 
     const [updated] = await db
       .update(employeeDeduction)
@@ -50,9 +63,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; deductionId: string }> }
 ) {
   try {
-    const { deductionId } = await params;
+    const { id, deductionId } = await params;
     const ctx = await getAuthContext(request);
     requireRole(ctx, "manage:payroll");
+
+    const existing = await db.query.employeeDeduction.findFirst({
+      where: eq(employeeDeduction.id, deductionId),
+      with: { employee: true },
+    });
+    if (
+      !existing ||
+      existing.employeeId !== id ||
+      existing.employee?.organizationId !== ctx.organizationId
+    ) {
+      return notFound("Deduction");
+    }
 
     const [deleted] = await db
       .update(employeeDeduction)

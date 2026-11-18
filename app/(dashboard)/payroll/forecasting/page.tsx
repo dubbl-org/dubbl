@@ -7,10 +7,10 @@ import { TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/shared/currency-input";
 import { Label } from "@/components/ui/label";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { formatMoney } from "@/lib/money";
 
@@ -83,7 +83,7 @@ export default function ForecastingPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   const totalGross = projection.reduce((s, p) => s + p.gross, 0);
   const totalNet = projection.reduce((s, p) => s + p.net, 0);

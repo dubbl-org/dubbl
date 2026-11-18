@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+            *************** Entry-point : 2026-01-01*************
+          
+            *************** Entities following SFRS *************
+			
+			*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+					     
+      
+-->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:roleRef roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs/sg-ee-sfrs_2026-01-01/sg-ee-sfrs_2026-01-01_role-0a" xlink:type="simple" xlink:href="sg-ee-sfrs_2026-01-01.xsd#sg-ee-sfrs_2026-01-01_role-0a"/>
+  <link:arcroleRef arcroleURI="http://xbrl.org/int/dim/arcrole/dimension-domain" xlink:type="simple" xlink:href="http://www.xbrl.org/2005/xbrldt-2005.xsd#dimension-domain"/>
+  <link:arcroleRef arcroleURI="http://xbrl.org/int/dim/arcrole/domain-member" xlink:type="simple" xlink:href="http://www.xbrl.org/2005/xbrldt-2005.xsd#domain-member"/>
+  <link:definitionLink xlink:type="extended" xlink:role="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-ee/sg-ee-sfrs/sg-ee-sfrs_2026-01-01/sg-ee-sfrs_2026-01-01_role-0a">
+    <link:loc xlink:type="locator" xlink:href="../../sg-as-cor_2026-01-01.xsd#sg-as_ConsolidatedAndSeparateFinancialStatementsAxis" xlink:label="ConsolidatedAndSeparateFinancialStatementsAxis" xlink:title="ConsolidatedAndSeparateFinancialStatementsAxis"/>
+    <link:loc xlink:type="locator" xlink:href="../../sg-as-cor_2026-01-01.xsd#sg-as_ConsolidatedMember" xlink:label="ConsolidatedMember" xlink:title="ConsolidatedMember"/>
+    <link:definitionArc xlink:type="arc" xlink:arcrole="http://xbrl.org/int/dim/arcrole/dimension-domain" xlink:from="ConsolidatedAndSeparateFinancialStatementsAxis" xlink:to="ConsolidatedMember" xlink:title="definition: ConsolidatedAndSeparateFinancialStatementsAxis to ConsolidatedMember" order="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../sg-as-cor_2026-01-01.xsd#sg-as_SeparateMember" xlink:label="SeparateMember" xlink:title="SeparateMember"/>
+    <link:definitionArc xlink:type="arc" xlink:arcrole="http://xbrl.org/int/dim/arcrole/domain-member" xlink:from="ConsolidatedMember" xlink:to="SeparateMember" xlink:title="definition: ConsolidatedMember to SeparateMember" order="1.0"/>
+  </link:definitionLink>
+</link:linkbase>

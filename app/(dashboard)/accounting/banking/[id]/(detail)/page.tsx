@@ -4,7 +4,9 @@ import { Clock3, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
+import { useState } from "react";
 import { useBankAccountContext } from "./layout";
+import { ExpenseDrawer } from "@/components/dashboard/expense-drawer";
 import { TransactionRow, ImportRow } from "../_components";
 
 export default function BankAccountOverviewPage() {
@@ -29,8 +31,12 @@ export default function BankAccountOverviewPage() {
   useDocumentTitle("Accounting \u00B7 Bank Overview");
 
   const cur = account.currencyCode;
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null;
+  const [drawerClaim, setDrawerClaim] = useState<string | null>(null);
 
   return (
+    <>
+    <ExpenseDrawer claimId={drawerClaim} orgId={orgId} onClose={() => setDrawerClaim(null)} />
     <div className="space-y-8">
       {/* Reconciliation breakdown */}
       <div>
@@ -96,6 +102,7 @@ export default function BankAccountOverviewPage() {
                 onTransfer={handleOpenTransfer}
                 onSplit={handleOpenSplit}
                 onUndo={handleUndo}
+                onOpenClaim={setDrawerClaim}
               />
             ))}
           </div>
@@ -116,5 +123,6 @@ export default function BankAccountOverviewPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

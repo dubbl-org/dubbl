@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask, taskComment } from "@/lib/db/schema";
+import { project, projectTask, taskComment, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
@@ -24,10 +24,17 @@ export async function GET(
     });
     if (!proj) return notFound("Project");
 
+    // The project in the path proves nothing about taskId: bind the task to it,
+    // or any member reads another tenant's task discussion and its authors.
+    const task = await db.query.projectTask.findFirst({
+      where: and(eq(projectTask.id, taskId), eq(projectTask.projectId, id)),
+    });
+    if (!task) return notFound("Task");
+
     const comments = await db.query.taskComment.findMany({
       where: eq(taskComment.taskId, taskId),
       orderBy: desc(taskComment.createdAt),
-      with: { author: true },
+      with: { author: { columns: publicUserColumns } },
     });
 
     return NextResponse.json({ comments });

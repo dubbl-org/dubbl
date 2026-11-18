@@ -11,7 +11,7 @@ export interface ProjectMemberData {
   member: {
     id: string;
     role: string;
-    user: { id: string; name: string | null; email: string; image: string | null };
+    user: { id: string; name: string | null; email: string };
   };
 }
 
@@ -53,7 +53,7 @@ export interface TaskData {
   assignee: {
     id: string;
     role: string;
-    user: { id: string; name: string | null; email: string; image: string | null };
+    user: { id: string; name: string | null; email: string };
   } | null;
   team: { id: string; name: string; color: string } | null;
   createdBy: { id: string; name: string | null; email: string } | null;
@@ -70,7 +70,7 @@ export interface TeamData {
     member: {
       id: string;
       role: string;
-      user: { id: string; name: string | null; email: string; image: string | null };
+      user: { id: string; name: string | null; email: string };
     };
   }[];
 }
@@ -175,10 +175,17 @@ export function useProject() {
   return ctx;
 }
 
-export function ProjectProvider({ children }: { children: React.ReactNode }) {
+export function ProjectProvider({
+  children,
+  initialProject = null,
+}: {
+  children: React.ReactNode;
+  initialProject?: ProjectDetail | null;
+}) {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<ProjectDetail | null>(initialProject);
+  // The layout loads this on the server; only re-fetch after a mutation.
+  const [loading, setLoading] = useState(!initialProject);
   const [orgId] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("activeOrgId") : null
   );
@@ -196,8 +203,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, [id, orgId]);
 
   useEffect(() => {
+    if (initialProject) return;   // already rendered by the server
     refresh();
-  }, [refresh]);
+  }, [refresh, initialProject]);
 
   return (
     <ProjectContext.Provider value={{ project, loading, orgId, projectId: id, refresh }}>

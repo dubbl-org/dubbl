@@ -15,8 +15,8 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
@@ -128,7 +128,7 @@ export default function CategoriesPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   if (categories.length === 0) {
     return (

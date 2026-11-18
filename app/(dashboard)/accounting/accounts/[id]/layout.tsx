@@ -1,11 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { ArrowLeft, ArrowDownRight, ArrowUpRight, BookOpen, Hash, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +113,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
     fetchAccount();
   }, [fetchAccount]);
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   if (!account) {
     return <p className="text-muted-foreground">Account not found.</p>;
@@ -207,9 +208,9 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
               ? pathname.endsWith("/settings")
               : !pathname.endsWith("/settings");
             return (
-              <button
+              <Link
                 key={t.value}
-                onClick={() => router.push(tabHref)}
+                href={tabHref}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 text-[13px] font-medium transition-colors",
                   active
@@ -219,7 +220,7 @@ export default function AccountDetailLayout({ children }: { children: React.Reac
               >
                 <Icon className="size-3.5" />
                 {t.label}
-              </button>
+              </Link>
             );
           })}
         </nav>

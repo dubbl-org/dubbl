@@ -47,6 +47,16 @@ export const taxRateKindEnum = pgEnum("tax_rate_kind", [
   "sales_tax_us", // US sales/use tax — collected gross on sales, non-recoverable on purchases
 ]);
 
+// How a supply is treated on the return's supply boxes. `kind` above describes
+// posting/recovery behaviour and cannot separate zero-rated from exempt (both
+// post 0%), which the return boxes need. Null = treat as standard.
+export const taxSupplyCategoryEnum = pgEnum("tax_supply_category", [
+  "standard",
+  "zero_rated",
+  "exempt",
+  "outside_scope",
+]);
+
 // Currency
 export const currency = pgTable("currency", {
   id: uuid("id")
@@ -214,6 +224,14 @@ export const taxRate = pgTable("tax_rate", {
   rate: integer("rate").notNull(), // basis points: 1000 = 10.00%
   type: taxTypeEnum("type").notNull().default("both"),
   kind: taxRateKindEnum("kind").notNull().default("standard"),
+  // Supply classification for return boxes (standard / zero-rated / exempt /
+  // outside scope). Null on rows created before this column existed; the
+  // reporting layer falls back to `kind`.
+  supplyCategory: taxSupplyCategoryEnum("supply_category"),
+  // Rate validity window, inclusive. Null = unbounded. Makes a rate change
+  // (e.g. SG GST 8% → 9% on 2024-01-01) auditable instead of a silent overwrite.
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
   // Share of input tax that is recoverable, in basis points (10000 = 100%).
   // 0 = fully blocked/absorbed into cost; 5000 = 50% (e.g. UK car lease).
   recoverablePercent: integer("recoverable_percent").notNull().default(10000),
@@ -458,6 +476,12 @@ export const taxPeriod = pgTable("tax_period", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   type: taxPeriodTypeEnum("type").notNull(),
+  // Which return this period belongs to ("vat100" | "gst_f5" | "form_c_s" |
+  // "eci" | "bas" | …). A fiscal year holds four GST periods AND one Form C-S
+  // period, so period identity is (kind, dates).
+  returnKind: text("return_kind").notNull().default("vat_return"),
+  /** Filing authority for the return, e.g. "IRAS" | "HMRC". */
+  authority: text("authority"),
   status: taxPeriodStatusEnum("status").notNull().default("open"),
   filedAt: timestamp("filed_at", { mode: "date" }),
   filedBy: uuid("filed_by").references(() => users.id),
@@ -465,7 +489,14 @@ export const taxPeriod = pgTable("tax_period", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("tax_period_org_kind_dates_idx").on(
+    table.organizationId,
+    table.returnKind,
+    table.startDate,
+    table.endDate
+  ),
+]);
 
 // Tax Return Line - individual boxes/fields on a tax return
 export const taxReturnLine = pgTable("tax_return_line", {

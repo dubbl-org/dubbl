@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--                     
+            *************** Calculation linkbase : 2026-01-01*************
+
+         *************** Financial Statements Highlights - Bank and finance companies *************
+		 
+		 *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. ***************  
+  -->
+<link:linkbase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2003/linkbase http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:sg-as="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-as" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <link:roleRef roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc/role/FSHofSFP" xlink:type="simple" xlink:href="sg-fsh-bfc_2026-01-01_elr.xsd#FSHofSFP"/>
+  <link:roleRef roleURI="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc/role/FSHofIS" xlink:type="simple" xlink:href="sg-fsh-bfc_2026-01-01_elr.xsd#FSHofIS"/>
+  <link:calculationLink xlink:type="extended" xlink:role="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc/role/FSHofSFP">
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_Assets" xlink:label="Assets" xlink:title="Assets"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_CurrentAssets" xlink:label="CurrentAssets" xlink:title="CurrentAssets"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Assets" xlink:to="CurrentAssets" xlink:title="calculation: Assets to CurrentAssets" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_NoncurrentAssets" xlink:label="NoncurrentAssets" xlink:title="NoncurrentAssets"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Assets" xlink:to="NoncurrentAssets" xlink:title="calculation: Assets to NoncurrentAssets" order="2.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_Liabilities" xlink:label="Liabilities" xlink:title="Liabilities"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_CurrentLiabilities" xlink:label="CurrentLiabilities" xlink:title="CurrentLiabilities"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Liabilities" xlink:to="CurrentLiabilities" xlink:title="calculation: Liabilities to CurrentLiabilities" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_NoncurrentLiabilities" xlink:label="NoncurrentLiabilities" xlink:title="NoncurrentLiabilities"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Liabilities" xlink:to="NoncurrentLiabilities" xlink:title="calculation: Liabilities to NoncurrentLiabilities" order="2.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_Equity" xlink:label="Equity" xlink:title="Equity"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_ShareCapital" xlink:label="ShareCapital"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Equity" xlink:to="ShareCapital" xlink:title="calculation: Equity to ShareCapital" use="optional" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_TreasuryShares" xlink:label="TreasuryShares" xlink:title="TreasuryShares"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Equity" xlink:to="TreasuryShares" xlink:title="calculation: Equity to TreasuryShares" use="optional" order="2.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_AccumulatedProfitsLosses" xlink:label="AccumulatedProfitsLosses"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Equity" xlink:to="AccumulatedProfitsLosses" xlink:title="calculation: Equity to AccumulatedProfitsLosses" use="optional" order="3.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_ReservesOtherThanAccumulatedProfitsLosses" xlink:label="ReservesOtherThanAccumulatedProfitsLosses"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Equity" xlink:to="ReservesOtherThanAccumulatedProfitsLosses" xlink:title="calculation: Equity to ReservesOtherThanAccumulatedProfitsLosses" use="optional" order="4.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_NoncontrollingInterests" xlink:label="NoncontrollingInterests"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Equity" xlink:to="NoncontrollingInterests" xlink:title="calculation: Equity to NoncontrollingInterests" use="optional" order="5.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilities" xlink:label="CreditFacilities" xlink:title="CreditFacilities"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsPass" xlink:label="CreditFacilitiesCategorisedAsPass" xlink:title="CreditFacilitiesCategorisedAsPass"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="CreditFacilities" xlink:to="CreditFacilitiesCategorisedAsPass" xlink:title="calculation: CreditFacilities to CreditFacilitiesCategorisedAsPass" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsSpecialMention" xlink:label="CreditFacilitiesCategorisedAsSpecialMention" xlink:title="CreditFacilitiesCategorisedAsSpecialMention"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="CreditFacilities" xlink:to="CreditFacilitiesCategorisedAsSpecialMention" xlink:title="calculation: CreditFacilities to CreditFacilitiesCategorisedAsSpecialMention" order="2.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsSubstandard" xlink:label="CreditFacilitiesCategorisedAsSubstandard" xlink:title="CreditFacilitiesCategorisedAsSubstandard"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="CreditFacilities" xlink:to="CreditFacilitiesCategorisedAsSubstandard" xlink:title="calculation: CreditFacilities to CreditFacilitiesCategorisedAsSubstandard" order="3.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsDoubtful" xlink:label="CreditFacilitiesCategorisedAsDoubtful" xlink:title="CreditFacilitiesCategorisedAsDoubtful"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="CreditFacilities" xlink:to="CreditFacilitiesCategorisedAsDoubtful" xlink:title="calculation: CreditFacilities to CreditFacilitiesCategorisedAsDoubtful" order="4.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_CreditFacilitiesCategorisedAsLoss" xlink:label="CreditFacilitiesCategorisedAsLoss" xlink:title="CreditFacilitiesCategorisedAsLoss"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="CreditFacilities" xlink:to="CreditFacilitiesCategorisedAsLoss" xlink:title="calculation: CreditFacilities to CreditFacilitiesCategorisedAsLoss" order="5.0" weight="1.0"/>
+  </link:calculationLink>
+  <link:calculationLink xlink:type="extended" xlink:role="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc/role/FSHofIS">
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_Revenue" xlink:label="Revenue" xlink:title="Revenue"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_RevenueFromInterestNet" xlink:label="RevenueFromInterestNet" xlink:title="RevenueFromInterestNet"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Revenue" xlink:to="RevenueFromInterestNet" xlink:title="calculation: Revenue to RevenueFromInterestNet" use="optional" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromInterest" xlink:label="RevenueFromInterest" xlink:title="RevenueFromInterest"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="RevenueFromInterestNet" xlink:to="RevenueFromInterest" xlink:title="calculation: RevenueFromInterestNet to RevenueFromInterest" use="optional" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-fsh-cor_2026-01-01.xsd#sg-fsh_InterestExpenditure" xlink:label="InterestExpenditure" xlink:title="InterestExpenditure"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="RevenueFromInterestNet" xlink:to="InterestExpenditure" xlink:title="calculation: RevenueFromInterestNet to InterestExpenditure" use="optional" order="2.0" weight="-1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_InvestmentIncome" xlink:label="InvestmentIncome"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Revenue" xlink:to="InvestmentIncome" xlink:title="calculation: Revenue to InvestmentIncome" use="optional" order="2.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromFeesAndCommission" xlink:label="RevenueFromFeesAndCommission"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Revenue" xlink:to="RevenueFromFeesAndCommission" xlink:title="calculation: Revenue to RevenueFromFeesAndCommission" use="optional" order="3.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_RevenueFromDividends" xlink:label="RevenueFromDividends"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Revenue" xlink:to="RevenueFromDividends" xlink:title="calculation: Revenue to RevenueFromDividends" use="optional" order="4.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_OtherRevenue" xlink:label="OtherRevenue"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="Revenue" xlink:to="OtherRevenue" xlink:title="calculation: Revenue to OtherRevenue" use="optional" order="5.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_ProfitLoss" xlink:label="ProfitLoss" xlink:title="ProfitLoss"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_ProfitLossBeforeTaxation" xlink:label="ProfitLossBeforeTaxation"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="ProfitLoss" xlink:to="ProfitLossBeforeTaxation" xlink:title="calculation: ProfitLoss to ProfitLossBeforeTaxation" use="optional" order="1.0" weight="1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_TaxExpenseBenefitContinuingOperations" xlink:label="TaxExpenseBenefitContinuingOperations" xlink:title="TaxExpenseBenefitContinuingOperations"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="ProfitLoss" xlink:to="TaxExpenseBenefitContinuingOperations" xlink:title="calculation: ProfitLoss to TaxExpenseBenefitContinuingOperations" use="optional" order="2.0" weight="-1.0"/>
+    <link:loc xlink:type="locator" xlink:href="../../elts/sg-as-cor_2026-01-01.xsd#sg-as_ProfitLossFromDiscontinuedOperations" xlink:label="ProfitLossFromDiscontinuedOperations"/>
+    <link:calculationArc xlink:type="arc" xlink:arcrole="http://www.xbrl.org/2003/arcrole/summation-item" xlink:from="ProfitLoss" xlink:to="ProfitLossFromDiscontinuedOperations" xlink:title="calculation: ProfitLoss to ProfitLossFromDiscontinuedOperations" use="optional" order="3.0" weight="1.0"/>
+  </link:calculationLink>
+</link:linkbase>

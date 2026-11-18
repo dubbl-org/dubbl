@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { deal } from "@/lib/db/schema";
+import { deal, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc, asc, isNull, isNotNull, ilike } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
     const all = await db.query.deal.findMany({
       where: and(...conditions),
-      with: { contact: true, assignedUser: true },
+      with: { contact: true, assignedUser: { columns: publicUserColumns } },
       orderBy: orderFn(orderCol),
     });
 

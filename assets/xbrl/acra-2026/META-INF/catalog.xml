@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+            *************** taxonomy package catalog file 2026-01-01*************
+			
+   		*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+
+<catalog 
+  xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2016/taxonomy-package-catalog.xsd">
+  <rewriteURI uriStartString="https://www.bizfinx.gov.sg/taxonomy/2026-01-01/" rewritePrefix="../"/>
+</catalog>

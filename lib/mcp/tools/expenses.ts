@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { expenseClaim, expenseItem, chartAccount } from "@/lib/db/schema";
+import { expenseClaim, expenseItem, chartAccount, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
@@ -57,7 +57,7 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
           orderBy: desc(expenseClaim.createdAt),
           limit: params.limit,
           offset,
-          with: { submittedByUser: true },
+          with: { submittedByUser: { columns: publicUserColumns } },
         });
         const [countResult] = await db
           .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -83,8 +83,8 @@ export function registerExpenseTools(server: McpServer, ctx: AuthContext) {
             notDeleted(expenseClaim.deletedAt)
           ),
           with: {
-            submittedByUser: true,
-            approvedByUser: true,
+            submittedByUser: { columns: publicUserColumns },
+            approvedByUser: { columns: publicUserColumns },
             items: {
               with: { account: true },
               orderBy: (items, { asc }) => [asc(items.sortOrder)],

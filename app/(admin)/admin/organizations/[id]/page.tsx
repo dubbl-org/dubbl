@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import Image from "next/image";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

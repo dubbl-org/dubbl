@@ -9,6 +9,7 @@ import { BE_ACCOUNTS } from "./be";
 import { AT_ACCOUNTS } from "./at";
 import { IT_ACCOUNTS } from "./it";
 import { PT_ACCOUNTS } from "./pt";
+import { SG_ACCOUNTS } from "./sg";
 
 /**
  * Maps country codes to their legally mandated or de facto standard
@@ -28,6 +29,8 @@ const COUNTRY_TEMPLATES: Record<string, AccountTemplate[]> = {
   DE: DE_ACCOUNTS, // SKR03
   AT: AT_ACCOUNTS, // Einheitskontenrahmen (EKR)
   SE: SE_ACCOUNTS, // BAS
+  // Local practice standard (no legally mandated chart in Singapore)
+  SG: SG_ACCOUNTS,
 };
 
 export function getAccountsForCountry(countryCode: string): AccountTemplate[] {

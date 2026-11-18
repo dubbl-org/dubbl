@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask } from "@/lib/db/schema";
+import { project, projectTask, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -45,7 +45,7 @@ export async function GET(
       orderBy: asc(projectTask.sortOrder),
       with: {
         assignee: {
-          with: { user: true },
+          with: { user: { columns: publicUserColumns } },
         },
       },
     });

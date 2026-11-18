@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { checkResourceLimit, checkMultiCurrency } from "@/lib/api/check-limit";
 import { ensureBankLedgerAccount } from "@/lib/api/bank-ledger";
+import { withBankBalances } from "@/lib/api/bank-balances";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       with: { chartAccount: true },
     });
 
-    return NextResponse.json({ bankAccounts: accounts });
+    return NextResponse.json({ bankAccounts: await withBankBalances(accounts) });
   } catch (err) {
     return handleError(err);
   }

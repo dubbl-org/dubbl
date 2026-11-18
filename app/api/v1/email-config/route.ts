@@ -22,12 +22,18 @@ const upsertSchema = z.object({
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:banking");
 
     const config = await db.query.emailConfig.findFirst({
       where: eq(emailConfig.organizationId, ctx.organizationId),
     });
 
-    return NextResponse.json({ emailConfig: config || null });
+    // Never return the encrypted SMTP credential to the client.
+    if (config) {
+      const { smtpPassword: _smtpPassword, ...safeConfig } = config;
+      return NextResponse.json({ emailConfig: safeConfig });
+    }
+    return NextResponse.json({ emailConfig: null });
   } catch (err) {
     return handleError(err);
   }

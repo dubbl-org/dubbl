@@ -9,7 +9,7 @@ import {
   ListFilter, Webhook, CheckCircle2, Zap, PaintbrushVertical, ArrowLeftRight,
   Trash2, Database, PackageCheck,
 } from "lucide-react";
-import { BlurReveal } from "@/components/ui/blur-reveal";
+import { BlurReveal } from "@/components/shared/blur-reveal";
 import { cn } from "@/lib/utils";
 
 interface NavItem {

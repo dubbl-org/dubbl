@@ -1,0 +1,331 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+                      
+       *************** Data types : 2026-01-01*************
+       
+	   *************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+               
+ -->
+<xs:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:sg-types="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <!-- Imports -->
+  <xs:import namespace="http://www.xbrl.org/2003/linkbase" schemaLocation="http://www.xbrl.org/2003/xbrl-linkbase-2003-12-31.xsd" />
+  <xs:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd" />
+  <!-- Complex Types -->
+  <xs:complexType  name="CompanyItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Private company" />
+        <xs:enumeration value="Public company" />
+        <xs:enumeration value="Exempt private company" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="YesNoItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Yes" />
+        <xs:enumeration value="No" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="PreparationOfXBRLFileItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="In-house" />
+        <xs:enumeration value="Outsourced" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="DesignationOfPreparerItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Accountant or person providing accounting related services" />
+        <xs:enumeration value="Company secretary or person providing corporate secretarial related services" />
+        <xs:enumeration value="Director" />
+        <xs:enumeration value="Others" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="ListingItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Listed in securities exchange in Singapore" />
+        <xs:enumeration value="Listed in securities exchange in Singapore and other country(s)" />
+        <xs:enumeration value="Listed only in securities exchange in other country(s)" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="AccountingStandardsItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="SFRS(I) (including simultaneous compliance with IFRS)" />
+		<xs:enumeration value="SFRS" />
+        <xs:enumeration value="SFRS for Small entities" />
+        <xs:enumeration value="IFRS only" />
+        <xs:enumeration value="Other accounting standards" />
+		<xs:enumeration value="SFRS (Reduced Disclosure Requirements) for eligible companies" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="NatureOfFinancialStatementsItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Company level" />
+        <xs:enumeration value="Consolidated" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="LevelOfRoundingItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Actual" />
+        <xs:enumeration value="Thousands" />
+        <xs:enumeration value="Millions" />
+        <xs:enumeration value="Billions" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="StatementOfFinancialPositionItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Current and non-current" />
+        <xs:enumeration value="Order of liquidity" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="IncomeStatementItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="By function of expense or cost of sales" />
+        <xs:enumeration value="By nature of expense" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="ComprehensiveIncomeItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Presented before tax" />
+        <xs:enumeration value="Presented net of tax" />
+        <xs:enumeration value="No other comprehensive income" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="CashFlowStatementItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Direct" />
+        <xs:enumeration value="Indirect" />
+        <xs:enumeration value="Not prepared" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="CurrencyCodeItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:stringItemType">
+        <xs:length value="3" fixed="true" />
+        <xs:pattern value="[A-Z][A-Z][A-Z]" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="ModificationsToAuditorsReportItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Qualified opinion" />
+        <xs:enumeration value="Disclaimer of opinion" />
+        <xs:enumeration value="Adverse opinion" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="InventoryCostFormulaItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Specific identification" />
+        <xs:enumeration value="FIFO" />
+        <xs:enumeration value="Weighted average cost formula" />
+        <xs:enumeration value="Combination of specific identification / FIFO / weighted average method" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="DepreciationMethodItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Straight-line-method" />
+        <xs:enumeration value="Diminishing balance method" />
+        <xs:enumeration value="Units-of-production depreciation method" />
+        <xs:enumeration value="Other depreciation method" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="AmortisationMethodItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Straight-line-method" />
+        <xs:enumeration value="Diminishing balance method" />
+        <xs:enumeration value="Units-of-production method" />
+        <xs:enumeration value="Other amortisation method" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="NatureOfCompanyFilingFinancialHighlightsItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Solvent EPC" />
+        <xs:enumeration value="Banks/Merchant Banks/Finance Companies" />
+        <xs:enumeration value="Registered Insurers" />
+        <xs:enumeration value="Company exempted by ACRA from filing a full set of financial statements in XBRL" />
+        <xs:enumeration value="Insolvent EPC" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="ShareOptionPricingModelItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Black-Scholes model" />
+        <xs:enumeration value="Binomial model" />
+        <xs:enumeration value="Other pricing model" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="ScopeOfFilingItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Full set of financial statements" />
+        <xs:enumeration value="Financial statements highlights" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="TaxonomyVersionItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Full_XBRL_2026_v1.0" />
+        <xs:enumeration value="Simplified_XBRL_2026_v1.0" />
+        <xs:enumeration value="FSH_Banks_&amp;_Finance_Company_2026_v1.0" />
+        <xs:enumeration value="FSH_Insurance_2026_v1.0" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="UENItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:stringItemType">
+        <xs:length value="10" fixed="true" />
+        <xs:pattern value="[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][A-Z,a-z]" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  name="MethodOfPresentingAllItemsOfIncomeAndExpensesItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Single statement of comprehensive income" />
+        <xs:enumeration value="Two statements of income statement and statement of comprehensive income" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType  id="sg-types_YesNoUnableToConcludeItemType" name="YesNoUnableToConcludeItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Yes" />
+        <xs:enumeration value="No" />
+		<xs:enumeration value="Unable to conclude" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType  id="sg-types_XBRLFilingItemType" name="XBRLFilingItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Full XBRL" />
+        <xs:enumeration value="Simplified XBRL" />
+        <xs:enumeration value="Financial Statements Highlights (Banks/Merchant Banks/Finance Companies)" />
+		<xs:enumeration value="Financial Statements Highlights (Registered Insurers)" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType  name="TypeOfAuditOpinionItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Not audited" />
+        <xs:enumeration value="Unqualified (clean) audit opinion" />
+        <xs:enumeration value="Unqualified with emphasis of matter" />
+		<xs:enumeration value="Qualified opinion" />
+		<xs:enumeration value="Adverse opinion" />
+        <xs:enumeration value="Disclaimer of opinion" />		
+        </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType  name="TypeOfAccountingStandardsItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Singapore Standards on Auditing" />
+		<xs:enumeration value="International Standards on Auditing" />
+        <xs:enumeration value="US Generally Accepted Auditing Standards" />
+        <xs:enumeration value="Others" />
+       </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType  name="TypeOfReasonForModificationAuditOpinion">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Impairment of assets" />
+		<xs:enumeration value="Going concern" />
+        <xs:enumeration value="Audit of opening balance" />
+        <xs:enumeration value="Consolidation or equity accounting" />
+		<xs:enumeration value="Ongoing investigation or legal cases" />
+		<xs:enumeration value="Others" />
+       </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  <xs:complexType  name="YesItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Yes" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  
+  
+  <xs:complexType  id="sg-types_YesNoNotApplicable" name="YesNoNotApplicableItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Yes" />
+        <xs:enumeration value="No" />
+		<xs:enumeration value="Not applicable (disclaimer issued by auditor)" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+ 
+ <xs:complexType  id="sg-types_NumberOfEmployeesOfGroupItemType" name="NumberOfEmployeesOfGroupItemType">
+    <xs:simpleContent>
+      <xs:restriction base="xbrli:tokenItemType">
+        <xs:enumeration value="Less than 50" />
+        <xs:enumeration value="51 to 100" />
+		<xs:enumeration value="101 to 150" />
+		<xs:enumeration value="151 to 200" />
+		<xs:enumeration value="More than 200" />
+		<xs:enumeration value="Not applicable" />
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+ 
+
+  <xs:complexType name="WhetherCompanyIsSubsidiaryItemType">
+     <xs:simpleContent>
+        <xs:restriction base="xbrli:tokenItemType">
+            <xs:enumeration value="No"/>
+			<xs:enumeration value="Yes - The company is both a subsidiary and a parent company that prepares consolidated financial statement."/>
+            <xs:enumeration value="Yes - The company has a Singapore incorporated parent company (immediate/intermediate/ultimate parent) that prepares consolidated financial statements (which included itself)."/>
+            <xs:enumeration value="Yes - The company has a foreign incorporated parent company (immediate/intermediate/ultimate parent) that prepares consolidated financial statements."/>
+        </xs:restriction>
+    </xs:simpleContent>
+   </xs:complexType>
+
+  
+  
+  
+  
+</xs:schema>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AccountPicker } from "@/components/dashboard/account-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import { BrandLoader } from "@/components/dashboard/brand-loader";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { useBankAccountContext } from "../layout";
 import { TransactionRow, CashCodingGrid } from "../../_components";
+import { TransactionsSplit } from "./transactions-split";
 
 export default function BankTransactionsPage() {
   const {
@@ -40,6 +41,8 @@ export default function BankTransactionsPage() {
     handleOpenMatchUnified,
     handleOpenTransfer,
     handleOpenSplit,
+    markSettled,
+    markUnsettled,
   } = useBankAccountContext();
 
   const cur = account.currencyCode;
@@ -275,13 +278,6 @@ export default function BankTransactionsPage() {
 
       {/* Results summary */}
       <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
-        {selectableTx.length > 0 && (
-          <Checkbox
-            checked={allVisibleSelected}
-            onCheckedChange={(c) => toggleSelectAll(c === true)}
-            aria-label="Select all to-do transactions"
-          />
-        )}
         <span className="font-medium text-foreground tabular-nums">{filteredTx.length}</span> transactions
         {statusFilter !== "all" && (
           <>
@@ -330,34 +326,17 @@ export default function BankTransactionsPage() {
           </p>
         </div>
       ) : (
-        <motion.div
-          key={`${statusFilter}-${debouncedTxSearch}-${txDateFrom}-${txDateTo}-${txSort}`}
-          initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="rounded-lg border"
-        >
-          {filteredTx.map((tx, i) => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              cur={cur}
-              isLast={i === filteredTx.length - 1}
-              onReconcile={handleReconcile}
-              onExclude={handleExclude}
-              onMatchBill={handleOpenMatch}
-              onCreateExpense={handleOpenExpense}
-              onCategorize={handleOpenCategorize}
-              onMatchInvoice={handleOpenMatchInvoice}
-              onMatch={handleOpenMatchUnified}
-              onTransfer={handleOpenTransfer}
-              onSplit={handleOpenSplit}
-              onUndo={handleUndo}
-              selected={selectedIds.has(tx.id)}
-              onSelectChange={toggleSelect}
-            />
-          ))}
-        </motion.div>
+        <TransactionsSplit
+          transactions={filteredTx}
+          cur={cur}
+          orgId={orgId}
+          onRefetch={refetch}
+          onCreateExpense={handleOpenExpense}
+          onCategorize={handleOpenCategorize}
+          onExclude={handleExclude}
+          onSettled={markSettled}
+          onUnsettled={markUnsettled}
+        />
       )}
       </div>
       )}

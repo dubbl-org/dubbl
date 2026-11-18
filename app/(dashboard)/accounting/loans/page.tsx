@@ -15,7 +15,8 @@ import { devDelay } from "@/lib/dev-delay";
 import { useCreateDrawer } from "@/components/dashboard/create-drawer";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 
 interface Loan {
   id: string;
@@ -206,7 +207,7 @@ export default function LoansPage() {
     [loans]
   );
 
-  if (initialLoad) return <BrandLoader />;
+  if (initialLoad) return <ListSkeleton />;
 
   if (!initialLoad && !refetching && loans.length === 0 && statusFilter === "all" && !hasFilters) {
     return (

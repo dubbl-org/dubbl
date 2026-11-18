@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { currencyCodeSchema } from "@/lib/currency/zod";
 import { db } from "@/lib/db";
-import { deal, dealActivity, pipeline } from "@/lib/db/schema";
+import { deal, dealActivity, pipeline, publicUserColumns } from "@/lib/db/schema";
 import {
   eq,
   and,
@@ -151,7 +151,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
 
         const all = await db.query.deal.findMany({
           where: and(...conditions),
-          with: { contact: true, assignedUser: true },
+          with: { contact: true, assignedUser: { columns: publicUserColumns } },
           orderBy: orderFn(orderCol),
         });
 
@@ -217,7 +217,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
           ),
           with: {
             contact: true,
-            assignedUser: true,
+            assignedUser: { columns: publicUserColumns },
             activities: true,
             pipeline: true,
           },
@@ -591,7 +591,7 @@ export function registerCrmTools(server: McpServer, ctx: AuthContext) {
         const offset = (params.page - 1) * params.limit;
         const activities = await db.query.dealActivity.findMany({
           where,
-          with: { user: true },
+          with: { user: { columns: publicUserColumns } },
           orderBy: orderFn(orderCol),
           limit: params.limit,
           offset,

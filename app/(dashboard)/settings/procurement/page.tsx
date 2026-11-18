@@ -5,8 +5,8 @@ import { PackageCheck, ShieldAlert, Percent, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { FormSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { toast } from "sonner";
 
 interface ProcurementSettings {
@@ -97,7 +97,7 @@ export default function ProcurementSettingsPage() {
     }
   };
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <FormSkeleton />;
 
   return (
     <ContentReveal>

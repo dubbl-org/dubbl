@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--                     
+       *************** Element declaration : 2026-01-01*************
+                      
+       *************** Listing Manual *************
+ 		*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+
+ -->
+<xsd:schema targetNamespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-lm" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sg-lm="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-lm" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:xl="http://www.xbrl.org/2003/XLink" xmlns:sg-parts="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:sg-types="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <xsd:annotation>
+    <xsd:appinfo>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../labels/sg-lm_2026-01-01_lab.xml" xlink:title="Label Linkbase" xlink:role="http://www.xbrl.org/2003/role/labelLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+      <link:linkbaseRef xlink:type="simple" xlink:href="../references/sg-lm_2026-01-01_ref.xml" xlink:title="Reference Linkbase" xlink:role="http://www.xbrl.org/2003/role/referenceLinkbaseRef" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase"/>
+    </xsd:appinfo>
+  </xsd:annotation>
+  <xsd:import namespace="http://www.xbrl.org/2003/instance" schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/non-numeric" schemaLocation="http://www.xbrl.org/dtr/type/nonNumeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.xbrl.org/dtr/type/numeric" schemaLocation="http://www.xbrl.org/dtr/type/numeric-2009-12-16.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-types" schemaLocation="sg-types_2026-01-01.xsd"/>
+  <xsd:import namespace="http://www.bizfinx.gov.sg/taxonomy/2026-01-01/elts/sg-parts" schemaLocation="sg-parts_2026-01-01.xsd"/>
+  <xsd:element name="YearOfAppointmentOfSigningAuditor" id="sg-lm_YearOfAppointmentOfSigningAuditor" type="xbrli:gYearItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="instant"/>
+  <xsd:element name="PaymentToAuditorsAbstract" id="sg-lm_PaymentToAuditorsAbstract" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="AuditFeesPaidToAuditorsOfCompany" id="sg-lm_AuditFeesPaidToAuditorsOfCompany" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="AuditFeesPaidToOtherAuditors" id="sg-lm_AuditFeesPaidToOtherAuditors" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="NonAuditFeesPaidToAuditorsOfCompany" id="sg-lm_NonAuditFeesPaidToAuditorsOfCompany" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="NonAuditFeesPaidToOtherAuditors" id="sg-lm_NonAuditFeesPaidToOtherAuditors" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="PaymentToAuditors" id="sg-lm_PaymentToAuditors" type="xbrli:monetaryItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:balance="debit" xbrli:periodType="duration"/>
+  <xsd:element name="NameOfAuditorOfSubsidiary" id="sg-lm_NameOfAuditorOfSubsidiary" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+  <xsd:element name="NameOfAuditorOfAssociate" id="sg-lm_NameOfAuditorOfAssociate" type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="false" nillable="true" xbrli:periodType="duration"/>
+</xsd:schema>

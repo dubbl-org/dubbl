@@ -19,8 +19,16 @@ import {
 import { eq, and, sql, isNull, ne, gte, lte, inArray, asc } from "drizzle-orm";
 import { centsToDecimal } from "@/lib/money";
 import { wrapTool } from "@/lib/mcp/errors";
+import { requireRole } from "@/lib/api/require-role";
 import type { AuthContext } from "@/lib/api/auth-context";
 import type { Statement } from "@/lib/reports/statement-export";
+import { buildFsModel, type FsModel } from "@/lib/reports/fs-model";
+import { buildSoceReport } from "@/lib/reports/soce";
+import { resolveTaxModuleForOrg } from "@/lib/tax/registry";
+import { assembleXbrlFiling } from "@/lib/reports/xbrl/assemble";
+import { buildXbrlPackage } from "@/lib/reports/xbrl/package";
+import { SG_MODULE } from "@/lib/tax/modules/sg";
+import type { FsPresentation } from "@/lib/tax/types";
 import {
   aggregateAsAt,
   aggregateByDateRange,
@@ -35,6 +43,44 @@ import {
 function parseBasis(value: string | undefined): ReportBasis {
   return value === "cash" ? "cash" : "accrual";
 }
+
+/**
+ * SFRS captions for the org's jurisdictions. A module without a presentation
+ * falls back to Singapore's, since SFRS is Singapore's standard.
+ */
+async function sfrsPresentation(organizationId: string): Promise<FsPresentation> {
+  return (await resolveTaxModuleForOrg(organizationId)).fsPresentation ?? SG_MODULE.fsPresentation!;
+}
+
+/** One FsModel section as JSON, decimal strings to match the other report tools. */
+function fsSectionJson(section: FsModel["equity"]) {
+  return {
+    caption: section.caption,
+    rows: section.rows.map((r) => ({
+      caption: r.caption,
+      amount: centsToDecimal(r.amount),
+      codes: r.codes,
+    })),
+    total: centsToDecimal(section.total),
+  };
+}
+
+/** Revenue and expenses grouped by caption (SFRS: by nature of expense). */
+function plSfrsJson(model: FsModel) {
+  return {
+    income: fsSectionJson(model.income),
+    expenses: fsSectionJson(model.expenses),
+    netProfit: centsToDecimal(model.netProfit),
+  };
+}
+
+/** `presentation` argument shared by the statement tools. */
+const PRESENTATION_SCHEMA = z
+  .enum(["default", "sfrs"])
+  .optional()
+  .describe(
+    "Statement presentation. 'default' (or omitted) keeps the flat per-account layout. 'sfrs' groups the balance sheet into current/non-current and the profit and loss by nature of expense, and adds an `sfrs` object to the result."
+  );
 
 /**
  * Resolve a single optional dimension filter from costCenterId / projectId.
@@ -150,6 +196,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .describe(
           "Optional prior dates (YYYY-MM-DD) to add as comparative columns. Each adds per-account `balances`/`totals` aligned to `dates`."
         ),
+      presentation: PRESENTATION_SCHEMA,
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -253,12 +300,38 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
           }
         }
 
+        let sfrs: Record<string, unknown> | undefined;
+        if (params.presentation === "sfrs") {
+          const model = buildFsModel({
+            accounts: [...primary, ...plPerDate[0]],
+            presentation: await sfrsPresentation(ctx.organizationId),
+          });
+          sfrs = {
+            presentation: "sfrs",
+            asAt,
+            assets: {
+              current: fsSectionJson(model.assets.current),
+              nonCurrent: fsSectionJson(model.assets.nonCurrent),
+              total: centsToDecimal(model.assets.total),
+            },
+            liabilities: {
+              current: fsSectionJson(model.liabilities.current),
+              nonCurrent: fsSectionJson(model.liabilities.nonCurrent),
+              total: centsToDecimal(model.liabilities.total),
+            },
+            equity: fsSectionJson(model.equity),
+            netProfit: centsToDecimal(model.netProfit),
+            imbalance: centsToDecimal(model.imbalance),
+          };
+        }
+
         return {
           asAt,
           ...(hasComparatives ? { dates: allDates, compareDates } : {}),
           assets: buildSection("asset"),
           liabilities: buildSection("liability"),
           equity,
+          ...(sfrs ? { sfrs } : {}),
         };
       })
   );
@@ -305,6 +378,7 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         .describe(
           "Comparative period end (YYYY-MM-DD). Both compareFrom and compareTo must be set to add a `comparison` period."
         ),
+      presentation: PRESENTATION_SCHEMA,
     },
     (params) =>
       wrapTool(ctx, async () => {
@@ -408,6 +482,59 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
           totalExpenses: primary.totalExpenses,
           netIncome: primary.netIncome,
           ...(comparison ? { comparison } : {}),
+          ...(params.presentation === "sfrs"
+            ? {
+                sfrs: {
+                  presentation: "sfrs",
+                  ...plSfrsJson(
+                    buildFsModel({
+                      accounts: primaryAggs,
+                      presentation: await sfrsPresentation(ctx.organizationId),
+                    })
+                  ),
+                },
+              }
+            : {}),
+        };
+      })
+  );
+
+  server.tool(
+    "statement_of_changes_in_equity",
+    "Generate a statement of changes in equity for a period: share capital, retained earnings and total, with the opening balance, profit for the period and closing balance. Amounts are decimal strings. A 'Dividends and other movements' row appears when shares were issued or dividends declared in the period. 'imbalance' is assets − liabilities − equity: non-zero means the books do not balance.",
+    {
+      startDate: z
+        .string()
+        .optional()
+        .describe("Period start (YYYY-MM-DD, defaults to Jan 1 of current year)"),
+      endDate: z
+        .string()
+        .optional()
+        .describe("Period end (YYYY-MM-DD, defaults to today)"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        const startDate = params.startDate ?? `${new Date().getFullYear()}-01-01`;
+        const endDate = params.endDate ?? new Date().toISOString().slice(0, 10);
+        const report = await buildSoceReport(ctx.organizationId, startDate, endDate);
+        return {
+          startDate,
+          endDate,
+          presentation: "sfrs",
+          columns: ["shareCapital", "retainedEarnings", "total"],
+          rows: report.rows.map((r) => ({
+            caption: r.caption,
+            shareCapital: centsToDecimal(r.shareCapital),
+            retainedEarnings: centsToDecimal(r.retainedEarnings),
+            total: centsToDecimal(r.total),
+          })),
+          closing: {
+            shareCapital: centsToDecimal(report.closing.shareCapital),
+            retainedEarnings: centsToDecimal(report.closing.retainedEarnings),
+            total: centsToDecimal(report.closing.total),
+          },
+          netProfit: centsToDecimal(report.netProfit),
+          imbalance: centsToDecimal(report.imbalance),
         };
       })
   );
@@ -2024,6 +2151,59 @@ export function registerReportTools(server: McpServer, ctx: AuthContext) {
         );
 
         return { startDate, endDate, items, totals };
+      })
+  );
+  server.tool(
+    "report_xbrl_package",
+    "Build the ACRA XBRL annual-return package for a financial year and return its validation report. " +
+      "The template is chosen from the year's own figures, exactly as ACRA decides: Simplified when revenue AND total " +
+      "assets are both at or below S$500,000, Full otherwise. Reports every validation issue with its ACRA rule id " +
+      "and severity ('genuine' blocks filing, 'possible' is a warning). Money is reported in cents; the XBRL instance " +
+      "itself is written in whole dollars. " +
+      "This tool returns the report only — the zip is downloaded from GET /api/v1/reports/xbrl?format=zip. " +
+      "A genuine error means BizFinx will reject the file, so fix and rebuild rather than uploading.",
+    {
+      fiscalYearEnd: z.string().describe("Financial year end, YYYY-MM-DD (e.g. 2026-12-31)"),
+      fiscalYearStart: z
+        .string()
+        .optional()
+        .describe("Financial year start; defaults to 1 January of the year end's year"),
+      template: z
+        .enum(["sim", "full"])
+        .optional()
+        .describe("Force a template. The S$500,000 test still wins: asking for Simplified above it returns Full."),
+      authorisationDate: z
+        .string()
+        .optional()
+        .describe("Date the directors authorised the statements; defaults to the year end"),
+    },
+    (params) =>
+      wrapTool(ctx, async () => {
+        requireRole(ctx, "view:data");
+        const fiscalYearStart =
+          params.fiscalYearStart ?? `${Number(params.fiscalYearEnd.slice(0, 4))}-01-01`;
+        const assembled = await assembleXbrlFiling(ctx.organizationId, {
+          fiscalYearStart,
+          fiscalYearEnd: params.fiscalYearEnd,
+          template: params.template ?? null,
+          authorisationDate: params.authorisationDate ?? null,
+        });
+        const pkg = buildXbrlPackage(assembled.input);
+        const genuine = pkg.issues.filter((i) => i.severity === "genuine");
+        const possible = pkg.issues.filter((i) => i.severity === "possible");
+        return {
+          fileName: pkg.fileName,
+          template: assembled.input.template,
+          templateChosenBecause: assembled.templateReason,
+          company: { name: assembled.input.company.name, uen: assembled.input.company.uen },
+          period: assembled.input.period,
+          size: assembled.size,
+          issueCounts: { genuine: genuine.length, possible: possible.length },
+          issues: pkg.issues,
+          files: pkg.files.map((f) => f.name),
+          readyToFile: genuine.length === 0,
+          downloadPath: `/api/v1/reports/xbrl?fiscalYearEnd=${params.fiscalYearEnd}&format=zip`,
+        };
       })
   );
 }

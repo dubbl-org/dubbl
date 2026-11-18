@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { creditNote, creditNoteLine } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -7,6 +8,18 @@ import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { logAudit, diffChanges } from "@/lib/api/audit";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
+
+// Header fields safe to patch on a draft credit note (whitelist — a blind
+// spread would let the caller overwrite totals, status, ids or audit columns).
+const updateHeaderSchema = z
+  .object({
+    contactId: z.string().uuid().optional(),
+    issueDate: z.string().min(1).optional(),
+    reference: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    currencyCode: z.string().min(1).optional(),
+  })
+  .partial();
 
 export async function GET(
   request: Request,
@@ -62,11 +75,16 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    const parsed = updateHeaderSchema.parse(await request.json());
     const [updated] = await db
       .update(creditNote)
-      .set({ ...body, updatedAt: new Date() })
-      .where(eq(creditNote.id, id))
+      .set({ ...parsed, updatedAt: new Date() })
+      .where(
+        and(
+          eq(creditNote.id, id),
+          eq(creditNote.organizationId, ctx.organizationId)
+        )
+      )
       .returning();
 
     logAudit({ ctx, action: "update", entityType: "credit_note", entityId: id, changes: diffChanges(existing as Record<string, unknown>, updated as Record<string, unknown>), request });

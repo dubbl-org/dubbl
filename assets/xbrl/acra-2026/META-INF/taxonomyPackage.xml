@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--                     
+            *************** taxonomy package file 2026-01-01*************
+			
+   		*************** All rights reserved. No part of this publication may be produced or transmitted in any form or by any means, 
+					   including photocopying and recording, without attributing the publication to the Accounting and Corporate Regulatory Authority (ACRA) of Singapore
+					   and shall be restricted to non-commercial use only. *************** 
+ -->
+<tp:taxonomyPackage xmlns:tp="http://xbrl.org/2016/taxonomy-package" xml:lang="en" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.xbrl.org/2016/taxonomy-package.xsd">
+
+
+	<tp:identifier>https://www.bizfinx.gov.sg/taxonomy/2026-01-01/</tp:identifier>
+	<tp:name lang="en">ACRA Taxonomy</tp:name>
+	<tp:description lang="en">ACRA Taxonomy for full set of financial statements and financial statements highlights in XBRL </tp:description>
+	<tp:version>2026v1.0</tp:version>
+	<tp:publisher lang="en">Accounting and Corporate Regulatory Authority</tp:publisher>
+	<tp:publisherURL>www.acra.gov.sg</tp:publisherURL>
+	<tp:publisherCountry>SG</tp:publisherCountry>
+	<tp:publicationDate>2026-01-13</tp:publicationDate>
+
+
+
+	<tp:entryPoints>
+		<tp:entryPoint>
+			<tp:name lang="en">Companies preparing financial statements using Full XBRL</tp:name>
+			<tp:version>2026v1.0</tp:version>
+			<tp:entryPointDocument href="https://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sfrs-ent_2026-01-01.xsd" />
+		</tp:entryPoint>
+		
+			<tp:entryPoint>
+			<tp:name lang="en">Companies preparing financial statements using Simplified XBRL</tp:name>
+			<tp:version>2026v1.0</tp:version>
+			<tp:entryPointDocument href="https://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-sim-ent_2026-01-01.xsd" />
+		</tp:entryPoint>
+		
+		
+			<tp:entryPoint>
+			<tp:name lang="en">Insurance companies preparing financial statements highlights</tp:name>
+			<tp:version>2026v1.0</tp:version>
+			<tp:entryPointDocument href="https://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-ins-ent_2026-01-01.xsd" />
+		</tp:entryPoint>
+		
+			<tp:entryPoint>
+			<tp:name lang="en">Banks and Finance companies preparing financial statements highlights</tp:name>
+			<tp:version>2026v1.0</tp:version>
+			<tp:entryPointDocument href="https://www.bizfinx.gov.sg/taxonomy/2026-01-01/sg-fsh-bfc-ent_2026-01-01.xsd" />
+		</tp:entryPoint>
+		
+		
+			
+		
+				
+
+	</tp:entryPoints>
+</tp:taxonomyPackage>
