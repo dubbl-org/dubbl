@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectNote } from "@/lib/db/schema";
+import { project, projectNote, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -34,7 +34,7 @@ export async function GET(
     const notes = await db.query.projectNote.findMany({
       where: eq(projectNote.projectId, id),
       orderBy: desc(projectNote.createdAt),
-      with: { author: true },
+      with: { author: { columns: publicUserColumns } },
     });
 
     return NextResponse.json({ notes });
@@ -78,7 +78,7 @@ export async function POST(
     // Fetch with author
     const note = await db.query.projectNote.findFirst({
       where: eq(projectNote.id, created.id),
-      with: { author: true },
+      with: { author: { columns: publicUserColumns } },
     });
 
     return NextResponse.json({ note }, { status: 201 });
@@ -132,7 +132,7 @@ export async function PATCH(
 
     const note = await db.query.projectNote.findFirst({
       where: eq(projectNote.id, updated.id),
-      with: { author: true },
+      with: { author: { columns: publicUserColumns } },
     });
 
     return NextResponse.json({ note });

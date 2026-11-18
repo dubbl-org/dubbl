@@ -6,8 +6,7 @@ import {
   projectBillableItem,
   timeEntry,
   invoice,
-  invoiceLine,
-} from "@/lib/db/schema";
+  invoiceLine, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, isNull, inArray, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -361,7 +360,7 @@ export async function GET(
           eq(timeEntry.isBillable, true),
           isNull(timeEntry.invoiceId)
         ),
-        with: { user: true, task: true },
+        with: { user: { columns: publicUserColumns }, task: true },
       });
 
       const totalAmount = entries.reduce((s, e) => {

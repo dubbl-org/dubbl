@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import {
   approvalRequest,
   approvalWorkflowStep,
-  member,
-} from "@/lib/db/schema";
+  member, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError } from "@/lib/api/response";
@@ -53,10 +52,10 @@ export async function GET(request: Request) {
         with: {
           workflow: {
             with: {
-              steps: { with: { approver: { with: { user: true } } } },
+              steps: { with: { approver: { with: { user: { columns: publicUserColumns } } } } },
             },
           },
-          requestedBy: { with: { user: true } },
+          requestedBy: { with: { user: { columns: publicUserColumns } } },
         },
       });
 
@@ -78,10 +77,10 @@ export async function GET(request: Request) {
         with: {
           workflow: {
             with: {
-              steps: { with: { approver: { with: { user: true } } } },
+              steps: { with: { approver: { with: { user: { columns: publicUserColumns } } } } },
             },
           },
-          requestedBy: { with: { user: true } },
+          requestedBy: { with: { user: { columns: publicUserColumns } } },
         },
       });
 
