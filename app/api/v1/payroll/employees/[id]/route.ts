@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payrollEmployee } from "@/lib/db/schema";
+import { payrollEmployee, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -39,7 +39,7 @@ export async function GET(
         eq(payrollEmployee.organizationId, ctx.organizationId),
         notDeleted(payrollEmployee.deletedAt)
       ),
-      with: { member: { with: { user: true } } },
+      with: { member: { with: { user: { columns: publicUserColumns } } } },
     });
 
     if (!employee) return notFound("Employee");

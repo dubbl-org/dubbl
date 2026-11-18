@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, validationError, created, ok } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -101,9 +102,12 @@ export async function POST(request: Request) {
     }
 
     // Create new opening balance journal entry
+    await assertNotLocked(ctx.organizationId, parsed.date, ctx);
+
     const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
     const [entry] = await db
+
       .insert(journalEntry)
       .values({
         organizationId: ctx.organizationId,

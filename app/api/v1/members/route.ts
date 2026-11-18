@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { member, users, organization } from "@/lib/db/schema";
+import { member, users, organization, publicUserColumns } from "@/lib/db/schema";
 import { subscription } from "@/lib/db/schema/billing";
 import { eq, and, count } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     const members = await db.query.member.findMany({
       where: eq(member.organizationId, ctx.organizationId),
-      with: { user: true, customRole: true },
+      with: { user: { columns: publicUserColumns }, customRole: true },
     });
 
     return NextResponse.json({

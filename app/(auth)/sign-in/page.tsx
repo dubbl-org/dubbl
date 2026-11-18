@@ -1,5 +1,6 @@
 "use client";
 
+import { setActiveOrgId } from "@/lib/active-org";
 import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, safeCallbackUrl } from "@/lib/utils";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -63,10 +64,14 @@ interface ProvidersConfig {
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"), "/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    searchParams.get("error") === "2fa_required"
+      ? "This account has two-factor authentication enabled. Sign in with your email, password and code."
+      : ""
+  );
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [providers, setProviders] = useState<ProvidersConfig | null>(null);
@@ -122,7 +127,7 @@ function SignInContent() {
       if (!seedRes.ok) throw new Error("Failed to seed dev user");
       const { credentials, organizationId } = await seedRes.json();
 
-      localStorage.setItem("activeOrgId", organizationId);
+      setActiveOrgId(organizationId);
 
       const res = await signIn("credentials", {
         email: credentials.email,

@@ -5,6 +5,7 @@ import { stripe } from "@/lib/stripe";
 import { ensureStripeAccounts } from "@/lib/integrations/stripe/accounts";
 import { eq, and } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
+import { decodeStripeState } from "@/lib/integrations/stripe/state";
 
 export async function GET(request: Request) {
   if (!stripe) {
@@ -29,11 +30,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Decode state
-    let stateData: { orgId: string; userId: string; nonce: string; label?: string };
-    try {
-      stateData = JSON.parse(Buffer.from(state, "base64url").toString());
-    } catch {
+    // Decode + verify the signed state (see lib/integrations/stripe/state.ts).
+    const stateData = state ? decodeStripeState(state) : null;
+    if (!stateData) {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL}/settings/integrations/stripe?error=invalid_state`
       );

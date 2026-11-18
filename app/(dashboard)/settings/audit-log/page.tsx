@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/shared/date-picker";
 import {
   Select,
   SelectContent,
@@ -40,8 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ContentReveal } from "@/components/ui/content-reveal";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { FormSkeleton } from "@/components/dashboard/skeletons";
 import { cn } from "@/lib/utils";
 
 interface AuditEntry {
@@ -301,7 +301,7 @@ export default function AuditLogPage() {
     return counts;
   }, [allEntries]);
 
-  if (loading && entries.length === 0) return <BrandLoader />;
+  if (loading && entries.length === 0) return <FormSkeleton />;
 
   return (
     <ContentReveal className="space-y-5">

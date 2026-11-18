@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { inventoryItem, inventoryMovement, journalEntry, journalLine } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
@@ -222,8 +223,11 @@ export async function POST(
         })
         .returning();
 
+      await assertNotLocked(ctx.organizationId, today, ctx);
+
       const entryNumber = await getNextEntryNumber(ctx.organizationId, tx);
       const [entry] = await tx
+
         .insert(journalEntry)
         .values({
           organizationId: ctx.organizationId,

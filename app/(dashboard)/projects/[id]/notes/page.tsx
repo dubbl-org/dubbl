@@ -69,11 +69,10 @@ export default function NotesPage() {
     return true;
   });
 
-  // Sort
+  // Sort strictly by the chosen order: a pin is a marker, not a ranking.
+  // Grouping pinned notes first used to override "newest first", so a note you
+  // just wrote appeared at the bottom whenever an older note was pinned.
   const sortedNotes = [...filteredNotes].sort((a, b) => {
-    // Pinned always first
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
     const da = new Date(a.createdAt).getTime();
     const db = new Date(b.createdAt).getTime();
     return sortBy === "newest" ? db - da : da - db;

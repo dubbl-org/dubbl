@@ -18,3 +18,25 @@ export function getErrorMessage(err: unknown, fallback = "Something went wrong")
   }
   return fallback;
 }
+
+/**
+ * Keep a `callbackUrl` on this origin.
+ *
+ * Taken verbatim from upstream's light-monochrome theme branch: a callback that
+ * arrives in the query string is attacker-controlled, so an absolute URL to
+ * another host would turn sign-in into an open redirect. Relative paths are
+ * accepted, protocol-relative (`//evil`) is not.
+ */
+export function safeCallbackUrl(value: string | null, fallback: string): string {
+  if (!value) return fallback
+  if (value.startsWith("/") && !value.startsWith("//")) return value
+  try {
+    const url = new URL(value)
+    if (typeof window !== "undefined" && url.origin === window.location.origin) {
+      return `${url.pathname}${url.search}${url.hash}`
+    }
+  } catch {
+    // not a valid URL, fall through to the fallback
+  }
+  return fallback
+}

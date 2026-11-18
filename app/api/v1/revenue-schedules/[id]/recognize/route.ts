@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { assertNotLocked } from "@/lib/api/period-lock";
 import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 
@@ -111,9 +112,12 @@ export async function POST(
     }
 
     // Create journal entry: DR Deferred Revenue (2300), CR Revenue (4000 or line account)
+    await assertNotLocked(ctx.organizationId, nextEntry.periodDate, ctx);
+
     const entryNumber = await getNextEntryNumber(ctx.organizationId);
 
     const [je] = await db
+
       .insert(journalEntry)
       .values({
         organizationId: ctx.organizationId,

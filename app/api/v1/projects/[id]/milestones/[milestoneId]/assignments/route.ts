@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectMilestone, milestoneAssignment } from "@/lib/db/schema";
+import { project, projectMilestone, milestoneAssignment, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -50,7 +50,7 @@ export async function GET(
       where: eq(milestoneAssignment.milestoneId, milestoneId),
       with: {
         employee: true,
-        member: { with: { user: true } },
+        member: { with: { user: { columns: publicUserColumns } } },
       },
     });
 

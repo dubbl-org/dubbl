@@ -68,8 +68,17 @@ const exchangeRateApiProvider: RateProvider = {
   },
 };
 
+/**
+ * A provider that can answer "what was the rate on this date?". Only the ECB
+ * feed does; the others are latest-only, which is why a backfill requires it.
+ */
+export interface DatedRateProvider {
+  name: string;
+  fetchRatesFor(base: string, date: string): Promise<RateFeed>;
+}
+
 /** Frankfurter / ECB — free, keyless, ~31 major currencies, official daily rates. */
-const frankfurterProvider: RateProvider = {
+const frankfurterProvider: RateProvider & DatedRateProvider = {
   name: "frankfurter",
   async fetchRates(base: string): Promise<RateFeed> {
     const url = `https://api.frankfurter.dev/v1/latest?base=${encodeURIComponent(base)}`;
@@ -84,7 +93,35 @@ const frankfurterProvider: RateProvider = {
     };
     return { date: data.date, base: data.base ?? base, rates: data.rates ?? {} };
   },
+
+  /** The same feed, pinned to a date. Weekends resolve to the prior business day. */
+  async fetchRatesFor(base: string, date: string): Promise<RateFeed> {
+    const url = `https://api.frankfurter.dev/v1/${encodeURIComponent(date)}?base=${encodeURIComponent(base)}`;
+    const res = await fetch(url, { headers: { accept: "application/json" } });
+    if (!res.ok) {
+      throw new Error(`frankfurter ${res.status} for ${base} on ${date}`);
+    }
+    const data = (await res.json()) as {
+      date: string;
+      base: string;
+      rates: Record<string, number>;
+    };
+    return { date: data.date, base: data.base ?? base, rates: data.rates ?? {} };
+  },
 };
+
+/**
+ * The provider used for historical dates.
+ *
+ * `EXCHANGE_RATE_PROVIDER` chooses the *latest* feed, and only two of those can
+ * quote a past date: the ECB one does, the others don't. So a dated lookup
+ * always uses the ECB feed rather than failing whenever the latest feed happens
+ * to be a different one — which is how every default install behaved, since the
+ * default latest feed is not the ECB one.
+ */
+export function datedProvider(): DatedRateProvider {
+  return frankfurterProvider;
+}
 
 /** Open Exchange Rates — ~200 currencies incl. crypto/metals; needs an app id. */
 function openExchangeRatesProvider(appId: string): RateProvider {

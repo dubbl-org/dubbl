@@ -118,6 +118,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Tailwind v4's preflight no longer gives buttons a pointer cursor, so every
+     button rendered as a plain arrow: cards built from <button>, the whole
+     Button component, icon buttons. One rule puts it back. Menu items keep
+     their explicit cursor-default (utilities win over this layer). */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground text-sm antialiased;
   }

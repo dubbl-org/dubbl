@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { bankAccount } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
+import { ensureRateSuite } from "@/lib/currency/rate-backfill";
 import { handleError, notFound, validationError } from "@/lib/api/response";
 import { logAudit } from "@/lib/api/audit";
 import { notDeleted } from "@/lib/db/soft-delete";
@@ -96,6 +97,16 @@ export async function POST(
 
     await logAudit({ ctx, action: "import", entityType: "bank_transaction", entityId: ctx.organizationId,
       changes: { count: result.imported, importId: result.importId, format: result.format, fileName: body.fileName, duplicates: result.duplicateCount }, request });
+
+    // Rates are pulled after the response is sent: an import of a few hundred
+    // rows must not wait on one ECB request per transaction date, and the
+    // postings that need the rate happen later, one at a time.
+    after(async () => {
+      const currencies = [...new Set(result.ratesNeeded ?? [])];
+      for (const currency of currencies) {
+        await ensureRateSuite(ctx.organizationId, currency).catch(() => {});
+      }
+    });
 
     return NextResponse.json({ import: result }, { status: 201 });
   } catch (err) {

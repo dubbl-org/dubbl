@@ -1,0 +1,231 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Gauge } from "lucide-react";
+import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { ReportSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
+import { formatMoney } from "@/lib/money";
+import { cn } from "@/lib/utils";
+
+interface Ratios {
+  currentRatio: number | null;
+  quickRatio: number | null;
+  debtToEquity: number | null;
+  grossMargin: number | null;
+  netMargin: number | null;
+  dso: number | null;
+  dpo: number | null;
+  returnOnAssets: number | null;
+  returnOnEquity: number | null;
+}
+
+interface Balances {
+  totalAssets: number;
+  currentAssets: number;
+  totalLiabilities: number;
+  currentLiabilities: number;
+  totalEquity: number;
+  inventory: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netIncome: number;
+  receivablesDue: number;
+  payablesDue: number;
+}
+
+const ratioInfo: Record<string, { label: string; description: string; format: (v: number) => string; goodWhen: (v: number) => boolean }> = {
+  currentRatio: {
+    label: "Current Ratio",
+    description: "Current assets / current liabilities. Measures short-term liquidity.",
+    format: (v) => `${v}x`,
+    goodWhen: (v) => v >= 1,
+  },
+  quickRatio: {
+    label: "Quick Ratio",
+    description: "Liquid assets (excl. inventory) / current liabilities.",
+    format: (v) => `${v}x`,
+    goodWhen: (v) => v >= 1,
+  },
+  debtToEquity: {
+    label: "Debt to Equity",
+    description: "Total liabilities / total equity. Lower is less leveraged.",
+    format: (v) => `${v}x`,
+    goodWhen: (v) => v <= 2,
+  },
+  grossMargin: {
+    label: "Gross Margin",
+    description: "Revenue minus cost of goods sold as a percentage of revenue.",
+    format: (v) => `${v}%`,
+    goodWhen: (v) => v > 0,
+  },
+  netMargin: {
+    label: "Net Margin",
+    description: "Net income as a percentage of revenue.",
+    format: (v) => `${v}%`,
+    goodWhen: (v) => v > 0,
+  },
+  dso: {
+    label: "Days Sales Outstanding",
+    description: "Average days to collect receivables.",
+    format: (v) => `${v} days`,
+    goodWhen: (v) => v <= 45,
+  },
+  dpo: {
+    label: "Days Payable Outstanding",
+    description: "Average days to pay suppliers.",
+    format: (v) => `${v} days`,
+    goodWhen: (v) => v <= 60,
+  },
+  returnOnAssets: {
+    label: "Return on Assets",
+    description: "Net income / total assets.",
+    format: (v) => `${v}%`,
+    goodWhen: (v) => v > 0,
+  },
+  returnOnEquity: {
+    label: "Return on Equity",
+    description: "Net income / total equity.",
+    format: (v) => `${v}%`,
+    goodWhen: (v) => v > 0,
+  },
+};
+
+export default function FinancialRatiosPage({ initialData }: { initialData: Record<string, unknown> | null }) {
+  const srv = initialData ?? {};
+  const now = new Date();
+  const [initialLoad, setInitialLoad] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
+  const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
+  const [ratios, setRatios] = useState<Ratios | null>(null);
+  const [balances, setBalances] = useState<Balances | null>(null);
+
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;   // the server rendered the default query
+    }
+    const orgId = localStorage.getItem("activeOrgId");
+    if (!orgId) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    const params = new URLSearchParams({ startDate, endDate });
+    fetch(`/api/v1/reports/financial-ratios?${params}`, {
+      headers: { "x-organization-id": orgId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setRatios(data.ratios || null);
+        setBalances(data.balances || null);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setInitialLoad(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [startDate, endDate]);
+
+  if (initialLoad) return <ReportSkeleton />;
+
+  return (
+    <ContentReveal className="space-y-6">
+      <Link href="/reports" className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="size-3.5" /> Back to reports
+      </Link>
+
+      <PageHeader
+        title="Business health signals"
+        description="Quick measures of how easily you can cover bills and how strong your margins are."
+      />
+
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+      />
+
+      {loading ? (
+        <BrandLoader className="h-48" />
+      ) : !ratios ? (
+        <ContentReveal>
+          <div className="rounded-xl border border-dashed py-12 text-center">
+            <p className="text-sm text-muted-foreground">No financial data available.</p>
+          </div>
+        </ContentReveal>
+      ) : (
+        <ContentReveal>
+          {/* Ratio Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(ratioInfo).map(([key, info]) => {
+              const value = ratios[key as keyof Ratios];
+              if (value === null) return null;
+              const good = info.goodWhen(value);
+              return (
+                <div key={key} className="rounded-lg border p-4 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{info.label}</p>
+                    <Gauge className="size-3.5 text-muted-foreground/50" />
+                  </div>
+                  <p className={cn(
+                    "text-2xl font-bold font-mono tabular-nums truncate",
+                    good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                  )}>
+                    {info.format(value)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground leading-tight">{info.description}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Underlying Balances */}
+          {balances && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-3">Underlying Balances</p>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {[
+                      ["Total Assets", balances.totalAssets],
+                      ["Current Assets", balances.currentAssets],
+                      ["Inventory", balances.inventory],
+                      ["Total Liabilities", balances.totalLiabilities],
+                      ["Current Liabilities", balances.currentLiabilities],
+                      ["Total Equity", balances.totalEquity],
+                      ["Revenue (Period)", balances.totalRevenue],
+                      ["Expenses (Period)", balances.totalExpenses],
+                      ["Net Income (Period)", balances.netIncome],
+                      ["Receivables Due", balances.receivablesDue],
+                      ["Payables Due", balances.payablesDue],
+                    ].map(([label, value]) => (
+                      <tr key={label as string} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 text-muted-foreground">{label as string}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums font-medium">
+                          {formatMoney(value as number)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </ContentReveal>
+      )}
+    </ContentReveal>
+  );
+}
+
+/** Cast a payload field back to the type the setter expects. */
+function seed<T>(value: unknown, fallback: T): T {
+  return (value ?? fallback) as T;
+}

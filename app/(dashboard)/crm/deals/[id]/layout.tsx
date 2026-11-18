@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -18,8 +19,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useEntityTitle } from "@/lib/hooks/use-entity-title";
 import { formatMoney } from "@/lib/money";
@@ -221,7 +222,7 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
     : pathname.endsWith("/settings") ? "settings"
     : "overview";
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   if (!deal) {
     return (
@@ -397,9 +398,9 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
               : `/crm/deals/${id}/${t.value}`;
             const active = activeTab === t.value;
             return (
-              <button
+              <Link
                 key={t.value}
-                onClick={() => router.push(tabHref)}
+                href={tabHref}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 pb-2.5 pt-3 text-[13px] font-medium transition-colors",
                   active
@@ -409,7 +410,7 @@ export default function DealDetailLayout({ children }: { children: React.ReactNo
               >
                 <Icon className="size-3.5" />
                 {t.label}
-              </button>
+              </Link>
             );
           })}
         </nav>

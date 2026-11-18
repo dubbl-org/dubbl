@@ -88,6 +88,7 @@ import { eq, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { DEFAULT_ACCOUNTS } from "./default-accounts";
 import { getIsoCurrencies } from "../currency/iso4217";
+import { publicUserColumns } from "@/lib/db/schema";
 
 // The full active ISO 4217 set (codes/names/symbols/minor units from ICU),
 // so the demo seed and the runtime self-heal share one source of truth.
@@ -156,14 +157,14 @@ async function seed() {
   const existingMember = devUser
     ? (await db.query.member.findFirst({
         where: eq(member.userId, devUser.id),
-        with: { user: true, organization: true },
+        with: { user: { columns: publicUserColumns }, organization: true },
       }))
     : null;
 
   const resolvedMember = existingMember ??
     (await db.query.member.findFirst({
       where: eq(member.role, "owner"),
-      with: { user: true, organization: true },
+      with: { user: { columns: publicUserColumns }, organization: true },
     }));
 
   let userId: string;

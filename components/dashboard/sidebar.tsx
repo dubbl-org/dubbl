@@ -29,21 +29,21 @@ import { useCreateDrawer } from "./create-drawer";
 import { cn } from "@/lib/utils";
 
 // Animated icons
-import { GaugeIcon } from "@/components/ui/gauge";
-import { FileTextIcon } from "@/components/ui/file-text";
-import { CartIcon } from "@/components/ui/cart";
-import { HandCoinsIcon } from "@/components/ui/hand-coins";
-import { ArrowLeftRightAnimatedIcon } from "@/components/ui/arrow-left-right-animated";
-import { LayersIcon } from "@/components/ui/layers";
-import { ChartLineIcon } from "@/components/ui/chart-line";
-import { SettingsIcon } from "@/components/ui/settings";
-import { CircleHelpIcon } from "@/components/ui/circle-help";
-import { ReceiptAnimatedIcon } from "@/components/ui/receipt-animated";
-import { LandmarkAnimatedIcon } from "@/components/ui/landmark-animated";
-import { UsersAnimatedIcon } from "@/components/ui/users-animated";
-import { TargetIcon } from "@/components/ui/target";
-import { FolderOpenIcon } from "@/components/ui/folder-open";
-import { PercentAnimatedIcon } from "@/components/ui/percent-animated";
+import { GaugeIcon } from "@/components/icons/gauge";
+import { FileTextIcon } from "@/components/icons/file-text";
+import { CartIcon } from "@/components/icons/cart";
+import { HandCoinsIcon } from "@/components/icons/hand-coins";
+import { ArrowLeftRightAnimatedIcon } from "@/components/icons/arrow-left-right-animated";
+import { LayersIcon } from "@/components/icons/layers";
+import { ChartLineIcon } from "@/components/icons/chart-line";
+import { SettingsIcon } from "@/components/icons/settings";
+import { CircleHelpIcon } from "@/components/icons/circle-help";
+import { ReceiptAnimatedIcon } from "@/components/icons/receipt-animated";
+import { LandmarkAnimatedIcon } from "@/components/icons/landmark-animated";
+import { UsersAnimatedIcon } from "@/components/icons/users-animated";
+import { TargetIcon } from "@/components/icons/target";
+import { FolderOpenIcon } from "@/components/icons/folder-open";
+import { PercentAnimatedIcon } from "@/components/icons/percent-animated";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnimatedIcon = React.ForwardRefExoticComponent<any>;

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { attachment } from "@/lib/db/schema";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
-import { getUploadUrl } from "@/lib/s3";
+import { getUploadUrl, validateUpload } from "@/lib/s3";
+import { rateLimit, clientIp } from "@/lib/api/rate-limit";
 import { nanoid } from "nanoid";
 import { checkStorageLimit, LimitExceededError } from "@/lib/api/check-limit";
 import { z } from "zod";
@@ -17,13 +18,23 @@ const presignSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    if (!rateLimit(`presign:${ctx.organizationId}`, 60)) {
+      return NextResponse.json({ error: "Too many uploads, try again later" }, { status: 429 });
+    }
     const body = await request.json();
     const parsed = presignSchema.parse(body);
+
+    const uploadError = validateUpload(parsed.contentType, parsed.fileSize);
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError }, { status: 400 });
+    }
 
     await checkStorageLimit(ctx.organizationId, parsed.fileSize);
 
     const fileKey = `${ctx.organizationId}/${nanoid()}/${parsed.fileName}`;
-    const uploadUrl = await getUploadUrl(fileKey, parsed.contentType);
+    // Signing ContentLength binds the upload to the declared size: the storage
+    // provider rejects the PUT if the browser sends a different body length.
+    const uploadUrl = await getUploadUrl(fileKey, parsed.contentType, parsed.fileSize);
 
     const [att] = await db
       .insert(attachment)

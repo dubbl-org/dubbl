@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invitation } from "@/lib/db/schema";
+import { invitation, publicUserColumns } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 // Public endpoint - returns basic info about an invitation (no auth required)
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const inv = await db.query.invitation.findFirst({
     where: eq(invitation.token, token),
-    with: { organization: true, invitedBy: true },
+    with: { organization: true, invitedBy: { columns: publicUserColumns } },
   });
 
   if (!inv) {

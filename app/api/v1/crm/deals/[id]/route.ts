@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { deal } from "@/lib/db/schema";
+import { deal, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
@@ -21,7 +21,7 @@ export async function GET(
         eq(deal.organizationId, ctx.organizationId),
         notDeleted(deal.deletedAt)
       ),
-      with: { contact: true, assignedUser: true, activities: true, pipeline: true },
+      with: { contact: true, assignedUser: { columns: publicUserColumns }, activities: true, pipeline: true },
     });
 
     if (!d) return notFound("Deal");

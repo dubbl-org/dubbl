@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { webhook } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
+import { requireRole } from "@/lib/api/require-role";
 import { handleError, notFound } from "@/lib/api/response";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { logAudit } from "@/lib/api/audit";
@@ -15,6 +16,7 @@ const unsubscribeSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthContext(request);
+    requireRole(ctx, "manage:webhooks");
 
     const body = await request.json();
     const parsed = unsubscribeSchema.parse(body);

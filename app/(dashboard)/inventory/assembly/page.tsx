@@ -5,8 +5,8 @@ import { Cog, Play, CheckCircle2, XCircle, ClipboardList, ArrowRightLeft, BarCha
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
-import { ContentReveal } from "@/components/ui/content-reveal";
+import { ListSkeleton } from "@/components/dashboard/skeletons";
+import { ContentReveal } from "@/components/shared/content-reveal";
 import { useConfirm } from "@/lib/hooks/use-confirm";
 import { useDocumentTitle } from "@/lib/hooks/use-document-title";
 
@@ -84,7 +84,7 @@ export default function AssemblyOrdersPage() {
     toast.success("Assembly started");
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <ListSkeleton />;
 
   return (
     <ContentReveal>

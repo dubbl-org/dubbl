@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { invitation, member, users, organization } from "@/lib/db/schema";
+import { invitation, member, users, organization, publicUserColumns } from "@/lib/db/schema";
 import { subscription } from "@/lib/db/schema/billing";
 import { eq, and, count } from "drizzle-orm";
 import { getAuthContext, AuthError } from "@/lib/api/auth-context";
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     const invitations = await db.query.invitation.findMany({
       where: eq(invitation.organizationId, ctx.organizationId),
-      with: { invitedBy: true },
+      with: { invitedBy: { columns: publicUserColumns } },
       orderBy: (inv, { desc }) => [desc(inv.createdAt)],
     });
 

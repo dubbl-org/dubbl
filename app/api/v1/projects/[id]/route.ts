@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project } from "@/lib/db/schema";
+import { project, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -52,35 +52,35 @@ export async function GET(
       with: {
         contact: true,
         timeEntries: {
-          with: { user: true, task: true },
+          with: { user: { columns: publicUserColumns }, task: true },
         },
         members: {
           with: {
             member: {
-              with: { user: true },
+              with: { user: { columns: publicUserColumns } },
             },
           },
         },
         tasks: {
           with: {
-            assignee: { with: { user: true } },
+            assignee: { with: { user: { columns: publicUserColumns } } },
             team: true,
-            createdBy: true,
+            createdBy: { columns: publicUserColumns },
             checklist: true,
-            comments: { with: { author: true } },
+            comments: { with: { author: { columns: publicUserColumns } } },
           },
         },
         labels: true,
         teams: {
           with: {
             members: {
-              with: { member: { with: { user: true } } },
+              with: { member: { with: { user: { columns: publicUserColumns } } } },
             },
           },
         },
         milestones: true,
         notes: {
-          with: { author: true },
+          with: { author: { columns: publicUserColumns } },
         },
         runningTimers: {
           with: { task: true },

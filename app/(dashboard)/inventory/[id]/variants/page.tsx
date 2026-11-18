@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Layers, Plus } from "lucide-react";
-import { BrandLoader } from "@/components/dashboard/brand-loader";
+import { DetailSkeleton } from "@/components/dashboard/skeletons";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
+import { CurrencyInput } from "@/components/shared/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -87,7 +87,7 @@ export default function InventoryItemVariantsPage() {
     }
   }
 
-  if (loading) return <BrandLoader />;
+  if (loading) return <DetailSkeleton />;
 
   return (
     <>

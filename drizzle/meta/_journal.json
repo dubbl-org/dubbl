@@ -36,6 +36,13 @@
       "when": 1782035443582,
       "tag": "0004_faithful_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792574692823,
+      "tag": "0005_easy_amazoness",
+      "breakpoints": true
     }
   ]
 }
