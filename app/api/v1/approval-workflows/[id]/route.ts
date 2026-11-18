@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { approvalWorkflow, approvalWorkflowStep } from "@/lib/db/schema";
+import { approvalWorkflow, approvalWorkflowStep, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -52,7 +52,7 @@ export async function GET(
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: publicUserColumns } } } },
         },
       },
     });
@@ -115,7 +115,7 @@ export async function PATCH(
       with: {
         steps: {
           orderBy: asc(approvalWorkflowStep.stepOrder),
-          with: { approver: { with: { user: true } } },
+          with: { approver: { with: { user: { columns: publicUserColumns } } } },
         },
       },
     });

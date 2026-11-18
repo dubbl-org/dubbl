@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { project, projectTask, taskComment } from "@/lib/db/schema";
+import { project, projectTask, taskComment, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { handleError, notFound } from "@/lib/api/response";
@@ -34,7 +34,7 @@ export async function GET(
     const comments = await db.query.taskComment.findMany({
       where: eq(taskComment.taskId, taskId),
       orderBy: desc(taskComment.createdAt),
-      with: { author: true },
+      with: { author: { columns: publicUserColumns } },
     });
 
     return NextResponse.json({ comments });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { advisorAccess } from "@/lib/db/schema";
+import { advisorAccess, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -13,8 +13,8 @@ export async function GET(request: Request) {
     const advisors = await db.query.advisorAccess.findMany({
       where: eq(advisorAccess.organizationId, ctx.organizationId),
       with: {
-        advisorUser: true,
-        grantedByUser: true,
+        advisorUser: { columns: publicUserColumns },
+        grantedByUser: { columns: publicUserColumns },
       },
     });
 

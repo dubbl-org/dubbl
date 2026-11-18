@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { deal, pipeline } from "@/lib/db/schema";
+import { deal, pipeline, publicUserColumns } from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 /** Pipelines for the CRM board, mirroring GET /api/v1/crm/pipelines. */
@@ -31,7 +31,7 @@ export async function dealsForPipeline(
 
   const rows = await db.query.deal.findMany({
     where: inPipeline,
-    with: { contact: true, assignedUser: true },
+    with: { contact: true, assignedUser: { columns: publicUserColumns } },
     orderBy: desc(deal.createdAt),
     limit,
   });

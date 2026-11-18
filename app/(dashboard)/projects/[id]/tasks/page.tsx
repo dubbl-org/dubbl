@@ -740,7 +740,7 @@ function TaskDetailDrawer({
   editPriority: string; setEditPriority: (v: string) => void;
   editAssigneeId: string; setEditAssigneeId: (v: string) => void;
   editTeamId: string; setEditTeamId: (v: string) => void;
-  members: { id: string; role: string; member: { id: string; role: string; user: { id: string; name: string | null; email: string; image: string | null } } }[];
+  members: { id: string; role: string; member: { id: string; role: string; user: { id: string; name: string | null; email: string } } }[];
   teams: { id: string; name: string; color: string }[];
   labels: { id: string; name: string; color: string }[];
   newCheckItem: string; setNewCheckItem: (v: string) => void;

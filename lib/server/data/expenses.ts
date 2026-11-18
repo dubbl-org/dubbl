@@ -1,6 +1,12 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { expenseClaim, journalEntry, journalLine, organization } from "@/lib/db/schema";
+import {
+  expenseClaim,
+  journalEntry,
+  journalLine,
+  organization,
+  publicUserColumns,
+} from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { convertAmount } from "@/lib/currency/converter";
 import { getRateStatus } from "@/lib/currency/rate-status";
@@ -20,7 +26,7 @@ export async function listExpenseClaims(organizationId: string, limit = 50) {
     where: and(...conditions),
     orderBy: desc(expenseClaim.createdAt),
     limit,
-    with: { submittedByUser: true },
+    with: { submittedByUser: { columns: publicUserColumns } },
   });
 
   const [count] = await db

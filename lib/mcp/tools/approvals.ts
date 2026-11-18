@@ -5,8 +5,7 @@ import {
   approvalWorkflow,
   approvalWorkflowStep,
   approvalRequest,
-  member,
-} from "@/lib/db/schema";
+  member, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { notDeleted, softDelete } from "@/lib/db/soft-delete";
 import { requireRole } from "@/lib/api/require-role";
@@ -61,7 +60,7 @@ export function registerApprovalTools(server: McpServer, ctx: AuthContext) {
           with: {
             steps: {
               orderBy: asc(approvalWorkflowStep.stepOrder),
-              with: { approver: { with: { user: true } } },
+              with: { approver: { with: { user: { columns: publicUserColumns } } } },
             },
           },
         });
@@ -150,7 +149,7 @@ export function registerApprovalTools(server: McpServer, ctx: AuthContext) {
           with: {
             steps: {
               orderBy: asc(approvalWorkflowStep.stepOrder),
-              with: { approver: { with: { user: true } } },
+              with: { approver: { with: { user: { columns: publicUserColumns } } } },
             },
           },
         });
@@ -240,7 +239,7 @@ export function registerApprovalTools(server: McpServer, ctx: AuthContext) {
           with: {
             steps: {
               orderBy: asc(approvalWorkflowStep.stepOrder),
-              with: { approver: { with: { user: true } } },
+              with: { approver: { with: { user: { columns: publicUserColumns } } } },
             },
           },
         });
@@ -330,7 +329,7 @@ export function registerApprovalTools(server: McpServer, ctx: AuthContext) {
           offset,
           with: {
             workflow: true,
-            requestedBy: { with: { user: true } },
+            requestedBy: { with: { user: { columns: publicUserColumns } } },
           },
         });
 
@@ -367,13 +366,13 @@ export function registerApprovalTools(server: McpServer, ctx: AuthContext) {
               with: {
                 steps: {
                   orderBy: asc(approvalWorkflowStep.stepOrder),
-                  with: { approver: { with: { user: true } } },
+                  with: { approver: { with: { user: { columns: publicUserColumns } } } },
                 },
               },
             },
-            requestedBy: { with: { user: true } },
+            requestedBy: { with: { user: { columns: publicUserColumns } } },
             actions: {
-              with: { user: { with: { user: true } }, step: true },
+              with: { user: { with: { user: { columns: publicUserColumns } } }, step: true },
             },
           },
         });

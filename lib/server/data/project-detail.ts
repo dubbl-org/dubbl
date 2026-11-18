@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { project } from "@/lib/db/schema";
+import { project, publicUserColumns } from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 /**
@@ -19,21 +19,21 @@ export async function getProjectDetail(organizationId: string, projectId: string
     ),
     with: {
       contact: true,
-      timeEntries: { with: { user: true, task: true } },
-      members: { with: { member: { with: { user: true } } } },
+      timeEntries: { with: { user: { columns: publicUserColumns }, task: true } },
+      members: { with: { member: { with: { user: { columns: publicUserColumns } } } } },
       tasks: {
         with: {
-          assignee: { with: { user: true } },
+          assignee: { with: { user: { columns: publicUserColumns } } },
           team: true,
-          createdBy: true,
+          createdBy: { columns: publicUserColumns },
           checklist: true,
-          comments: { with: { author: true } },
+          comments: { with: { author: { columns: publicUserColumns } } },
         },
       },
       labels: true,
-      teams: { with: { members: { with: { member: { with: { user: true } } } } } },
+      teams: { with: { members: { with: { member: { with: { user: { columns: publicUserColumns } } } } } } },
       milestones: true,
-      notes: { with: { author: true } },
+      notes: { with: { author: { columns: publicUserColumns } } },
       runningTimers: { with: { task: true } },
     },
   });

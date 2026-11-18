@@ -24,7 +24,7 @@ interface ProjectMember {
   role: string;
   member: {
     id: string;
-    user: { name: string | null; email: string; image: string | null };
+    user: { name: string | null; email: string };
   };
 }
 

@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { project } from "@/lib/db/schema";
+import { project, publicUserColumns } from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 /**
@@ -25,7 +25,7 @@ export async function listProjects(organizationId: string, status?: string) {
     orderBy: desc(project.createdAt),
     with: {
       contact: true,
-      members: { with: { member: { with: { user: true } } } },
+      members: { with: { member: { with: { user: { columns: publicUserColumns } } } } },
       tasks: true,
     },
   });

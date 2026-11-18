@@ -11,7 +11,7 @@ export interface ProjectMemberData {
   member: {
     id: string;
     role: string;
-    user: { id: string; name: string | null; email: string; image: string | null };
+    user: { id: string; name: string | null; email: string };
   };
 }
 
@@ -53,7 +53,7 @@ export interface TaskData {
   assignee: {
     id: string;
     role: string;
-    user: { id: string; name: string | null; email: string; image: string | null };
+    user: { id: string; name: string | null; email: string };
   } | null;
   team: { id: string; name: string; color: string } | null;
   createdBy: { id: string; name: string | null; email: string } | null;
@@ -70,7 +70,7 @@ export interface TeamData {
     member: {
       id: string;
       role: string;
-      user: { id: string; name: string | null; email: string; image: string | null };
+      user: { id: string; name: string | null; email: string };
     };
   }[];
 }

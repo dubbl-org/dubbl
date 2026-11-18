@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { expenseClaim, expenseItem } from "@/lib/db/schema";
+import { expenseClaim, expenseItem, publicUserColumns } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -43,8 +43,8 @@ export async function GET(
         notDeleted(expenseClaim.deletedAt)
       ),
       with: {
-        submittedByUser: true,
-        approvedByUser: true,
+        submittedByUser: { columns: publicUserColumns },
+        approvedByUser: { columns: publicUserColumns },
         items: {
           with: { account: true },
           orderBy: (items, { asc }) => [asc(items.sortOrder)],
