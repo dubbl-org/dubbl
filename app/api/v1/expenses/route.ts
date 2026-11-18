@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { expenseClaim, expenseItem } from "@/lib/db/schema";
+import { expenseClaim, expenseItem, publicUserColumns } from "@/lib/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api/auth-context";
 import { requireRole } from "@/lib/api/require-role";
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       orderBy: desc(expenseClaim.createdAt),
       limit,
       offset,
-      with: { submittedByUser: true },
+      with: { submittedByUser: { columns: publicUserColumns } },
     });
 
     const [countResult] = await db

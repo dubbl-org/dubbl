@@ -34,6 +34,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/** The only user columns a record may carry out to a client. Never the
+ *  password hash, the site-admin flag or session state. */
+export const publicUserColumns = { id: true, name: true, email: true } as const;
+
 // Per-user TOTP (RFC 6238) two-factor authentication. Opt-in: a row exists
 // once a user begins enrollment; `enabled` flips true only after the first
 // successful code verification. `secret` is the base32 TOTP secret. `backupCodes`

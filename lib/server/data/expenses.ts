@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { expenseClaim } from "@/lib/db/schema";
+import { expenseClaim, publicUserColumns } from "@/lib/db/schema";
 import { notDeleted } from "@/lib/db/soft-delete";
 
 /**
@@ -18,7 +18,7 @@ export async function listExpenseClaims(organizationId: string, limit = 50) {
     where: and(...conditions),
     orderBy: desc(expenseClaim.createdAt),
     limit,
-    with: { submittedByUser: true },
+    with: { submittedByUser: { columns: publicUserColumns } },
   });
 
   const [count] = await db
