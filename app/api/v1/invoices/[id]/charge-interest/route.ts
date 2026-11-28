@@ -26,15 +26,7 @@ const bodySchema = z.object({
   amount: z.number().optional(), // decimal override, converted to cents
 });
 
-async function getNextEntryNumber(organizationId: string) {
-  const [maxResult] = await db
-    .select({
-      max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
-    })
-    .from(journalEntry)
-    .where(eq(journalEntry.organizationId, organizationId));
-  return (maxResult?.max || 0) + 1;
-}
+class InvoiceNoLongerChargeable extends Error {}
 
 export async function POST(
   request: Request,
@@ -112,7 +104,28 @@ export async function POST(
       return validationError("Interest amount must be positive");
     }
 
-    // Create a new invoice for the interest charge
+    // AR and Interest Income must both exist before any write happens: without
+    // them the journal entry would be posted with no lines (unbalanced).
+    const arAccount = await db.query.chartAccount.findFirst({
+      where: and(
+        eq(chartAccount.organizationId, ctx.organizationId),
+        eq(chartAccount.code, "1200")
+      ),
+    });
+    const interestIncomeAccount = await db.query.chartAccount.findFirst({
+      where: and(
+        eq(chartAccount.organizationId, ctx.organizationId),
+        eq(chartAccount.code, "4100")
+      ),
+    });
+    if (!arAccount || !interestIncomeAccount) {
+      return validationError(
+        "Chart of accounts is missing the AR (1200) or Interest Income (4100) account"
+      );
+    }
+
+    // getNextNumber opens its own transaction and we want its row-level lock
+    // released before we open the outer tx, so take it here.
     const invoiceNumber = await getNextNumber(
       ctx.organizationId,
       "invoice",
@@ -120,96 +133,119 @@ export async function POST(
       "INV"
     );
 
-    const [interestInvoice] = await db
-      .insert(invoice)
-      .values({
-        organizationId: ctx.organizationId,
-        contactId: found.contactId,
-        invoiceNumber,
-        issueDate: today,
-        dueDate: today, // due immediately
-        status: "sent",
-        reference: `Interest on ${found.invoiceNumber}`,
-        notes: `Late payment interest charge for invoice ${found.invoiceNumber} (${daysOverdue} days overdue)`,
-        subtotal: interestAmountCents,
-        taxTotal: 0,
-        total: interestAmountCents,
-        amountPaid: 0,
-        amountDue: interestAmountCents,
-        currencyCode: found.currencyCode,
-        createdBy: ctx.userId,
-      })
-      .returning();
+    const { interestInvoice, journalEntry: je } = await db.transaction(
+      async (tx) => {
+        // Lock the source invoice row and re-check the fields the write
+        // depends on. A concurrent payment or void could change amountDue or
+        // status between the pre-read and the posting.
+        const locked = await tx.execute(
+          sql`SELECT id, status, amount_due, due_date FROM invoice
+              WHERE id = ${id} AND organization_id = ${ctx.organizationId} AND deleted_at IS NULL
+              FOR UPDATE`
+        );
+        const lockedRows = Array.isArray(locked)
+          ? locked
+          : (locked as { rows?: unknown[] }).rows ?? [];
+        const lockedRow = lockedRows[0] as
+          | { id: string; status: string; amount_due: number; due_date: string }
+          | undefined;
+        if (!lockedRow) {
+          throw new InvoiceNoLongerChargeable("Invoice not found");
+        }
+        if (
+          lockedRow.status === "draft" ||
+          lockedRow.status === "void" ||
+          lockedRow.status === "paid"
+        ) {
+          throw new InvoiceNoLongerChargeable(
+            "Cannot charge interest on this invoice status"
+          );
+        }
+        if (lockedRow.due_date >= today) {
+          throw new InvoiceNoLongerChargeable("Invoice is not overdue");
+        }
 
-    // Create invoice line
-    await db.insert(invoiceLine).values({
-      invoiceId: interestInvoice.id,
-      description: `Late payment interest on invoice ${found.invoiceNumber} (${daysOverdue} days overdue at ${interestRate / 100}% p.a.)`,
-      quantity: 100, // 1.00
-      unitPrice: interestAmountCents,
-      taxAmount: 0,
-      amount: interestAmountCents,
-      sortOrder: 0,
-    });
+        const [interestInvoice] = await tx
+          .insert(invoice)
+          .values({
+            organizationId: ctx.organizationId,
+            contactId: found.contactId,
+            invoiceNumber,
+            issueDate: today,
+            dueDate: today,
+            status: "sent",
+            reference: `Interest on ${found.invoiceNumber}`,
+            notes: `Late payment interest charge for invoice ${found.invoiceNumber} (${daysOverdue} days overdue)`,
+            subtotal: interestAmountCents,
+            taxTotal: 0,
+            total: interestAmountCents,
+            amountPaid: 0,
+            amountDue: interestAmountCents,
+            currencyCode: found.currencyCode,
+            createdBy: ctx.userId,
+          })
+          .returning();
 
-    // Create journal entry: DR Accounts Receivable, CR Interest Income
-    const entryNumber = await getNextEntryNumber(ctx.organizationId);
+        await tx.insert(invoiceLine).values({
+          invoiceId: interestInvoice.id,
+          description: `Late payment interest on invoice ${found.invoiceNumber} (${daysOverdue} days overdue at ${interestRate / 100}% p.a.)`,
+          quantity: 100,
+          unitPrice: interestAmountCents,
+          taxAmount: 0,
+          amount: interestAmountCents,
+          sortOrder: 0,
+        });
 
-    const [je] = await db
-      .insert(journalEntry)
-      .values({
-        organizationId: ctx.organizationId,
-        entryNumber,
-        date: today,
-        description: `Interest charge for overdue invoice ${found.invoiceNumber}`,
-        reference: invoiceNumber,
-        status: "posted",
-        sourceType: "invoice",
-        sourceId: interestInvoice.id,
-        createdBy: ctx.userId,
-        postedAt: new Date(),
-      })
-      .returning();
+        // Allocate the entry number inside the tx so a rollback un-reserves it.
+        const [{ max }] = await tx
+          .select({
+            max: sql<number>`coalesce(max(${journalEntry.entryNumber}), 0)`,
+          })
+          .from(journalEntry)
+          .where(eq(journalEntry.organizationId, ctx.organizationId));
+        const entryNumber = (max || 0) + 1;
 
-    // Find AR account (code 1200) and Interest Income account (code 4100)
-    const arAccount = await db.query.chartAccount.findFirst({
-      where: and(
-        eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "1200")
-      ),
-    });
+        const [je] = await tx
+          .insert(journalEntry)
+          .values({
+            organizationId: ctx.organizationId,
+            entryNumber,
+            date: today,
+            description: `Interest charge for overdue invoice ${found.invoiceNumber}`,
+            reference: invoiceNumber,
+            status: "posted",
+            sourceType: "invoice",
+            sourceId: interestInvoice.id,
+            createdBy: ctx.userId,
+            postedAt: new Date(),
+          })
+          .returning();
 
-    const interestIncomeAccount = await db.query.chartAccount.findFirst({
-      where: and(
-        eq(chartAccount.organizationId, ctx.organizationId),
-        eq(chartAccount.code, "4100")
-      ),
-    });
+        await tx.insert(journalLine).values([
+          {
+            journalEntryId: je.id,
+            accountId: arAccount.id,
+            description: `Interest receivable - ${found.invoiceNumber}`,
+            debitAmount: interestAmountCents,
+            creditAmount: 0,
+          },
+          {
+            journalEntryId: je.id,
+            accountId: interestIncomeAccount.id,
+            description: `Interest income - ${found.invoiceNumber}`,
+            debitAmount: 0,
+            creditAmount: interestAmountCents,
+          },
+        ]);
 
-    if (arAccount && interestIncomeAccount) {
-      await db.insert(journalLine).values([
-        {
-          journalEntryId: je.id,
-          accountId: arAccount.id,
-          description: `Interest receivable - ${found.invoiceNumber}`,
-          debitAmount: interestAmountCents,
-          creditAmount: 0,
-        },
-        {
-          journalEntryId: je.id,
-          accountId: interestIncomeAccount.id,
-          description: `Interest income - ${found.invoiceNumber}`,
-          debitAmount: 0,
-          creditAmount: interestAmountCents,
-        },
-      ]);
-    }
+        await tx
+          .update(invoice)
+          .set({ journalEntryId: je.id })
+          .where(eq(invoice.id, interestInvoice.id));
 
-    // Link journal entry to the interest invoice
-    await db
-      .update(invoice)
-      .set({ journalEntryId: je.id })
-      .where(eq(invoice.id, interestInvoice.id));
+        return { interestInvoice, journalEntry: je };
+      }
+    );
 
     logAudit({ ctx, action: "charge_interest", entityType: "invoice", entityId: id, changes: { previousStatus: found.status }, request });
 
@@ -224,6 +260,9 @@ export async function POST(
       { status: 201 }
     );
   } catch (err) {
+    if (err instanceof InvoiceNoLongerChargeable) {
+      return validationError(err.message);
+    }
     return handleError(err);
   }
 }

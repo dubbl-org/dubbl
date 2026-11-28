@@ -117,6 +117,7 @@ export async function GET(request: Request) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
+    console.error("[DEBUG organization GET]", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

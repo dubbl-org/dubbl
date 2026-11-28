@@ -19,6 +19,8 @@ import { eq, and, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { stripe as _stripeClient } from "@/lib/stripe";
 import { getNextNumber } from "@/lib/api/numbering";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
+import { assertNotLocked, PeriodLockedError } from "@/lib/api/period-lock";
 
 // Non-null wrapper - callers (webhook handlers) already guard for null stripe
 const stripe = _stripeClient!;
@@ -1321,26 +1323,103 @@ export async function handleInvoiceVoided(
 
   if (!mapped) return;
 
-  // Void the linked journal entry
-  await db
-    .update(journalEntry)
-    .set({
-      status: "void",
-      voidReason: "Stripe invoice voided",
-      updatedAt: new Date(),
-    })
-    .where(eq(journalEntry.id, mapped.dubblEntityId));
+  // Fast-path idempotency: a prior delivery already marked the map as voided.
+  // The in-tx reversedByEntryId check below is still the source of truth.
+  if ((mapped.metadata as Record<string, unknown> | null)?.voided) return;
 
-  // Update entity map metadata
-  await db
-    .update(stripeEntityMap)
-    .set({
-      metadata: {
-        ...(mapped.metadata as Record<string, unknown> ?? {}),
-        voided: true,
+  // Post a reversing entry instead of flipping the original to status="void":
+  // flipping a posted entry removes the debits/credits from history and makes
+  // the ledger non-replayable. A reversing entry zeroes the balances while
+  // preserving both the original posting and the void event.
+  //
+  // Idempotent on redelivery: reverseJournalEntry links the original via
+  // reversedByEntryId, and we re-check that marker inside the tx.
+  const voidDate = stripeInvoice.status_transitions?.voided_at
+    ? new Date(stripeInvoice.status_transitions.voided_at * 1000)
+        .toISOString()
+        .slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  // Honor the period lock: if the void date is in a closed period, skip rather
+  // than throw (a thrown error here propagates to the Stripe event dispatcher
+  // and triggers retries). A later redelivery after the lock is lifted picks
+  // it up; until then the map metadata is not marked voided.
+  try {
+    await assertNotLocked(integration.organizationId, voidDate);
+  } catch (err) {
+    if (err instanceof PeriodLockedError) {
+      console.warn(
+        `[stripe] skip invoice.voided reversal for ${stripeInvoice.id}: ${err.message}`
+      );
+      return;
+    }
+    throw err;
+  }
+
+  // reverseJournalEntry attributes the reversal to a user; a webhook has no
+  // acting user, so we fall back to the integration's connector. When the
+  // integration row has no connectedBy either, we skip the attribution-
+  // dependent reversal rather than inventing an id.
+  if (!integration.connectedBy) return;
+  const actingUserId = integration.connectedBy;
+
+  const reversed = await db.transaction(async (tx) => {
+    const [original] = await tx
+      .select({
+        id: journalEntry.id,
+        status: journalEntry.status,
+        deletedAt: journalEntry.deletedAt,
+        reversedByEntryId: journalEntry.reversedByEntryId,
+        organizationId: journalEntry.organizationId,
+      })
+      .from(journalEntry)
+      .where(
+        and(
+          eq(journalEntry.id, mapped.dubblEntityId),
+          eq(journalEntry.organizationId, integration.organizationId)
+        )
+      )
+      .for("update");
+    // Only reverse a live, posted, un-reversed entry. If any of the guards
+    // fail we return null and the entity-map voided marker stays unset, so a
+    // human can look at the specific case instead of us silently flagging it
+    // as handled.
+    if (
+      !original ||
+      original.deletedAt ||
+      original.status !== "posted" ||
+      original.reversedByEntryId
+    ) {
+      return null;
+    }
+    return reverseJournalEntry(
+      { organizationId: integration.organizationId, userId: actingUserId },
+      {
+        entryId: mapped.dubblEntityId,
+        date: voidDate,
+        description: "Stripe invoice voided",
+        reference: stripeInvoice.number ?? stripeInvoice.id,
+        sourceType: "stripe_invoice_void",
+        sourceId: stripeInvoice.id,
       },
-    })
-    .where(eq(stripeEntityMap.id, mapped.id));
+      tx
+    );
+  });
+
+  // Mark the entity map so a redelivery skips immediately via the fast-path
+  // check above. (We still re-check reversedByEntryId inside the tx, so the
+  // marker is a hint, not the source of truth.)
+  if (reversed) {
+    await db
+      .update(stripeEntityMap)
+      .set({
+        metadata: {
+          ...(mapped.metadata as Record<string, unknown> ?? {}),
+          voided: true,
+        },
+      })
+      .where(eq(stripeEntityMap.id, mapped.id));
+  }
 }
 
 export async function handleCustomerCreated(
