@@ -19,6 +19,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { notDeleted } from "@/lib/db/soft-delete";
 import { stripe as _stripeClient } from "@/lib/stripe";
 import { getNextNumber } from "@/lib/api/numbering";
+import { reverseJournalEntry } from "@/lib/api/journal-automation";
 
 // Non-null wrapper - callers (webhook handlers) already guard for null stripe
 const stripe = _stripeClient!;
@@ -1321,26 +1322,61 @@ export async function handleInvoiceVoided(
 
   if (!mapped) return;
 
-  // Void the linked journal entry
-  await db
-    .update(journalEntry)
-    .set({
-      status: "void",
-      voidReason: "Stripe invoice voided",
-      updatedAt: new Date(),
-    })
-    .where(eq(journalEntry.id, mapped.dubblEntityId));
+  // Post a reversing entry instead of flipping the original to status="void":
+  // flipping a posted entry removes the debits/credits from history and makes
+  // the ledger non-replayable. A reversing entry zeroes the balances while
+  // preserving both the original posting and the void event.
+  //
+  // Idempotent on redelivery: reverseJournalEntry links the original via
+  // reversedByEntryId, and we re-check that marker inside the tx.
+  const voidDate = stripeInvoice.status_transitions?.voided_at
+    ? new Date(stripeInvoice.status_transitions.voided_at * 1000)
+        .toISOString()
+        .slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
 
-  // Update entity map metadata
-  await db
-    .update(stripeEntityMap)
-    .set({
-      metadata: {
-        ...(mapped.metadata as Record<string, unknown> ?? {}),
-        voided: true,
+  // reverseJournalEntry attributes the reversal to a user; a webhook has no
+  // acting user, so we fall back to the integration's connector. When the
+  // integration row has no connectedBy either, we skip the attribution-
+  // dependent reversal rather than inventing an id.
+  if (!integration.connectedBy) return;
+  const actingUserId = integration.connectedBy;
+
+  const reversed = await db.transaction(async (tx) => {
+    const [original] = await tx
+      .select({ id: journalEntry.id, reversedByEntryId: journalEntry.reversedByEntryId })
+      .from(journalEntry)
+      .where(eq(journalEntry.id, mapped.dubblEntityId))
+      .for("update");
+    if (!original || original.reversedByEntryId) return null;
+    return reverseJournalEntry(
+      { organizationId: integration.organizationId, userId: actingUserId },
+      {
+        entryId: mapped.dubblEntityId,
+        date: voidDate,
+        description: "Stripe invoice voided",
+        reference: stripeInvoice.number ?? stripeInvoice.id,
+        sourceType: "stripe_invoice_void",
+        sourceId: stripeInvoice.id,
       },
-    })
-    .where(eq(stripeEntityMap.id, mapped.id));
+      tx
+    );
+  });
+
+  // Mark the entity map so a redelivery skips immediately. (We still re-check
+  // reversedByEntryId inside the tx above, so the marker is a fast-path hint,
+  // not the source of truth.)
+  if (reversed) {
+    await db
+      .update(stripeEntityMap)
+      .set({
+        metadata: {
+          ...(mapped.metadata as Record<string, unknown> ?? {}),
+          voided: true,
+        },
+      })
+      .where(eq(stripeEntityMap.id, mapped.id));
+  }
 }
 
 export async function handleCustomerCreated(
