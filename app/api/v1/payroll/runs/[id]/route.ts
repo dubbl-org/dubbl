@@ -66,13 +66,32 @@ export async function DELETE(
         await assertNotLocked(ctx.organizationId, run.payPeriodEnd, ctx);
       }
       await db.transaction(async (tx) => {
-        if (run.journalEntryId) {
+        // Claim the run inside the tx by flipping status=completed→void
+        // conditionally. If a concurrent void raced us the UPDATE returns no
+        // row and we post no reversal.
+        const [claimed] = await tx
+          .update(payrollRun)
+          .set({ status: "void" })
+          .where(
+            and(
+              eq(payrollRun.id, id),
+              eq(payrollRun.organizationId, ctx.organizationId),
+              eq(payrollRun.status, "completed")
+            )
+          )
+          .returning({
+            journalEntryId: payrollRun.journalEntryId,
+            payPeriodEnd: payrollRun.payPeriodEnd,
+            payPeriodStart: payrollRun.payPeriodStart,
+          });
+        if (!claimed) return;
+        if (claimed.journalEntryId) {
           await reverseJournalEntry(
             { organizationId: ctx.organizationId, userId: ctx.userId },
             {
-              entryId: run.journalEntryId,
-              date: run.payPeriodEnd,
-              description: `Void payroll ${run.payPeriodStart} to ${run.payPeriodEnd}`,
+              entryId: claimed.journalEntryId,
+              date: claimed.payPeriodEnd,
+              description: `Void payroll ${claimed.payPeriodStart} to ${claimed.payPeriodEnd}`,
               reference: `PR-${run.id.slice(0, 8)}`,
               sourceType: "payroll_void",
               sourceId: run.id,
@@ -80,10 +99,6 @@ export async function DELETE(
             tx
           );
         }
-        await tx
-          .update(payrollRun)
-          .set({ status: "void" })
-          .where(eq(payrollRun.id, id));
       });
 
       logAudit({
